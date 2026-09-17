@@ -6,7 +6,7 @@ import datetime
 import io
 import math
 import zipfile
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
 from horaires.geo import haversine_km
@@ -53,6 +53,7 @@ class Reseau:
     gares: list[Gare]
     connexions: list[Connexion]
     liaisons: list[list[tuple[int, int]]] = field(default_factory=list)  # (voisine, secondes)
+    anomalies: dict[str, int] = field(default_factory=dict)  # lignes sautées, par motif
 
 
 def _lire(z: zipfile.ZipFile, nom: str):
@@ -128,39 +129,91 @@ def liaisons_entre_gares(gares: list[Gare], desservies: list[bool]) -> list[list
     return liaisons
 
 
+def _info(z: zipfile.ZipFile) -> dict:
+    if "feed_info.txt" not in z.namelist():
+        raise ValueError("Archive GTFS sans feed_info.txt : version et dates des horaires inconnues.")
+    info = next(_lire(z, "feed_info.txt"), None) or {}
+    for champ in ("feed_start_date", "feed_version"):
+        if not (info.get(champ) or "").strip():
+            raise ValueError(f"feed_info.txt : champ {champ} vide ou absent.")
+    return info
+
+
+def _gares(z: zipfile.ZipFile, anomalies: Counter) -> tuple[list[Gare], dict[str, str]]:
+    """Zones d'arrêt triées par identifiant, et zone de chaque point d'arrêt."""
+    zones: list[Gare] = []
+    points: dict[str, str] = {}
+    for r in _lire(z, "stops.txt"):
+        type_lieu = (r.get("location_type") or "").strip() or "0"
+        if type_lieu == "1":
+            try:
+                zones.append(Gare(r["stop_id"], r["stop_name"], float(r["stop_lat"]), float(r["stop_lon"])))
+            except (TypeError, ValueError):
+                anomalies["zone sans position"] += 1
+        elif type_lieu == "0":
+            points[r["stop_id"]] = (r.get("parent_station") or "").strip()
+    zones.sort(key=lambda g: g.identifiant)
+    connues = {g.identifiant for g in zones}
+    parent = {}
+    for point, zone in points.items():
+        if zone in connues:
+            parent[point] = zone
+        else:
+            anomalies["point sans zone connue"] += 1
+    return zones, parent
+
+
+def _passages(z: zipfile.ZipFile, trajets: set[str], parent: dict[str, str], anomalies: Counter):
+    """Passages valides des trajets du jour, triés par rang : (rang, arrivée, départ, ligne)."""
+    passages: dict[str, list[tuple[int, int, int, dict]]] = defaultdict(list)
+    for r in _lire(z, "stop_times.txt"):
+        if r["trip_id"] not in trajets:
+            continue
+        if r["stop_id"] not in parent:
+            anomalies["passage vers un point inconnu"] += 1
+            continue
+        try:
+            rang = int(r["stop_sequence"])
+        except (TypeError, ValueError):
+            anomalies["passage sans rang"] += 1
+            continue
+        try:
+            arrivee, depart = _secondes(r["arrival_time"]), _secondes(r["departure_time"])
+        except (TypeError, ValueError):
+            anomalies["passage sans heure"] += 1
+            continue
+        passages[r["trip_id"]].append((rang, arrivee, depart, r))
+    for arrets in passages.values():
+        arrets.sort(key=lambda p: p[0])
+    return passages
+
+
 def charger(contenu: bytes) -> Reseau:
+    anomalies: Counter = Counter()
     with zipfile.ZipFile(io.BytesIO(contenu)) as z:
-        info = next(_lire(z, "feed_info.txt"))
+        info = _info(z)
         services_par_date: dict[str, set[str]] = defaultdict(set)
         for r in _lire(z, "calendar_dates.txt"):
             if r["exception_type"] == "1":
                 services_par_date[r["date"]].add(r["service_id"])
         jour = _choisir_jour(services_par_date, info["feed_start_date"])
         actifs = services_par_date[jour]
-
-        zones = sorted((r for r in _lire(z, "stops.txt") if r["location_type"] == "1"), key=lambda r: r["stop_id"])
-        gares = [Gare(r["stop_id"], r["stop_name"], float(r["stop_lat"]), float(r["stop_lon"])) for r in zones]
+        gares, parent = _gares(z, anomalies)
         indice = {g.identifiant: i for i, g in enumerate(gares)}
-        parent = {r["stop_id"]: r["parent_station"] for r in _lire(z, "stops.txt") if r["location_type"] == "0"}
-
         trajets = {r["trip_id"] for r in _lire(z, "trips.txt") if r["service_id"] in actifs}
-        passages: dict[str, list[dict]] = defaultdict(list)
-        for r in _lire(z, "stop_times.txt"):
-            if r["trip_id"] in trajets:
-                passages[r["trip_id"]].append(r)
+        passages = _passages(z, trajets, parent, anomalies)
 
     connexions: list[Connexion] = []
     for trajet, arrets in passages.items():
-        arrets.sort(key=lambda r: int(r["stop_sequence"]))
-        for a, b in zip(arrets, arrets[1:]):
+        for (_, _, depart, a), (_, arrivee, _, b) in zip(arrets, arrets[1:]):
             de, vers = indice[parent[a["stop_id"]]], indice[parent[b["stop_id"]]]
             if de == vers:
                 continue
             ga, gb = gares[de], gares[vers]
             connexions.append(
                 Connexion(
-                    depart=_secondes(a["departure_time"]),
-                    arrivee=_secondes(b["arrival_time"]),
+                    depart=depart,
+                    arrivee=arrivee,
                     de=de,
                     vers=vers,
                     trajet=trajet,
@@ -174,4 +227,5 @@ def charger(contenu: bytes) -> Reseau:
     desservies = [False] * len(gares)
     for c in connexions:
         desservies[c.de] = desservies[c.vers] = True
-    return Reseau(info["feed_version"], jour, gares, connexions, liaisons_entre_gares(gares, desservies))
+    liaisons = liaisons_entre_gares(gares, desservies)
+    return Reseau(info["feed_version"], jour, gares, connexions, liaisons, dict(anomalies))

@@ -1,7 +1,7 @@
 import unittest
 
 from horaires.gtfs import Gare, charger, liaisons_entre_gares
-from horaires.tests.fabrique import STOP_TIMES, archive
+from horaires.tests.fabrique import FEED_INFO, STOP_TIMES, STOPS, archive
 
 
 class LectureTest(unittest.TestCase):
@@ -79,6 +79,51 @@ class MonteeDescenteTest(unittest.TestCase):
         )
         t2 = next(c for c in charger(archive(stop_times=horaires)).connexions if c.trajet == "T2")
         self.assertEqual((t2.montee, t2.descente), (True, False))
+
+
+class LectureTolerante(unittest.TestCase):
+    def test_lignes_malformees_sautees_et_comptees(self):
+        arrets = (
+            STOPS
+            # location_type vide = point d'arrêt.
+            + "StopPoint:OCETrain TER-9,Beta bis,,45.0000,5.0000,,,,StopArea:OCE2\n"
+            + "StopPoint:OCETrain TER-7,Orphelin,,45.0,5.0,,,0,\n"
+            + "StopPoint:OCETrain TER-8,Perdu,,45.0,5.0,,,0,StopArea:OCE99\n"
+            + "StopArea:OCE6,Sans position,,,,,,1,\n"
+        )
+        horaires = STOP_TIMES + (
+            "T2,09:50:00,09:50:00,StopPoint:OCEInconnu-1,2,,0,0,\n"
+            "T2,,,StopPoint:OCETrain TER-3,3,,0,0,\n"
+            "T3,09:30:00,09:30:00,StopPoint:OCETrain TER-9,2,,0,0,\n"
+            "T3,09:40:00,09:40:00,StopPoint:OCETrain TER-7,3,,0,0,\n"
+            "T3,09:45:00,09:45:00,StopPoint:OCETrain TER-2,x,,0,0,\n"
+        )
+        reseau = charger(archive(stops=arrets, stop_times=horaires))
+        self.assertEqual([g.nom for g in reseau.gares], ["Alpha", "Beta", "Gamma", "Delta"])
+        self.assertEqual(
+            reseau.anomalies,
+            {
+                "zone sans position": 1,
+                "point sans zone connue": 2,
+                "passage vers un point inconnu": 2,
+                "passage sans heure": 1,
+                "passage sans rang": 1,
+            },
+        )
+        # T3 continue vers Beta (point à location_type vide) : Gamma 09:20 -> Beta 09:30.
+        t3 = [(c.de, c.vers) for c in reseau.connexions if c.trajet == "T3"]
+        self.assertEqual(t3, [(1, 2), (2, 1)])
+
+    def test_sans_feed_info_erreur_claire(self):
+        with self.assertRaisesRegex(ValueError, "feed_info.txt"):
+            charger(archive(feed_info=None))
+
+    def test_dates_vides_erreur_claire(self):
+        with self.assertRaisesRegex(ValueError, "feed_start_date"):
+            charger(archive(feed_info=FEED_INFO.replace("20260928,20261031", ",")))
+
+    def test_sans_anomalie(self):
+        self.assertEqual(charger(archive()).anomalies, {})
 
 
 if __name__ == "__main__":

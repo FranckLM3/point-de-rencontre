@@ -5,7 +5,9 @@ import base64
 import datetime
 import json
 import math
+import shutil
 import struct
+import tempfile
 from multiprocessing import Pool
 from pathlib import Path
 
@@ -110,30 +112,50 @@ def _ligne(source: int) -> tuple[int, bytes]:
     return source, encoder_ligne(meilleurs_trajets(_reseau, source, _index))
 
 
-def ecrire_tout(reseau: Reseau, grille: dict, dossier: Path, processus: int) -> None:
-    (dossier / "lignes").mkdir(parents=True, exist_ok=True)
-    desservies = gares_desservies(reseau)
-    stations = [
-        {"nom": g.nom, "lat": g.lat, "lon": g.lon, "desservie": d} for g, d in zip(reseau.gares, desservies)
-    ]
-    (dossier / "stations.json").write_text(json.dumps(stations, ensure_ascii=False))
-    (dossier / "voisins-4km.bin").write_bytes(index_voisins(reseau.gares, grille, desservies))
+def _ecrire_lignes(reseau: Reseau, dossier: Path, processus: int) -> None:
     sources = range(len(reseau.gares))
     if processus == 1:
         _initialiser(reseau)
-        resultats = map(_ligne, sources)
-    else:
-        pool = Pool(processus, initializer=_initialiser, initargs=(reseau,))
-        resultats = pool.imap_unordered(_ligne, sources, chunksize=16)
-    for source, octets in resultats:
-        (dossier / "lignes" / f"{source}.bin").write_bytes(octets)
-    if processus != 1:
-        pool.close()
-        pool.join()
-    version = {
-        "feed_version": reseau.version,
-        "jour": reseau.jour,
-        "genere_le": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
-        "nb_gares": len(reseau.gares),
-    }
-    (dossier / "version.json").write_text(json.dumps(version))
+        for source, octets in map(_ligne, sources):
+            (dossier / f"{source}.bin").write_bytes(octets)
+        return
+    with Pool(processus, initializer=_initialiser, initargs=(reseau,)) as pool:
+        for source, octets in pool.imap_unordered(_ligne, sources, chunksize=16):
+            (dossier / f"{source}.bin").write_bytes(octets)
+
+
+def _remplacer(neuf: Path, dossier: Path) -> None:
+    """Met `neuf` à la place de `dossier` par renommages ; l'ancien contenu disparaît en entier."""
+    ancien = dossier.with_name(f".{dossier.name}.ancien")
+    shutil.rmtree(ancien, ignore_errors=True)
+    if dossier.exists():
+        dossier.rename(ancien)
+    neuf.rename(dossier)
+    shutil.rmtree(ancien, ignore_errors=True)
+
+
+def ecrire_tout(reseau: Reseau, grille: dict, dossier: Path, processus: int) -> None:
+    """Écrit tout dans un dossier temporaire voisin, puis le met à la place de `dossier`."""
+    dossier.parent.mkdir(parents=True, exist_ok=True)
+    neuf = Path(tempfile.mkdtemp(prefix=f".{dossier.name}.", dir=dossier.parent))
+    try:
+        (neuf / "lignes").mkdir()
+        desservies = gares_desservies(reseau)
+        stations = [
+            {"nom": g.nom, "lat": g.lat, "lon": g.lon, "desservie": d} for g, d in zip(reseau.gares, desservies)
+        ]
+        (neuf / "stations.json").write_text(json.dumps(stations, ensure_ascii=False))
+        (neuf / "voisins-4km.bin").write_bytes(index_voisins(reseau.gares, grille, desservies))
+        _ecrire_lignes(reseau, neuf / "lignes", processus)
+        version = {
+            "feed_version": reseau.version,
+            "jour": reseau.jour,
+            "genere_le": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+            "nb_gares": len(reseau.gares),
+        }
+        (neuf / "version.json").write_text(json.dumps(version))
+        neuf.chmod(0o755)
+        _remplacer(neuf, dossier)
+    except BaseException:
+        shutil.rmtree(neuf, ignore_errors=True)
+        raise

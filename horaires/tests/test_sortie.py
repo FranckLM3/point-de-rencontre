@@ -42,6 +42,28 @@ class SortieTest(unittest.TestCase):
             self.assertEqual(len((Path(d) / "lignes" / "0.bin").read_bytes()), 5 * 4)
             version = json.loads((Path(d) / "version.json").read_text())
             self.assertEqual(version["jour"], "20261006")
+    def test_ecriture_atomique_et_lignes_perimees_retirees(self):
+        reseau = charger(archive())
+        grille = {"lon0": 4.0, "lat0": 45.0, "pasLon": 1.0, "pasLat": 1.0, "nx": 1, "ny": 1, "dedans": [1]}
+        with tempfile.TemporaryDirectory() as d:
+            sortie = Path(d) / "tc"
+            (sortie / "lignes").mkdir(parents=True)
+            (sortie / "lignes" / "99.bin").write_bytes(b"vieux")
+            ecrire_tout(reseau, grille, sortie, processus=2)
+            self.assertEqual(sorted(p.name for p in (sortie / "lignes").iterdir()), ["0.bin", "1.bin", "2.bin", "3.bin"])
+            self.assertEqual(sorted(p.name for p in Path(d).iterdir()), ["tc"])
+
+    def test_echec_laisse_l_ancienne_sortie_intacte(self):
+        reseau = charger(archive())
+        with tempfile.TemporaryDirectory() as d:
+            sortie = Path(d) / "tc"
+            sortie.mkdir()
+            (sortie / "version.json").write_text("ancien")
+            with self.assertRaises(KeyError):
+                ecrire_tout(reseau, {"nx": 1}, sortie, processus=1)
+            self.assertEqual((sortie / "version.json").read_text(), "ancien")
+            self.assertFalse((sortie / "stations.json").exists())
+            self.assertEqual(sorted(p.name for p in Path(d).iterdir()), ["tc"])
 
 
 def _voisins(octets: bytes, k: int) -> list[int]:
