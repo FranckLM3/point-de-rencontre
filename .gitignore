@@ -6,3 +6,8 @@ data/cache/
 *.pbf
 *.zip
 .DS_Store
+
+!.env.example
+!.env.e2e
+test-results/
+playwright-report/
