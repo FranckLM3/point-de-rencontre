@@ -11,3 +11,4 @@ data/cache/
 !.env.e2e
 test-results/
 playwright-report/
+.mcp.json
