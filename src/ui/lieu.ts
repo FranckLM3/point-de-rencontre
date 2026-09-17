@@ -1,7 +1,8 @@
-import { haversineKm } from '../calcul/geo'
+import type { Unite } from '../calcul/unites'
+import type { Detail } from '../calcul/villes'
 import { chercherAdresses, LONGUEUR_MIN } from '../donnees/geocodage'
 import type { Ami, Lieu } from '../types'
-import { echapper, km } from './format'
+import { echapper, valeur } from './format'
 import { detailParAmi } from './liste-villes'
 
 const DELAI_FRAPPE_MS = 250
@@ -75,21 +76,33 @@ export function rendreRechercheLieu(el: HTMLElement, lieu: Lieu | null, choisir:
   }
 }
 
-export function rendreResultatLieu(el: HTMLElement, lieu: Lieu | null, amis: Ami[], retirer: () => void): void {
+function resumeLieu(amis: Ami[], details: (Detail | null)[], unite: Unite): string {
+  if (amis.length === 0) return ''
+  const valeurs = details.flatMap((d) => (d ? [d.valeur] : []))
+  const ligne = valeurs.length < amis.length
+    ? 'Pas de trajet pour tout le monde'
+    : `Pire trajet ${valeur(Math.max(...valeurs), unite)} · <span class="valeur">Total ${valeur(valeurs.reduce((s, v) => s + v, 0), unite)}</span>`
+  return `<span class="ligne">${ligne}</span>${detailParAmi(amis, details, unite)}`
+}
+
+/** `details` : trajet de chaque personne (même ordre que `amis`), null si elle ne peut pas venir. */
+export function rendreResultatLieu(
+  el: HTMLElement,
+  lieu: Lieu | null,
+  amis: Ami[],
+  details: (Detail | null)[],
+  unite: Unite,
+  retirer: () => void,
+): void {
   if (!lieu) {
     el.innerHTML = ''
     return
   }
-  const valeurs = amis.map((a) => haversineKm(a.lat, a.lon, lieu.lat, lieu.lon))
-  const total = valeurs.reduce((s, v) => s + v, 0)
-  const resume = amis.length > 0
-    ? `<span class="ligne">Pire trajet ${km(Math.max(...valeurs))} · <span class="valeur">Total ${km(total)}</span></span>${detailParAmi(amis, valeurs)}`
-    : ''
   el.innerHTML = `
     <article class="ville-carte lieu">
       <span class="sur-titre">Lieu testé</span>
       <h2>${echapper(lieu.label)}</h2>
-      ${resume}
+      ${resumeLieu(amis, details, unite)}
       <button type="button" class="pastille secondaire" data-action="retirer-lieu">Retirer le lieu</button>
     </article>`
   el.querySelector('button')!.addEventListener('click', () => retirer())

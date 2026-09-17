@@ -84,6 +84,9 @@ form.groupe .champ { flex: 1 1 100%; }
 .detail { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 1rem; }
 .detail td { padding: 4px 0; border-top: 1px solid var(--bord); }
 .detail td:last-child { text-align: right; }
+.detail .precision { display: block; color: var(--texte-doux); font-size: .875rem; }
+.reservation { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0 0; }
+.reservation a { color: var(--accent); font-weight: 500; }
 
 .erreur { color: var(--danger); margin: 0; }
 .erreur:empty { display: none; }

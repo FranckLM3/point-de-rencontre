@@ -142,13 +142,22 @@ test('filtres : critère et distance maximum', () => {
 })
 
 const ville = { nom: 'Dijon', dep: '21', lat: 47.3, lon: 5.04, population: 1 }
-const classee = { ville, parAmi: [270, 170], total: 440, moyenne: 220, pire: 270 }
+const classee = { ville, parAmi: [{ valeur: 270 }, { valeur: 170 }], total: 440, moyenne: 220, pire: 270 }
+const enTrain = {
+  ville,
+  parAmi: [{ valeur: 194, precision: 'Marseille Saint-Charles → Paris Gare de Lyon' }, { valeur: 126, precision: 'sans train' }],
+  total: 320,
+  moyenne: 160,
+  pire: 194,
+}
 const actionsVilles = () => ({ choisir: vi.fn(), ajouter: vi.fn() })
+const oiseau = { unite: 'km', mode: 'oiseau' } as const
+const transports = { unite: 'min', mode: 'tc' } as const
 
 test('une carte de ville affiche pire trajet et total, et se déplie', () => {
   const el = document.createElement('div')
   const a = actionsVilles()
-  rendreVilles(el, { villes: [classee], amis, nbPersonnes: 2, max: null }, a)
+  rendreVilles(el, { villes: [classee], amis, nbPersonnes: 2, max: null, ...oiseau }, a)
   expect(el.textContent).toContain('Pire trajet 270 km')
   expect(el.textContent).toContain('Total 440 km')
   const bouton = el.querySelector<HTMLButtonElement>('.ville-carte button')!
@@ -158,10 +167,42 @@ test('une carte de ville affiche pire trajet et total, et se déplie', () => {
   expect(a.choisir).toHaveBeenCalledWith(classee)
 })
 
+test('une carte de ville en minutes affiche des durées', () => {
+  const el = document.createElement('div')
+  rendreVilles(el, { villes: [enTrain], amis, nbPersonnes: 2, max: null, ...transports }, actionsVilles())
+  expect(el.textContent).toContain('Pire trajet 3 h 14')
+  expect(el.textContent).toContain('Total 5 h 20')
+  expect(el.querySelector('.detail')!.textContent).toContain('2 h 06')
+})
+
+test('en transports : précision sous le nom et liens de réservation', () => {
+  const el = document.createElement('div')
+  const avecBalise = { ...enTrain, parAmi: [enTrain.parAmi[0]!, { valeur: 126, precision: '<b>Gare</b>' }] }
+  rendreVilles(el, { villes: [avecBalise], amis, nbPersonnes: 2, max: null, ...transports }, actionsVilles())
+  const precisions = [...el.querySelectorAll('.detail .precision')].map((p) => p.textContent)
+  expect(precisions).toContain('Marseille Saint-Charles → Paris Gare de Lyon')
+  expect(precisions).toContain('<b>Gare</b>')
+  expect(el.querySelector('.detail b')).toBeNull()
+  const liens = [...el.querySelectorAll<HTMLAnchorElement>('.zone-detail a')]
+  expect(liens.map((l) => l.textContent)).toEqual(['SNCF Connect', 'Trainline'])
+  expect(liens.map((l) => l.href)).toEqual(['https://www.sncf-connect.com/', 'https://www.thetrainline.com/fr'])
+  for (const l of liens) {
+    expect(l.target).toBe('_blank')
+    expect(l.rel).toBe('noopener')
+  }
+})
+
+test('à vol d’oiseau : aucun lien de réservation ni précision', () => {
+  const el = document.createElement('div')
+  rendreVilles(el, { villes: [classee], amis, nbPersonnes: 2, max: null, ...oiseau }, actionsVilles())
+  expect(el.querySelector('a')).toBeNull()
+  expect(el.querySelector('.precision')).toBeNull()
+})
+
 test('personne en base : invitation à ajouter la première personne', () => {
   const el = document.createElement('div')
   const a = actionsVilles()
-  rendreVilles(el, { villes: [], amis: [], nbPersonnes: 0, max: null }, a)
+  rendreVilles(el, { villes: [], amis: [], nbPersonnes: 0, max: null, ...oiseau }, a)
   expect(el.textContent).toContain('Ajoute la première personne pour commencer.')
   const bouton = el.querySelector<HTMLButtonElement>('button')!
   expect(bouton.textContent).toBe('Ajouter une personne')
@@ -171,32 +212,54 @@ test('personne en base : invitation à ajouter la première personne', () => {
 
 test('personne cochée : consigne', () => {
   const el = document.createElement('div')
-  rendreVilles(el, { villes: [], amis: [], nbPersonnes: 2, max: null }, actionsVilles())
+  rendreVilles(el, { villes: [], amis: [], nbPersonnes: 2, max: null, ...oiseau }, actionsVilles())
   expect(el.textContent).toBe('Coche au moins une personne pour voir la carte.')
 })
 
 test('aucune ville sous le maximum : message avec la valeur réelle', () => {
   const el = document.createElement('div')
-  rendreVilles(el, { villes: [], amis, nbPersonnes: 2, max: 150 }, actionsVilles())
+  rendreVilles(el, { villes: [], amis, nbPersonnes: 2, max: 150, ...oiseau }, actionsVilles())
   expect(el.textContent).toBe('Aucune ville à moins de 150 km pour tout le monde. Choisis une distance plus grande.')
+  rendreVilles(el, { villes: [], amis, nbPersonnes: 2, max: 180, ...transports }, actionsVilles())
+  expect(el.textContent).toBe('Aucune ville à moins de 3 h pour tout le monde. Choisis une durée plus longue.')
+  rendreVilles(el, { villes: [], amis, nbPersonnes: 2, max: 40, unite: 'eur', mode: 'tc' }, actionsVilles())
+  expect(el.textContent).toBe('Aucune ville à moins de 40 € pour tout le monde. Choisis un prix plus élevé.')
 })
 
 test('le lieu testé liste chaque ami et peut être retiré', () => {
   const el = document.createElement('div')
   const retirer = vi.fn()
-  rendreResultatLieu(el, { lat: 47.3, lon: 5.04, label: '<i>Dijon</i>' }, amis, retirer)
+  rendreResultatLieu(el, { lat: 47.3, lon: 5.04, label: '<i>Dijon</i>' }, amis, [{ valeur: 270 }, { valeur: 170 }], 'km', retirer)
   expect(el.querySelectorAll('.detail tr')).toHaveLength(2)
   expect(el.querySelector('i')).toBeNull()
+  expect(el.textContent).toContain('Pire trajet 270 km')
   const bouton = el.querySelector<HTMLButtonElement>('button')!
   expect(bouton.textContent).toBe('Retirer le lieu')
   bouton.click()
   expect(retirer).toHaveBeenCalled()
 })
 
+test('le lieu testé affiche l’unité courante et la précision', () => {
+  const el = document.createElement('div')
+  rendreResultatLieu(el, marseille, amis, enTrain.parAmi, 'min', vi.fn())
+  expect(el.textContent).toContain('Pire trajet 3 h 14')
+  expect(el.textContent).toContain('Total 5 h 20')
+  expect(el.querySelector('.precision')!.textContent).toBe('Marseille Saint-Charles → Paris Gare de Lyon')
+})
+
+test('le lieu testé injoignable pour une personne le dit', () => {
+  const el = document.createElement('div')
+  rendreResultatLieu(el, marseille, amis, [{ valeur: 194 }, null], 'min', vi.fn())
+  expect(el.textContent).toContain('Pas de trajet pour tout le monde')
+  expect(el.textContent).not.toContain('Total')
+  expect(el.querySelector('.detail')!.textContent).toContain('Pas de trajet')
+  expect(el.querySelectorAll('.detail tr')).toHaveLength(2)
+})
+
 test('sans lieu, rien n’est affiché', () => {
   const el = document.createElement('div')
   el.innerHTML = 'ancien'
-  rendreResultatLieu(el, null, amis, vi.fn())
+  rendreResultatLieu(el, null, amis, [], 'km', vi.fn())
   expect(el.innerHTML).toBe('')
 })
 

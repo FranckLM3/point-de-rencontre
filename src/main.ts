@@ -5,7 +5,7 @@ import './styles/app.css'
 import { agreger, distancesOiseau, meilleurIndice } from './calcul/agregat'
 import { coordonnees, type Grille } from './calcul/grille'
 import { uniteDe } from './calcul/unites'
-import { classerVilles } from './calcul/villes'
+import { classerVilles, mesureOiseau } from './calcul/villes'
 import { seuils, zones } from './calcul/zones'
 import { ajouterAmi, listerAmis, modifierAmi, supprimerAmi } from './donnees/amis'
 import { connecter, deconnecter, estConnecte } from './donnees/auth'
@@ -113,9 +113,13 @@ function rendrePanneau(s: Session, choisis: Ami[]): void {
     },
   })
   rendreFiltres($('#filtres'), s.etat, choisis.length, (p) => changer(s, p))
-  rendreResultatLieu($('#resultat-lieu'), s.etat.lieu, choisis, () => retirerLieu(s))
-  const villes = classerVilles(s.villes, choisis, s.etat.critere, s.etat.max, NB_VILLES)
-  rendreVilles($('#villes'), { villes, amis: choisis, nbPersonnes: s.amis.length, max: s.etat.max }, {
+  const { lieu, mode, critere, max } = s.etat
+  const unite = uniteDe(mode, s.etat.grandeur)
+  const mesure = mesureOiseau
+  const details = lieu ? choisis.map((a) => mesure(a, lieu.lat, lieu.lon)) : []
+  rendreResultatLieu($('#resultat-lieu'), lieu, choisis, details, unite, () => retirerLieu(s))
+  const villes = classerVilles(s.villes, choisis, mesure, critere, max, NB_VILLES)
+  rendreVilles($('#villes'), { villes, amis: choisis, nbPersonnes: s.amis.length, max, unite, mode }, {
     choisir: (c) => s.carte.lignes(choisis, { lat: c.ville.lat, lon: c.ville.lon, label: c.ville.nom }),
     ajouter: () => ajouter(s),
   })
