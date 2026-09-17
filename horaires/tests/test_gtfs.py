@@ -1,7 +1,7 @@
 import unittest
 
 from horaires.gtfs import charger
-from horaires.tests.fabrique import archive
+from horaires.tests.fabrique import STOP_TIMES, archive
 
 
 class LectureTest(unittest.TestCase):
@@ -33,6 +33,31 @@ class LectureTest(unittest.TestCase):
         self.assertIn((3, 0.3), [(v, round(km, 1)) for v, km in self.reseau.a_pied[2]])
         self.assertIn((2, 0.3), [(v, round(km, 1)) for v, km in self.reseau.a_pied[3]])
         self.assertEqual(self.reseau.a_pied[0], [])
+
+
+class MonteeDescenteTest(unittest.TestCase):
+    def test_autorisees_par_defaut(self):
+        t1 = next(c for c in charger(archive()).connexions if c.trajet == "T1")
+        self.assertEqual((t1.montee, t1.descente), (True, True))
+
+    def test_interdites_si_type_1_seulement(self):
+        # T2 : montée interdite à Beta ; T3 : descente vide (autorisée) ; T1 : descente sur demande (3).
+        horaires = (
+            STOP_TIMES.replace("T2,09:10:00,09:10:00,StopPoint:OCETrain TER-2,0,,0,1,", "T2,09:10:00,09:10:00,StopPoint:OCETrain TER-2,0,,1,1,")
+            .replace("T3,09:20:00,09:20:00,StopPoint:OCETrain TER-3,1,,1,0,", "T3,09:20:00,09:20:00,StopPoint:OCETrain TER-3,1,,,,")
+            .replace("T1,09:00:00,09:00:00,StopPoint:OCETGV INOUI-2,1,,1,0,", "T1,09:00:00,09:00:00,StopPoint:OCETGV INOUI-2,1,,1,3,")
+        )
+        par_trajet = {c.trajet: c for c in charger(archive(stop_times=horaires)).connexions}
+        self.assertEqual((par_trajet["T2"].montee, par_trajet["T2"].descente), (False, True))
+        self.assertEqual((par_trajet["T3"].montee, par_trajet["T3"].descente), (True, True))
+        self.assertEqual((par_trajet["T1"].montee, par_trajet["T1"].descente), (True, True))
+
+    def test_descente_interdite_a_l_arrivee(self):
+        horaires = STOP_TIMES.replace(
+            "T2,09:40:00,09:40:00,StopPoint:OCETrain TER-3,1,,1,0,", "T2,09:40:00,09:40:00,StopPoint:OCETrain TER-3,1,,1,1,"
+        )
+        t2 = next(c for c in charger(archive(stop_times=horaires)).connexions if c.trajet == "T2")
+        self.assertEqual((t2.montee, t2.descente), (True, False))
 
 
 if __name__ == "__main__":

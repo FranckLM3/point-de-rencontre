@@ -31,7 +31,7 @@ class Trajet:
 class Index:
     """Connexions à plat et départs par gare, préparés une fois par réseau."""
 
-    connexions: list[tuple]  # (départ, arrivée, de, vers, n° de trajet, km, grande ligne)
+    connexions: list[tuple]  # (départ, arrivée, de, vers, n° de trajet, km, grande ligne, montée, descente)
     departs: list[int]
     departs_par_gare: list[list[int]]
     liaisons: list[list[tuple[int, int, float]]]  # (voisine, secondes, km)
@@ -44,12 +44,13 @@ def _marche_s(km: float) -> int:
 def preparer(reseau: Reseau) -> Index:
     numeros: dict[str, int] = {}
     connexions = [
-        (c.depart, c.arrivee, c.de, c.vers, numeros.setdefault(c.trajet, len(numeros)), c.km, c.grande_ligne)
+        (c.depart, c.arrivee, c.de, c.vers, numeros.setdefault(c.trajet, len(numeros)), c.km, c.grande_ligne, c.montee, c.descente)
         for c in reseau.connexions
     ]
     departs_par_gare: list[set[int]] = [set() for _ in reseau.gares]
     for c in reseau.connexions:
-        departs_par_gare[c.de].add(c.depart)
+        if c.montee:
+            departs_par_gare[c.de].add(c.depart)
     liaisons = [[(j, _marche_s(km), km) for j, km in voisins] for voisins in reseau.a_pied]
     return Index(
         connexions=connexions,
@@ -83,16 +84,18 @@ def _un_depart(index: Index, source: int, depart: int, arrivee: list[int], info:
     en_cours: dict[int, tuple[float, bool]] = {}
     connexions = index.connexions
     for k in range(bisect_left(index.departs, depart), len(connexions)):
-        dep, arr, de, vers, trajet, km, gl = connexions[k]
+        dep, arr, de, vers, trajet, km, gl, montee, descente = connexions[k]
         pris = en_cours.get(trajet)
         if pris is None:
+            if not montee:
+                continue
             marge = 0 if de == source else CORRESPONDANCE_S
             if arrivee[de] + marge > dep:
                 continue
             pris = info[de]
         pris = (pris[0] + km, pris[1] or gl)
         en_cours[trajet] = pris
-        if arr < arrivee[vers]:
+        if descente and arr < arrivee[vers]:
             arrivee[vers] = arr
             info[vers] = pris
             atteintes.append(vers)

@@ -35,5 +35,24 @@ class DureesExactesTest(unittest.TestCase):
         self.assertEqual(meilleurs_trajets(r, 0)[1].minutes, 330)
 
 
+class MonteeDescenteTest(unittest.TestCase):
+    def test_pas_de_montee_a_un_arret_interdit(self):
+        # T : 0 -> 1 -> 2, montée interdite en 1.
+        r = reseau_synthetique(3, [(H(8), H(9), 0, 1, "T"), (H(9), H(10), 1, 2, "T", False, True)])
+        self.assertEqual(meilleurs_trajets(r, 1)[2].minutes, 65535)
+        self.assertEqual(meilleurs_trajets(r, 0)[2].minutes, 120)
+
+    def test_pas_d_arrivee_a_un_arret_interdit_mais_le_train_continue(self):
+        # T : 0 -> 1 -> 2, descente interdite en 1 ; U part de 1 à 9 h 30.
+        r = reseau_synthetique(
+            4,
+            [(H(8), H(9), 0, 1, "T", True, False), (H(9), H(10), 1, 2, "T"), (H(9, 30), H(10), 1, 3, "U")],
+        )
+        t = meilleurs_trajets(r, 0)
+        self.assertEqual(t[1].minutes, 65535)
+        self.assertEqual(t[2].minutes, 120)
+        self.assertEqual(t[3].minutes, 65535)
+
+
 if __name__ == "__main__":
     unittest.main()

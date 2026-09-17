@@ -53,18 +53,22 @@ FEED_INFO = """feed_id,feed_publisher_name,feed_publisher_url,feed_lang,feed_sta
 """
 
 
-def archive() -> bytes:
+def archive(**remplacements: str | None) -> bytes:
+    """Archive du petit GTFS ; `stop_times="..."` remplace un fichier, `feed_info=None` le retire."""
+    fichiers = {
+        "stops": STOPS,
+        "routes": ROUTES,
+        "trips": TRIPS,
+        "stop_times": STOP_TIMES,
+        "calendar_dates": CALENDAR_DATES,
+        "feed_info": FEED_INFO,
+    }
+    fichiers.update(remplacements)
     tampon = io.BytesIO()
     with zipfile.ZipFile(tampon, "w") as z:
-        for nom, contenu in {
-            "stops.txt": STOPS,
-            "routes.txt": ROUTES,
-            "trips.txt": TRIPS,
-            "stop_times.txt": STOP_TIMES,
-            "calendar_dates.txt": CALENDAR_DATES,
-            "feed_info.txt": FEED_INFO,
-        }.items():
-            z.writestr(nom, contenu)
+        for nom, contenu in fichiers.items():
+            if contenu is not None:
+                z.writestr(f"{nom}.txt", contenu)
     return tampon.getvalue()
 
 

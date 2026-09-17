@@ -15,6 +15,7 @@ DISTANCE_A_PIED_KM = 0.5
 MARGE_PREMIERE_SEMAINE = 7
 MARDI = 1
 NB_MARDIS_CANDIDATS = 6
+INTERDIT = "1"
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,8 @@ class Connexion:
     trajet: str
     km: float
     grande_ligne: bool
+    montee: bool = True  # montée autorisée à `de`
+    descente: bool = True  # descente autorisée à `vers`
 
 
 @dataclass
@@ -53,6 +56,11 @@ def _lire(z: zipfile.ZipFile, nom: str):
 def _secondes(h: str) -> int:
     heures, minutes, secondes = (int(x) for x in h.split(":"))
     return heures * 3600 + minutes * 60 + secondes
+
+
+def _autorise(type_arret: str | None) -> bool:
+    """GTFS pickup_type / drop_off_type : seul 1 interdit ; 0, 2, 3 ou vide autorisent."""
+    return (type_arret or "").strip() != INTERDIT
 
 
 def _date(texte: str) -> datetime.date:
@@ -129,6 +137,8 @@ def charger(contenu: bytes) -> Reseau:
                     trajet=trajet,
                     km=haversine_km(ga.lat, ga.lon, gb.lat, gb.lon),
                     grande_ligne=_type_service(a["stop_id"]) in TYPES_GRANDE_LIGNE,
+                    montee=_autorise(a.get("pickup_type")),
+                    descente=_autorise(b.get("drop_off_type")),
                 )
             )
     connexions.sort(key=lambda c: (c.depart, c.arrivee))
