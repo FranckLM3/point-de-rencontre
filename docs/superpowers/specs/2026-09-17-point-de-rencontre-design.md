@@ -22,6 +22,8 @@ Fonctions :
 4. Tester un lieu précis : temps et prix de chaque ami jusqu'à ce lieu.
 5. Choisir qui entre dans le calcul (cases à cocher, groupes enregistrés).
 6. Ajouter, modifier, supprimer une adresse depuis le téléphone.
+7. Donner à chaque ami son moyen de transport (voiture ou transports en
+   commun) et calculer le centre avec le moyen propre à chacun.
 
 Hors périmètre de la v1 : pays étrangers, photos de villes, trains de nuit,
 filtre « direct », horaires à une date précise, prix réels de billets.
@@ -33,7 +35,15 @@ Pour un ensemble S d'amis sélectionnés et un point P :
 - **Total** : somme sur S du temps (ou du prix) de chaque ami vers P.
 - **Pire trajet** : maximum sur S du temps (ou du prix) vers P.
 
-L'utilisateur choisit le mode (vol d'oiseau, voiture, transports), la
+L'utilisateur choisit le mode parmi quatre :
+
+- **Chacun son moyen** (mode par défaut dès que voiture et transports
+  existent) : chaque ami compte avec le moyen de transport de sa fiche ;
+- **Tous en voiture**, **Tous en transports** : on force le même moyen pour
+  tout le monde, pour comparer ;
+- **Vol d'oiseau**.
+
+Il choisit aussi la
 grandeur (temps, prix) et le critère (total, pire trajet). Le meilleur point
 de chaque combinaison est marqué sur la carte comme « centre ».
 
@@ -63,10 +73,12 @@ n'est alors pas classé pour ce mode tant que le calcul manque.
 - Panneau à gauche (~ 460 px), carte à droite sur le reste. Fond gris-bleu
   clair, cartes blanches arrondies.
 - En-tête du panneau :
-  - rangée d'amis en pastilles (nom + ville), case à cocher sur chacune,
+  - rangée d'amis en pastilles (nom + ville + icône voiture ou train),
+    case à cocher sur chacune,
     « tout / aucun », menu des groupes enregistrés, bouton « + » pour ajouter ;
   - champ « Où se retrouver ? » pour tester un lieu (autocomplétion IGN) ;
   - pastilles de filtres sombres : mode (Voiture, Transports, Vol d'oiseau),
+    (Chacun son moyen, Tous en voiture, Tous en transports, Vol d'oiseau),
     critère (Pire trajet, Total), grandeur (Temps, Prix), puis une pastille
     verte « Temps maximum » (menu 1 à 8 h) et « Prix maximum ».
 - Grand titre en gras, par exemple « Où se retrouver à 12, en transports,
@@ -87,7 +99,8 @@ n'est alors pas classé pour ce mode tant que le calcul manque.
   comme sur Chronotrains.
 - Les pastilles de filtres défilent horizontalement.
 - Ajout / modification d'un ami : feuille plein écran avec nom, adresse
-  (autocomplétion), et deux options : « abonné Navigo », « a une voiture ».
+  (autocomplétion), moyen de transport (Voiture ou Transports en commun,
+  choix obligatoire) et l'option « abonné Navigo ».
 
 ### État dans l'URL
 
@@ -122,7 +135,7 @@ les journaux d'Actions. Le dépôt peut donc être public.
 
 ### 4.2 Données Supabase
 
-- `amis(id, nom, adresse, lat, lon, navigo bool, voiture bool, maj_le)`
+- `amis(id, nom, adresse, lat, lon, transport ('voiture' | 'tc'), navigo bool, maj_le)`
 - `groupes(id, nom, amis uuid[])`
 - `temps(ami_id, couche text, version int, minutes bytea, km bytea, maj_le)`
   : une ligne par ami et par couche (`voiture`, `tc_france`, `tc_idf`). Les
@@ -170,7 +183,10 @@ est la distance en km. Prix : non applicable (la pastille Prix est grisée).
   - Péage estimé : au-delà de 80 km, 0,09 € × 70 % de la distance.
     Constantes dans `parametres`, présentées comme estimation.
   - Réglage « personnes par voiture » : divise le prix affiché.
-- Un ami sans voiture a un temps voiture « injoignable » et est signalé.
+- Les temps voiture sont calculés pour tous les amis, quel que soit leur
+  moyen, pour que le mode « Tous en voiture » fonctionne.
+- En mode « Chacun son moyen », la couche d'un ami est sa couche voiture ou
+  sa couche transports selon sa fiche ; l'agrégation ne change pas.
 
 ### 5.3 Transports, France
 
@@ -185,7 +201,8 @@ est la distance en km. Prix : non applicable (la pastille Prix est grisée).
 - Trajet d'un ami vers une gare cible G :
   min sur les 3 gares les plus proches de l'ami A de
   (accès(ami, A) + ligne[A][G]). Accès = vol d'oiseau × 1,3, à pied si
-  ≤ 1,5 km (4,5 km/h), sinon en voiture (40 km/h) ou vélo si pas de voiture.
+  ≤ 1,5 km (4,5 km/h), sinon en voiture (40 km/h) si l'ami se déplace en
+  voiture, ou en bus (20 km/h) sinon.
 - Temps vers un point quelconque P : min sur les 3 gares proches de P de
   (temps vers G + sortie(G, P)), même règle. Les zones sont tracées sur une
   grille de 5 km remplie ainsi.
