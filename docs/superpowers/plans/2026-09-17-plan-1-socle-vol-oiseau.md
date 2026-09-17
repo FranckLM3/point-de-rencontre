@@ -1325,7 +1325,11 @@ jaune, rouge. Dans `src/calcul/zones.ts`, remplacer `COULEURS_TRANCHES` par :
 export const COULEURS_TRANCHES = ['#0b5d2a', '#1a7f3c', '#2f9e52', '#55b86f', '#86cf95', '#b5e2bd', '#d6efd9', '#ecf8ee'] as const
 ```
 
-`OPACITE_ZONES` passe à `0.5` dans `src/ui/carte.ts`.
+Rendu retenu après essai (Franck, 2026-09-17 : « trop opaque ») : une seule
+teinte `#1a7f3c` à 9 % d'opacité par tranche, empilée ; le dégradé vient
+du cumul (`src/ui/rendu-zones.ts`, `opaciteCumulee`). La légende montre
+l'opacité cumulée de chaque tranche. Fond de carte OpenStreetMap en gris
+(CARTO exige désormais une clé).
 
 **D2. Légende obligatoire.** Nouveau module `src/ui/legende.ts`, test
 `tests/unit/legende.test.ts` :

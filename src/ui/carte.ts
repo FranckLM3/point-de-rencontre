@@ -1,4 +1,5 @@
 import L from 'leaflet'
+import { OPACITE_TRANCHE, TEINTE_ZONES } from './rendu-zones'
 import 'leaflet/dist/leaflet.css'
 import type { Tranche } from '../calcul/zones'
 import type { Ami, Lieu } from '../types'
@@ -13,7 +14,6 @@ const ZOOM_FRANCE = 6
 const ZOOM_MAX_CADRAGE = 9
 const MARGE_CADRAGE: L.PointTuple = [40, 40]
 /** D1 : même valeur que l'opacité des nuances de la légende (app.css). */
-const OPACITE_ZONES = 0.5
 /** Valeurs de tokens.css (--pastille, --accent) : Leaflet dessine en SVG, sans accès aux variables. */
 const COULEUR_LIGNE = '#1f2733'
 const COULEUR_LIEU = '#15803d'
@@ -69,7 +69,7 @@ export function creerCarte(element: HTMLElement): Carte {
       coucheZones.clearLayers()
       for (const t of tranches) {
         const forme: GeoJSON.MultiPolygon = { type: 'MultiPolygon', coordinates: t.coordonnees }
-        L.geoJSON(forme, { style: { stroke: false, fillColor: t.couleur, fillOpacity: OPACITE_ZONES }, interactive: false }).addTo(coucheZones)
+        L.geoJSON(forme, { style: { stroke: false, fillColor: TEINTE_ZONES, fillOpacity: OPACITE_TRANCHE }, interactive: false }).addTo(coucheZones)
       }
     },
     centre(lat, lon, libelle) {
