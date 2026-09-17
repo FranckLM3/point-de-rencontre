@@ -27,13 +27,13 @@ test('valeur selon l’unité', () => {
 
 test('titre selon le mode, la grandeur et le maximum', () => {
   expect(titre({ nombre: 3, mode: 'tc', unite: 'min', critere: 'pire', max: 180 })).toBe(
-    'Où se retrouver à 3, en transports, sans dépasser 3 h',
+    'Où se retrouver à 3 Crocos, en transports, sans dépasser 3 h',
   )
   expect(titre({ nombre: 3, mode: 'tc', unite: 'eur', critere: 'moyenne', max: null })).toBe(
-    'Où se retrouver à 3, en transports, au moins cher en moyenne',
+    'Où se retrouver à 3 Crocos, en transports, au moins cher en moyenne',
   )
   expect(titre({ nombre: 2, mode: 'oiseau', unite: 'km', critere: 'pire', max: null })).toBe(
-    'Où se retrouver à 2, à vol d’oiseau, au pire trajet le plus court',
+    'Où se retrouver à 2 Crocos, à vol d’oiseau, au pire trajet le plus court',
   )
 })
 
@@ -91,4 +91,10 @@ test('descriptionTrajet : trajet direct sans train', () => {
   expect(descriptionTrajet(trajet({ acces: { minutes: 35, mode: 'bus' } }))).toBe('35 min en bus')
   expect(descriptionTrajet(trajet({ acces: { minutes: 20, mode: 'voiture' } }))).toBe('20 min en voiture')
   expect(descriptionTrajet(trajet({ acces: { minutes: 14, mode: 'à pied' } }))).toBe('14 min à pied')
+})
+
+test('titre : un seul Croco au singulier', () => {
+  expect(titre({ nombre: 1, mode: 'oiseau', unite: 'km', critere: 'moyenne', max: null })).toBe(
+    'Où se retrouver à 1 Croco, à vol d’oiseau, au plus court en moyenne',
+  )
 })

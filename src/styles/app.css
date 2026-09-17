@@ -14,6 +14,9 @@ button, input, select { font: inherit; }
 h1 { font-size: var(--titre); font-weight: 800; line-height: 1.1; margin: 4px 0; }
 
 .rang { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+/* Marque : la tête de croco précède le nom, à sa hauteur de texte. */
+.marque { display: inline-flex; align-items: center; gap: 8px; }
+.croco { width: 1.5em; height: 1.5em; flex: none; }
 .defile { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
 .villes { display: grid; gap: 12px; }
 
@@ -83,7 +86,8 @@ form.groupe .champ { flex: 1 1 100%; }
 
 .detail { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 1rem; }
 .detail td { padding: 4px 0; border-top: 1px solid var(--bord); }
-.detail td:last-child { text-align: right; }
+/* La valeur reste d'un bloc : la précision peut être longue, c'est elle qui se replie. */
+.detail td:last-child { text-align: right; white-space: nowrap; vertical-align: top; padding-left: 10px; }
 .detail .precision { display: block; color: var(--texte-doux); font-size: .875rem; }
 .reservation { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0 0; }
 .reservation a { color: var(--accent); font-weight: 500; }
@@ -141,7 +145,15 @@ form.groupe .champ { flex: 1 1 100%; }
 .feuille .aide { margin: 0; }
 
 .connexion { min-height: 100dvh; display: grid; place-items: center; padding: 16px; }
-.connexion form { background: var(--surface); border-radius: var(--rayon-volet); padding: 28px; width: min(380px, 100%); display: grid; gap: 14px; box-shadow: var(--ombre); }
+.connexion form { position: relative; background: var(--surface); border-radius: var(--rayon-volet); padding: 28px; width: min(380px, 100%); display: grid; gap: 14px; box-shadow: var(--ombre); }
+.connexion h1 { margin: 0; }
+/* Rangée de dents décorative, en haut de la carte : des triangles, rien de plus. */
+.dents { display: flex; justify-content: center; gap: 4px; margin: -28px -28px 6px; padding-top: 4px; }
+.dents span {
+  width: 0; height: 0;
+  border-left: 9px solid transparent; border-right: 9px solid transparent;
+  border-top: 14px solid var(--accent-fond);
+}
 
 #poignee { display: none; }
 

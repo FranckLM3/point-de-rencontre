@@ -96,7 +96,7 @@ export function ouvrirFicheAmi(ami: Ami | null, actions: ActionsFiche): boolean 
   const dialogue = document.createElement('dialog')
   dialogue.className = 'feuille'
   dialogue.setAttribute('aria-labelledby', 'fiche-titre')
-  dialogue.innerHTML = gabarit(ami ? 'Modifier une personne' : 'Ajouter une personne', ami !== null && actions.supprimer !== undefined)
+  dialogue.innerHTML = gabarit(ami ? 'Modifier un Croco' : 'Ajouter un Croco', ami !== null && actions.supprimer !== undefined)
   document.body.append(dialogue)
   // jsdom n'implémente pas showModal : l'attribut open suffit alors.
   if (typeof dialogue.showModal === 'function') dialogue.showModal()

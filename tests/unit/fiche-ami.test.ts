@@ -45,13 +45,13 @@ test('la fiche est un dialogue modal nommé par son titre', () => {
   const dialogue = $<HTMLDialogElement>('dialog.feuille')
   expect(dialogue.open).toBe(true)
   expect(dialogue.getAttribute('aria-labelledby')).toBe('fiche-titre')
-  expect($('#fiche-titre').textContent).toBe('Ajouter une personne')
+  expect($('#fiche-titre').textContent).toBe('Ajouter un Croco')
   expect(document.querySelector('[data-action="supprimer"]')).toBeNull()
 })
 
-test('titre « Modifier une personne », sans aria-pressed', () => {
+test('titre « Modifier un Croco », sans aria-pressed', () => {
   ouvrirFicheAmi(lea, { enregistrer: vi.fn(), supprimer: vi.fn() })
-  expect($('#fiche-titre').textContent).toBe('Modifier une personne')
+  expect($('#fiche-titre').textContent).toBe('Modifier un Croco')
   expect(document.querySelector('[aria-pressed]')).toBeNull()
 })
 

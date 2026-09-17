@@ -26,7 +26,7 @@ test('le bouton s’appelle « Ouvrir la carte » et le champ a un libellé visi
   const racine = document.createElement('div')
   afficherConnexion(racine, vi.fn(), vi.fn())
   expect(racine.querySelector('button[type="submit"]')!.textContent).toBe('Ouvrir la carte')
-  expect(racine.querySelector('label[for="mdp"]')!.textContent).toBe('Mot de passe du groupe')
+  expect(racine.querySelector('label[for="mdp"]')!.textContent).toBe('Mot de passe des Crocos')
 })
 
 test('le bouton est désactivé pendant la connexion puis réactivé après un refus', async () => {
@@ -62,4 +62,12 @@ test('connecter rejeté avec un message : ce message est affiché', async () => 
   racine.querySelector('form')!.dispatchEvent(new Event('submit'))
   await vi.waitFor(() => expect(racine.querySelector('.erreur')!.textContent).toBe('Configuration absente.'))
   expect(succes).not.toHaveBeenCalled()
+})
+
+test('la carte de connexion porte le nom du groupe et sa rangée de dents décorative', () => {
+  const racine = document.createElement('div')
+  afficherConnexion(racine, vi.fn(), vi.fn())
+  expect(racine.querySelector('h1')!.textContent).toBe('Les Crocos')
+  const dents = racine.querySelector('.dents')!
+  expect(dents.getAttribute('aria-hidden')).toBe('true')
 })

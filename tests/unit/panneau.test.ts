@@ -61,7 +61,7 @@ test('pastille : nom échappé, ville et moyen de transport visibles', () => {
   expect(el.textContent).toContain('voiture')
 })
 
-test('libellés : Aucune, Ajouter une personne, pas d’aria-pressed sur une liste', () => {
+test('libellés : Aucune, Ajouter un Croco, pas d’aria-pressed sur une liste', () => {
   const el = document.createElement('div')
   const a = actions()
   rendreAmis(el, { amis, groupes: [], selection: new Set(['a']) }, a)
@@ -70,7 +70,7 @@ test('libellés : Aucune, Ajouter une personne, pas d’aria-pressed sur une lis
   cliquer(el, '[data-action="aucun"]')
   expect(a.changerSelection).toHaveBeenCalledWith([])
   const ajouter = el.querySelector<HTMLButtonElement>('[data-action="ajouter"]')!
-  expect(ajouter.textContent).toBe('Ajouter une personne')
+  expect(ajouter.textContent).toBe('Ajouter un Croco')
   ajouter.click()
   expect(a.ajouter).toHaveBeenCalled()
 })
@@ -192,7 +192,7 @@ test('filtres : maximum en durée ou en prix selon la grandeur', () => {
   expect(select.options[0]!.textContent).toBe('Durée maximum')
   expect([...select.options].map((o) => o.textContent)).toContain('3 h max')
   expect(select.value).toBe('180')
-  expect(el.querySelector('h1')!.textContent).toBe('Où se retrouver à 3, en transports, sans dépasser 3 h')
+  expect(el.querySelector('h1')!.textContent).toBe('Où se retrouver à 3 Crocos, en transports, sans dépasser 3 h')
 
   const prix = document.createElement('div')
   rendreFiltres(prix, { ...ETAT_DEFAUT, mode: 'tc', grandeur: 'prix' }, 3, vi.fn())
@@ -264,9 +264,9 @@ test('personne en base : invitation à ajouter la première personne', () => {
   const el = document.createElement('div')
   const a = actionsVilles()
   rendreVilles(el, { villes: [], amis: [], nbPersonnes: 0, max: null, ...oiseau }, a)
-  expect(el.textContent).toContain('Ajoute la première personne pour commencer.')
+  expect(el.textContent).toContain('Ajoute le premier Croco pour commencer.')
   const bouton = el.querySelector<HTMLButtonElement>('button')!
-  expect(bouton.textContent).toBe('Ajouter une personne')
+  expect(bouton.textContent).toBe('Ajouter un Croco')
   bouton.click()
   expect(a.ajouter).toHaveBeenCalled()
 })
@@ -274,7 +274,7 @@ test('personne en base : invitation à ajouter la première personne', () => {
 test('personne cochée : consigne', () => {
   const el = document.createElement('div')
   rendreVilles(el, { villes: [], amis: [], nbPersonnes: 2, max: null, ...oiseau }, actionsVilles())
-  expect(el.textContent).toBe('Coche au moins une personne pour voir la carte.')
+  expect(el.textContent).toBe('Coche au moins un Croco pour voir la carte.')
 })
 
 test('aucune ville sous le maximum : message avec la valeur réelle', () => {

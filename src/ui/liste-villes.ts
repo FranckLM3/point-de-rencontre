@@ -65,15 +65,15 @@ function rendreVide(el: HTMLElement, d: DonneesVilles, a: ActionsVilles): void {
   if (d.nbPersonnes === 0) {
     el.innerHTML = `
       <div class="vide">
-        <p>Ajoute la première personne pour commencer.</p>
-        <button type="button" class="pastille" data-action="premiere">Ajouter une personne</button>
+        <p>Ajoute le premier Croco pour commencer.</p>
+        <button type="button" class="pastille" data-action="premiere">Ajouter un Croco</button>
       </div>`
     el.querySelector('button')!.addEventListener('click', () => a.ajouter())
     return
   }
   const message =
     d.amis.length === 0
-      ? 'Coche au moins une personne pour voir la carte.'
+      ? 'Coche au moins un Croco pour voir la carte.'
       : d.max !== null
         ? `Aucune ville à moins de ${valeur(d.max, d.unite)} pour tout le monde. Choisis ${PLUS_GRAND[d.unite]}.`
         : 'Aucune ville à afficher.'

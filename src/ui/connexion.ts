@@ -1,4 +1,5 @@
 const LIBELLE_BOUTON = 'Ouvrir la carte'
+const NB_DENTS = 15
 const MESSAGE_ECHEC = 'Connexion impossible.'
 
 export function afficherConnexion(
@@ -9,8 +10,9 @@ export function afficherConnexion(
   racine.innerHTML = `
     <main class="connexion">
       <form>
-        <h1>Point de rencontre</h1>
-        <label for="mdp">Mot de passe du groupe</label>
+        <div class="dents" aria-hidden="true">${'<span></span>'.repeat(NB_DENTS)}</div>
+        <h1>Les Crocos</h1>
+        <label for="mdp">Mot de passe des Crocos</label>
         <input id="mdp" class="champ" type="password" autocomplete="current-password" required />
         <p class="erreur" role="alert"></p>
         <button class="pastille" type="submit">${LIBELLE_BOUTON}</button>

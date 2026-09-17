@@ -69,7 +69,7 @@ export interface OptionsTitre {
 }
 
 export function titre(o: OptionsTitre): string {
-  const debut = `Où se retrouver à ${o.nombre}, ${LIBELLE_MODE[o.mode]}`
+  const debut = `Où se retrouver à ${o.nombre} Croco${o.nombre > 1 ? 's' : ''}, ${LIBELLE_MODE[o.mode]}`
   if (o.max !== null) return `${debut}, sans dépasser ${valeur(o.max, o.unite)}`
   if (o.unite === 'eur') {
     return o.critere === 'pire' ? `${debut}, sans billet trop cher pour personne` : `${debut}, au moins cher en moyenne`

@@ -50,7 +50,7 @@ const gabarit = (d: DonneesAmis): string => `
   </form>
   <div class="rang amis">
     ${d.amis.map((x) => pastille(x, d.selection.has(x.id))).join('')}
-    <button type="button" class="pastille" data-action="ajouter">Ajouter une personne</button>
+    <button type="button" class="pastille" data-action="ajouter">Ajouter un Croco</button>
   </div>`
 
 function brancherGroupe(el: HTMLElement, a: ActionsAmis, coches: () => string[]): void {

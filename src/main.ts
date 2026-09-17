@@ -31,6 +31,16 @@ const TEXTE_CHARGEMENT = 'Chargement de la carte…'
 const TEXTE_HORAIRES = 'Chargement des horaires…'
 const racine = document.querySelector<HTMLElement>('#app')!
 
+/** Tête de crocodile de la marque, décorative : le nom qui suit la nomme déjà. */
+const CROCO = `<svg class="croco" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+    <circle cx="10.5" cy="9" r="4.5" fill="var(--accent)" />
+    <circle cx="21.5" cy="9" r="4.5" fill="var(--accent)" />
+    <circle cx="10.5" cy="8.5" r="1.7" fill="var(--accent-fond)" />
+    <circle cx="21.5" cy="8.5" r="1.7" fill="var(--accent-fond)" />
+    <path d="M7 12h18a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-8a3 3 0 0 1 3-3Z" fill="var(--accent)" />
+    <path d="M6 18h20l-2 3-2-3-2 3-2-3-2 3-2-3-2 3-2-3-2 3-2-3z" fill="var(--accent-fond)" />
+  </svg>`
+
 interface Session {
   grille: Grille
   villes: Ville[]
@@ -218,7 +228,7 @@ const SQUELETTE = `
     <aside id="panneau" class="panneau" aria-label="Recherche et résultats">
       <button type="button" id="poignee" aria-expanded="false" aria-controls="panneau">Voir la liste</button>
       <header class="rang entete">
-        <strong>Point de rencontre</strong>
+        <strong class="marque">${CROCO}Les Crocos</strong>
         <button type="button" class="pastille secondaire pousse" id="sortir">Se déconnecter</button>
       </header>
       <div id="amis"></div>

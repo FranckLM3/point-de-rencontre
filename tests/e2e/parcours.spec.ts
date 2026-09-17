@@ -92,7 +92,7 @@ async function simuler(page: Page, echouerAmis = false): Promise<Simulation> {
 
 /** Connexion sans attendre le rendu du panneau (utilisé quand le premier chargement doit échouer). */
 async function connecter(page: Page): Promise<void> {
-  await page.getByLabel('Mot de passe du groupe').fill(MOT_DE_PASSE)
+  await page.getByLabel('Mot de passe des Crocos').fill(MOT_DE_PASSE)
   await page.getByRole('button', { name: 'Ouvrir la carte' }).click()
 }
 
@@ -116,7 +116,7 @@ test('connexion, sélection, ajout d’une personne, test d’un lieu', async ({
   await simuler(page)
   await page.goto('./')
 
-  await page.getByLabel('Mot de passe du groupe').fill('faux')
+  await page.getByLabel('Mot de passe des Crocos').fill('faux')
   await page.getByRole('button', { name: 'Ouvrir la carte' }).click()
   await expect(page.getByRole('alert')).toHaveText('Mot de passe incorrect.')
   await entrer(page)
@@ -136,7 +136,7 @@ test('connexion, sélection, ajout d’une personne, test d’un lieu', async ({
   await page.getByRole('button', { name: 'Tout le monde' }).click()
   await expect(page.getByRole('heading', { level: 1 })).toContainText('à 2')
 
-  await page.locator('#amis').getByRole('button', { name: 'Ajouter une personne' }).click()
+  await page.locator('#amis').getByRole('button', { name: 'Ajouter un Croco' }).click()
   await page.getByLabel('Nom', { exact: true }).fill('Zoé')
   await page.getByLabel('Adresse').fill('canebiere')
   await page.getByRole('button', { name: MARSEILLE.properties.label }).click()
@@ -212,7 +212,7 @@ test('états vide et erreur', async ({ page }) => {
   await ouvrirVoletSiVisible(page)
 
   await page.getByRole('button', { name: 'Aucune' }).click()
-  await expect(page.locator('#villes')).toContainText('Coche au moins une personne pour voir la carte.')
+  await expect(page.locator('#villes')).toContainText('Coche au moins un Croco pour voir la carte.')
   await expect(page.locator('#legende')).toBeHidden()
 })
 

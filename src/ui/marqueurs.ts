@@ -32,4 +32,4 @@ export const infobulleMarqueur = (p: Point): string =>
   p.amis.map((a) => `${echapper(a.nom)} (${libelleTransport(a.transport)})`).join('<br>')
 
 export const infobulleCentre = (v: number, critere: Critere, unite: Unite = 'km'): string =>
-  `Meilleur point, ${valeur(v, unite)} ${critere === 'pire' ? 'au pire' : 'en moyenne'}`
+  `Le repaire : ${valeur(v, unite)} ${critere === 'pire' ? 'au pire' : 'en moyenne'}`
