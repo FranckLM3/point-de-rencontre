@@ -1,0 +1,27 @@
+:root {
+  --fond: #eef1f5;
+  --surface: #ffffff;
+  --texte: #1c1f24;
+  --texte-doux: #5b6472;
+  --pastille: #1f2733;
+  --pastille-texte: #ffffff;
+  --accent: #15803d;
+  --accent-fond: #dcfce7;
+  --bord: #d9dee6;
+  --danger: #b42318;
+  --avertissement-fond: #fff4e5;
+  --rayon-carte: 14px;
+  --rayon-pastille: 10px;
+  --rayon-volet: 18px;
+  --ombre: 0 1px 2px rgb(16 24 40 / 6%), 0 4px 12px rgb(16 24 40 / 6%);
+  --ombre-volet: 0 -6px 24px rgb(16 24 40 / 14%);
+  --police: 'Jost', system-ui, sans-serif;
+  --titre: clamp(1.6rem, 1.1rem + 2vw, 2.4rem);
+  --texte-pastille: .875rem;
+  --panneau: 460px;
+  --cible-tactile: 44px;
+  --volet-ferme: 38dvh;
+  --volet-ouvert: 88dvh;
+  --duree: 150ms;
+  --duree-volet: 200ms;
+}

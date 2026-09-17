@@ -40,3 +40,7 @@ test('la couleur suit le rang du seuil dans une liste croissante, indépendammen
   expect(t2.map((z) => z.seuil)).toEqual(t1.map((z) => z.seuil))
   expect(t2.map((z) => z.couleur)).toEqual(t1.map((z) => z.couleur))
 })
+
+test('palette des zones : dégradé de vert, du plus proche au plus loin', () => {
+  expect(COULEURS_TRANCHES).toEqual(['#0b5d2a', '#1a7f3c', '#2f9e52', '#55b86f', '#86cf95', '#b5e2bd', '#d6efd9', '#ecf8ee'])
+})

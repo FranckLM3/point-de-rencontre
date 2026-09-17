@@ -1,8 +1,8 @@
 import { contours } from 'd3-contour'
 import type { Grille } from './grille'
 
-/** Du plus proche (vert) au plus loin (rouge). */
-export const COULEURS_TRANCHES = ['#1a9850', '#66bd63', '#a6d96a', '#d9ef8b', '#fee08b', '#fdae61', '#f46d43', '#d73027'] as const
+/** Du plus proche (vert profond) au plus loin (presque transparent). */
+export const COULEURS_TRANCHES = ['#0b5d2a', '#1a7f3c', '#2f9e52', '#55b86f', '#86cf95', '#b5e2bd', '#d6efd9', '#ecf8ee'] as const
 
 const HORS_ZONE = 1e9
 
@@ -31,7 +31,7 @@ export function zones(g: Grille, valeurs: Float32Array, listeSeuils: number[]): 
   // (contours.js:44), quel que soit l'ordre passé à .thresholds() : on ne peut donc pas
   // déduire le seuil d'origine du rang de sortie. On relit le seuil directement sur chaque
   // contour rendu (`-c.value`), et la couleur vient de son rang dans une copie croissante de
-  // `listeSeuils` (le plus petit seuil = le plus proche = vert, COULEURS_TRANCHES[0]).
+  // `listeSeuils` (le plus petit seuil = le plus proche = vert profond, COULEURS_TRANCHES[0]).
   const listeAscendante = [...listeSeuils].sort((a, b) => a - b)
   return generateur(opposees)
     .map((c) => {
