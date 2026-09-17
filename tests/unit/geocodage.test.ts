@@ -11,6 +11,17 @@ test('convertit la réponse IGN', async () => {
   const r = await chercherAdresses('10 rue de rivoli', f)
   expect(r).toEqual([{ label: '10 Rue de Rivoli 75004 Paris', lat: 48.8555, lon: 2.36041 }])
   expect(f.mock.calls[0]![0]).toContain('q=10+rue+de+rivoli')
+  expect(f.mock.calls[0]![0]).toContain('limit=5')
+})
+
+test('réponse sans « features » : aucun résultat, pas d’erreur', async () => {
+  const f = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+  expect(await chercherAdresses('paris', f)).toEqual([])
+})
+
+test('JSON invalide : même message d’erreur clair', async () => {
+  const f = vi.fn().mockResolvedValue({ ok: true, json: async () => { throw new SyntaxError('Unexpected token') } })
+  await expect(chercherAdresses('paris', f)).rejects.toThrow('recherche d’adresse')
 })
 
 test('moins de 3 caractères : aucun appel', async () => {
