@@ -28,6 +28,8 @@ export interface Carte {
   lignes(depuis: Ami[], vers: Lieu | null): void
   recalculer(): void
   surClic(action: (lat: number, lon: number) => void): void
+  /** Empêche un élément posé sur la carte (légende) de déclencher un clic ou un glisser. */
+  isoler(el: HTMLElement): void
 }
 
 const icone = (html: string, taille: number): L.DivIcon =>
@@ -71,7 +73,8 @@ export function creerCarte(element: HTMLElement): Carte {
     },
     centre(lat, lon, libelle) {
       marqueurCentre?.remove()
-      marqueurCentre = L.marker([lat, lon], { icon: iconeCible, title: libelle, zIndexOffset: 1000 })
+      // Sous les personnes : le centre tombe souvent sur une adresse, l'anneau entoure alors sa pastille.
+      marqueurCentre = L.marker([lat, lon], { icon: iconeCible, title: libelle, zIndexOffset: -100 })
         .bindTooltip(echapper(libelle))
         .addTo(carte)
     },
@@ -94,6 +97,10 @@ export function creerCarte(element: HTMLElement): Carte {
     },
     surClic(action) {
       carte.on('click', (e) => action(e.latlng.lat, e.latlng.lng))
+    },
+    isoler(el) {
+      L.DomEvent.disableClickPropagation(el)
+      L.DomEvent.disableScrollPropagation(el)
     },
   }
 }
