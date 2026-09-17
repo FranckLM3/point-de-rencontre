@@ -3,6 +3,7 @@ import type { Ami, Etat } from '../types'
 import { distancesOiseau } from './agregat'
 import type { Grille } from './grille'
 import { coucheTc, depuisGares, garesProches, versPointTc, type DepuisGares, type Proche } from './tc'
+import { descriptionTrajet } from '../ui/format'
 import { mesureOiseau, type Mesure } from './villes'
 
 type Choix = Pick<Etat, 'mode' | 'grandeur'>
@@ -58,7 +59,7 @@ export function choisirMesure(c: Choix, moteur: MoteurTc | null): Mesure {
     if (t === null) return null
     return {
       valeur: c.grandeur === 'temps' ? t.minutes : t.euros,
-      precision: t.depart ? `${t.depart} → ${t.arrivee}` : 'sans train',
+      precision: descriptionTrajet(t),
     }
   }
 }

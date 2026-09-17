@@ -20,6 +20,13 @@ test('decoderLigne lit minutes, km et grande ligne', () => {
   expect(Array.from(l.grandeLigne)).toEqual([0, 1])
 })
 
+test('decoderLigne lit le nombre de correspondances dans les bits 1 à 4', () => {
+  // 0b0000_0011 = grande ligne + 1 correspondance ; 0b0001_1110 = 15 correspondances, pas de grande ligne.
+  const l = decoderLigne(ligneBinaire([[194, 750, 0b0000_0011], [360, 900, 0b0001_1110]]))
+  expect(Array.from(l.grandeLigne)).toEqual([1, 0])
+  expect(Array.from(l.correspondances)).toEqual([1, 15])
+})
+
 test('decoderLigne refuse une taille incohérente', () => {
   expect(() => decoderLigne(new ArrayBuffer(7))).toThrow('horaires')
 })

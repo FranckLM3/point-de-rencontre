@@ -1,3 +1,4 @@
+import type { Segment, TrajetTc } from '../calcul/tc'
 import type { Unite } from '../calcul/unites'
 import type { Critere, Mode, Transport } from '../types'
 
@@ -17,6 +18,37 @@ export function valeur(v: number, unite: Unite): string {
   if (unite === 'min') return duree(v)
   if (unite === 'eur') return euros(v)
   return km(v)
+}
+
+/** « Paris Gare de Lyon Hall 1 - 2 » devient « Paris Gare de Lyon » ; les autres noms sont gardés tels quels. */
+export const nomCourt = (nom: string): string => nom.replace(/ Hall \d+( - \d+)?$/, '').trim()
+
+/** Une étape enchaînée : « 8 min de bus ». */
+const SUITE: Record<Segment['mode'], (d: string) => string> = {
+  'à pied': (d) => `${d} à pied`,
+  bus: (d) => `${d} de bus`,
+  voiture: (d) => `${d} de voiture`,
+}
+
+/** Le trajet entier, sans train : « 35 min en bus ». */
+const SEUL: Record<Segment['mode'], (d: string) => string> = {
+  'à pied': (d) => `${d} à pied`,
+  bus: (d) => `${d} en bus`,
+  voiture: (d) => `${d} en voiture`,
+}
+
+const correspondances = (nombre: number): string =>
+  `${nombre} correspondance${nombre > 1 ? 's' : ''}`
+
+/** Étapes du trajet : accès, gares, correspondances, sortie. Une étape nulle n'est pas écrite. */
+export function descriptionTrajet(t: TrajetTc): string {
+  if (t.depart === null) return SEUL[t.acces.mode](duree(t.acces.minutes))
+  const etapes: string[] = []
+  if (Math.round(t.acces.minutes) > 0) etapes.push(SUITE[t.acces.mode](duree(t.acces.minutes)))
+  etapes.push(`${nomCourt(t.depart)} → ${nomCourt(t.arrivee ?? '')}`)
+  if (t.correspondances > 0) etapes.push(correspondances(t.correspondances))
+  if (t.sortie && Math.round(t.sortie.minutes) > 0) etapes.push(SUITE[t.sortie.mode](duree(t.sortie.minutes)))
+  return etapes.join(' · ')
 }
 
 export const libelleTransport = (t: Transport): string => (t === 'voiture' ? 'voiture' : 'transports')

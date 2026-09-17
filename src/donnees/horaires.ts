@@ -10,6 +10,8 @@ export interface Ligne {
   minutes: Uint16Array
   km: Uint16Array
   grandeLigne: Uint8Array
+  /** Nombre de changements de train, 0 à 15. */
+  correspondances: Uint8Array
 }
 
 export interface Voisins {
@@ -29,17 +31,26 @@ export interface Horaires {
 export const INJOIGNABLE = 65535
 export const NB_VOISINS = 3
 const OCTETS_PAR_GARE = 5
+/** Bit 0 du drapeau : une grande ligne est empruntée. */
+const GRANDE_LIGNE = 1
+/** Bits 1 à 4 du drapeau : nombre de correspondances. */
+const CORRESPONDANCES = 15
 const MESSAGE = 'Horaires des trains indisponibles pour le moment.'
 
 export function decoderLigne(tampon: ArrayBuffer): Ligne {
   if (tampon.byteLength % OCTETS_PAR_GARE !== 0) throw new Error(`Fichier d’horaires invalide (${tampon.byteLength} octets).`)
   const n = tampon.byteLength / OCTETS_PAR_GARE
   const v = new DataView(tampon)
-  const ligne: Ligne = { minutes: new Uint16Array(n), km: new Uint16Array(n), grandeLigne: new Uint8Array(n) }
+  const ligne: Ligne = {
+    minutes: new Uint16Array(n), km: new Uint16Array(n),
+    grandeLigne: new Uint8Array(n), correspondances: new Uint8Array(n),
+  }
   for (let j = 0; j < n; j++) {
     ligne.minutes[j] = v.getUint16(j * OCTETS_PAR_GARE, true)
     ligne.km[j] = v.getUint16(j * OCTETS_PAR_GARE + 2, true)
-    ligne.grandeLigne[j] = v.getUint8(j * OCTETS_PAR_GARE + 4)
+    const drapeaux = v.getUint8(j * OCTETS_PAR_GARE + 4)
+    ligne.grandeLigne[j] = drapeaux & GRANDE_LIGNE
+    ligne.correspondances[j] = (drapeaux >> 1) & CORRESPONDANCES
   }
   return ligne
 }

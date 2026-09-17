@@ -4,14 +4,15 @@ import { acces, coucheTc, depuisGares, garesProches, prixTrain, versPointTc } fr
 import type { Horaires, Ligne, Station } from '../../src/donnees/horaires'
 import type { Ami } from '../../src/types'
 
-const ligne = (m: number[], k: number[], g: number[]): Ligne => ({
-  minutes: Uint16Array.from(m), km: Uint16Array.from(k), grandeLigne: Uint8Array.from(g),
+const ligne = (m: number[], k: number[], g: number[], c: number[] = m.map(() => 0)): Ligne => ({
+  minutes: Uint16Array.from(m), km: Uint16Array.from(k),
+  grandeLigne: Uint8Array.from(g), correspondances: Uint8Array.from(c),
 })
 
-// Gare 0 à Marseille, gare 1 à Paris ; 194 min, 750 km, grande ligne.
+// Gare 0 à Marseille, gare 1 à Paris ; 194 min, 750 km, grande ligne, 1 correspondance.
 const lignes = new Map([
-  [0, ligne([0, 194], [0, 750], [0, 1])],
-  [1, ligne([196, 0], [750, 0], [1, 0])],
+  [0, ligne([0, 194], [0, 750], [0, 1], [0, 1])],
+  [1, ligne([196, 0], [750, 0], [1, 0], [1, 0])],
 ])
 const horaires: Horaires = {
   stations: [
@@ -127,4 +128,35 @@ test('coucheTc : gare voisine à plus de 50 km ignorée', () => {
   }
   const temps = coucheTc(grille, h, depuisGares(h, franck), franck, 'temps')
   expect(Number.isNaN(temps[0])).toBe(true)
+})
+
+test('versPointTc : étapes du trajet, accès, sortie et correspondances', () => {
+  const d = depuisGares(horaires, franck)
+  const t = versPointTc(horaires, d, franck, 48.8566, 2.3522)!
+  // Environ 1,3 km jusqu'à Saint-Charles : à pied.
+  expect(t.acces.mode).toBe('à pied')
+  expect(t.acces.minutes).toBeGreaterThan(15)
+  expect(t.acces.minutes).toBeLessThan(30)
+  // Environ 2 km depuis la Gare de Lyon : en bus.
+  expect(t.sortie!.mode).toBe('bus')
+  expect(t.sortie!.minutes).toBeGreaterThan(0)
+  expect(t.correspondances).toBe(1)
+  expect(t.minutes).toBeCloseTo(t.acces.minutes + 194 + t.sortie!.minutes)
+})
+
+test('versPointTc : trajet direct, un seul segment et pas de sortie', () => {
+  const d = depuisGares(horaires, franck)
+  const t = versPointTc(horaires, d, franck, 43.2965, 5.37)!
+  expect(t.depart).toBeNull()
+  expect(t.sortie).toBeNull()
+  expect(t.correspondances).toBe(0)
+  expect(t.acces.mode).toBe('bus')
+  expect(t.acces.minutes).toBeCloseTo(t.minutes)
+})
+
+test('versPointTc : lieu sur la gare même, pas de sortie', () => {
+  const d = depuisGares(horaires, franck)
+  const t = versPointTc(horaires, d, franck, 48.8449, 2.3735)!
+  expect(t.arrivee).toBe('Paris Gare de Lyon')
+  expect(t.sortie).toBeNull()
 })

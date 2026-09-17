@@ -30,6 +30,17 @@ export function acces(km: number, transport: Transport): number {
   return minutesA(km, transport === 'voiture' ? VITESSE.voiture : VITESSE.bus)
 }
 
+/** Une étape du trajet hors train : rejoindre la gare, ou la quitter. */
+export interface Segment {
+  minutes: number
+  mode: 'à pied' | 'bus' | 'voiture'
+}
+
+export function segment(km: number, transport: Transport): Segment {
+  if (km <= MARCHE_MAX_KM) return { minutes: acces(km, transport), mode: 'à pied' }
+  return { minutes: acces(km, transport), mode: transport === 'voiture' ? 'voiture' : 'bus' }
+}
+
 const prixAcces = (km: number, transport: Transport): number =>
   km > MARCHE_MAX_KM && transport !== 'voiture' ? PRIX_BUS : 0
 
@@ -77,6 +88,8 @@ export interface DepuisGares {
   euros: Float32Array
   /** Gare de départ retenue, -1 si injoignable. */
   depart: Int32Array
+  /** Nombre de changements de train jusqu'à chaque gare. */
+  correspondances: Uint8Array
   proches: Proche[]
 }
 
@@ -86,6 +99,7 @@ export function depuisGares(h: Horaires, ami: Ami): DepuisGares {
     minutes: new Float32Array(n).fill(Number.POSITIVE_INFINITY),
     euros: new Float32Array(n).fill(Number.NaN),
     depart: new Int32Array(n).fill(-1),
+    correspondances: new Uint8Array(n),
     proches: garesProches(h.stations, ami.lat, ami.lon),
   }
   for (const p of r.proches) {
@@ -101,6 +115,7 @@ export function depuisGares(h: Horaires, ami: Ami): DepuisGares {
         r.minutes[g] = total
         r.euros[g] = prixAvant + prixTrain(ligne.km[g]!, ligne.grandeLigne[g] === 1)
         r.depart[g] = p.gare
+        r.correspondances[g] = ligne.correspondances[g]!
       }
     }
   }
@@ -113,23 +128,43 @@ export interface TrajetTc {
   /** Noms des gares, null pour un trajet direct sans train. */
   depart: string | null
   arrivee: string | null
+  /** Rejoindre la gare de départ ; le trajet entier s'il n'y a pas de train. */
+  acces: Segment
+  /** Quitter la gare d'arrivée ; null si le lieu est la gare même ou s'il n'y a pas de train. */
+  sortie: Segment | null
+  correspondances: number
 }
+
+/** Distance de la personne à la gare où elle prend son premier train. */
+const kmAcces = (d: DepuisGares, gare: number): number => d.proches.find((p) => p.gare === gare)?.km ?? 0
 
 function meilleurVers(h: Horaires, d: DepuisGares, ami: Ami, km: number, gares: Proche[]): TrajetTc | null {
   let best: TrajetTc | null = null
   if (km <= DIRECT_MAX_KM) {
-    best = { minutes: acces(km, ami.transport), euros: prixAcces(km, ami.transport), depart: null, arrivee: null }
+    best = {
+      minutes: acces(km, ami.transport),
+      euros: prixAcces(km, ami.transport),
+      depart: null,
+      arrivee: null,
+      acces: segment(km, ami.transport),
+      sortie: null,
+      correspondances: 0,
+    }
   }
   for (const g of gares) {
     const avant = d.minutes[g.gare]!
     if (!Number.isFinite(avant)) continue
     const minutes = avant + acces(g.km, 'tc')
     if (best === null || minutes < best.minutes) {
+      const gareDepart = d.depart[g.gare]!
       best = {
         minutes,
         euros: d.euros[g.gare]! + prixAcces(g.km, 'tc'),
-        depart: h.stations[d.depart[g.gare]!]!.nom,
+        depart: h.stations[gareDepart]!.nom,
         arrivee: h.stations[g.gare]!.nom,
+        acces: segment(kmAcces(d, gareDepart), ami.transport),
+        sortie: g.km > 0 ? segment(g.km, 'tc') : null,
+        correspondances: d.correspondances[g.gare]!,
       }
     }
   }
