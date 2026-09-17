@@ -23,6 +23,9 @@ export interface Groupe {
 export type Mode = 'mixte' | 'voiture' | 'tc' | 'oiseau'
 export type Critere = 'moyenne' | 'pire'
 
+/** Ce qui est colorié en voiture et en transports ; le vol d'oiseau est toujours en km. */
+export type Grandeur = 'temps' | 'prix'
+
 export interface Lieu {
   lat: number
   lon: number
@@ -32,6 +35,7 @@ export interface Lieu {
 export interface Etat {
   mode: Mode
   critere: Critere
+  grandeur: Grandeur
   /** Valeur maximale (km en vol d'oiseau), null = sans limite. */
   max: number | null
   /** Identifiants cochés, null = tout le monde. */

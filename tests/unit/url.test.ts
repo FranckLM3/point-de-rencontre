@@ -8,10 +8,17 @@ test('URL vide : état par défaut', () => {
 
 test('aller-retour complet', () => {
   const e: Etat = {
-    mode: 'oiseau', critere: 'moyenne', max: 300,
+    mode: 'oiseau', critere: 'moyenne', max: 300, grandeur: 'temps',
     selection: ['a1', 'b2'], lieu: { lat: 45.75, lon: 4.85, label: 'Lyon, Rhône' },
   }
   expect(lireEtat(ecrireEtat(e))).toEqual(e)
+})
+
+test('grandeur lue, écrite, et temps par défaut', () => {
+  expect(lireEtat('').grandeur).toBe('temps')
+  expect(lireEtat('?grandeur=prix').grandeur).toBe('prix')
+  expect(lireEtat('?grandeur=poids').grandeur).toBe('temps')
+  expect(lireEtat(ecrireEtat({ ...ETAT_DEFAUT, mode: 'tc', grandeur: 'prix' })).grandeur).toBe('prix')
 })
 
 test('sélection vide conservée', () => {

@@ -18,6 +18,12 @@ test('cleZones change avec le critère, le maximum, la sélection et la version'
   expect(cleZones(ETAT_DEFAUT, ['a', 'b'], 2)).not.toBe(base)
 })
 
+test('la grandeur change la clé des zones', () => {
+  const a = cleZones({ ...ETAT_DEFAUT, mode: 'tc', grandeur: 'temps' }, ['x'], 1)
+  const b = cleZones({ ...ETAT_DEFAUT, mode: 'tc', grandeur: 'prix' }, ['x'], 1)
+  expect(a).not.toBe(b)
+})
+
 test('cleZones ne modifie pas la liste reçue', () => {
   const ids = ['b', 'a']
   cleZones(ETAT_DEFAUT, ids, 0)

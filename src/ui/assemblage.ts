@@ -2,7 +2,7 @@ import type { Ami, Etat } from '../types'
 
 /** E4 : tout ce qui change les zones, et rien d'autre (le lieu testé n'y figure pas). */
 export function cleZones(e: Etat, ids: string[], version: number): string {
-  return [e.mode, e.critere, e.max ?? '', [...ids].sort().join(','), version].join('|')
+  return [e.mode, e.critere, e.grandeur, e.max ?? '', [...ids].sort().join(','), version].join('|')
 }
 
 /** `null` = tout le monde ; les identifiants inconnus sont ignorés. */
