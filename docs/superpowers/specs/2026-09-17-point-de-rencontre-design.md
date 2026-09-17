@@ -229,6 +229,32 @@ est la distance en km. Prix : non applicable (la pastille Prix est grisée).
   = min sur les grandes gares parisiennes de (r5py vers la gare + ligne SNCF).
 - Prix : ticket unique Île-de-France (constante), 0 € si « abonné Navigo ».
 
+### 5.4 bis Transports urbains des grandes villes (ajout du 2026-09-17)
+
+Demande de Franck : les réseaux de métro, tram et bus des grandes villes
+(Paris et Île-de-France, Lyon, Marseille, Lille, Bordeaux, Toulouse,
+Nantes, Strasbourg, Nice, Rennes, Montpellier, Grenoble) comptent dans
+les trajets. Ils sont publiés en GTFS sur transport.data.gouv.fr.
+
+- Ils ne sont pas fusionnés dans la matrice gare vers gare (elle passerait
+  d'environ 3400 à plus de 6000 arrêts, soit environ 180 Mo).
+- Ils servent à deux choses :
+  1. **correspondances entre gares d'une même ville** : durée réelle en
+     métro, tram ou bus, à la place de la liaison urbaine forfaitaire du
+     plan 2 (15 min plus 20 km/h jusqu'à 6 km) ;
+  2. **premier et dernier kilomètre** : du domicile à la gare et de la
+     gare au lieu visé, sur une grille plus fine dans ces villes.
+- Réalisé par le plan 4, qui couvre l'Île-de-France et ces villes. En
+  attendant, la règle forfaitaire du plan 2 s'applique.
+
+### 5.4 ter Trajets multimodaux (ajout du 2026-09-17)
+
+Un trajet enchaîne librement marche (jusqu'à 1 km), liaison urbaine et
+train, y compris plusieurs fois. La marche depuis la gare de départ vers
+une gare voisine et la marge de correspondance comptent dans la durée.
+Le détail affiché donne : mode et durée d'accès, gare de départ, gare
+d'arrivée, nombre de correspondances, mode et durée de sortie.
+
 ### 5.5 Risque à lever d'abord
 
 r5py demande Java 21 et une mémoire notable. Première tâche du plan : un
