@@ -5,8 +5,9 @@ import type { Ami, Lieu } from '../types'
 import { echapper } from './format'
 import { etiquette, grouperParPosition, infobulleMarqueur } from './marqueurs'
 
-const TUILES = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-const ATTRIBUTION = '&copy; OpenStreetMap, &copy; CARTO'
+/** Tuiles OpenStreetMap (sans clé), adoucies en gris par la feuille de style. */
+const TUILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+const ATTRIBUTION = '&copy; OpenStreetMap'
 const CENTRE_FRANCE: L.LatLngTuple = [46.6, 2.4]
 const ZOOM_FRANCE = 6
 const ZOOM_MAX_CADRAGE = 9
@@ -37,7 +38,7 @@ const icone = (html: string, taille: number): L.DivIcon =>
 
 export function creerCarte(element: HTMLElement): Carte {
   const carte = L.map(element).setView(CENTRE_FRANCE, ZOOM_FRANCE)
-  L.tileLayer(TUILES, { attribution: ATTRIBUTION, subdomains: 'abcd', maxZoom: 18 }).addTo(carte)
+  L.tileLayer(TUILES, { attribution: ATTRIBUTION, maxZoom: 19 }).addTo(carte)
   const coucheZones = L.layerGroup().addTo(carte)
   const coucheLignes = L.layerGroup().addTo(carte)
   const coucheAmis = L.layerGroup().addTo(carte)
