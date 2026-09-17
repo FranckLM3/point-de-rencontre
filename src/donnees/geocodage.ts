@@ -1,7 +1,7 @@
 import type { Lieu } from '../types'
 
 const URL_IGN = 'https://data.geopf.fr/geocodage/search'
-const LONGUEUR_MIN = 3
+export const LONGUEUR_MIN = 3
 const NB_PROPOSITIONS = '5'
 
 interface ReponseIgn {
