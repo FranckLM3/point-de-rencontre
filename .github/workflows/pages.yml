@@ -2,6 +2,8 @@ name: pages
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: '23 4 * * 3'
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,6 +23,27 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Tests des horaires
+        run: npm run test:horaires
+      - name: Version des horaires
+        id: version
+        run: |
+          mkdir -p .cache-horaires
+          curl -sfL -o .cache-horaires/sncf.zip "https://eu.ftp.opendatasoft.com/sncf/plandata/Export_OpenData_SNCF_GTFS_NewTripId.zip"
+          v=$(python3 -c "import csv, io, zipfile; f = zipfile.ZipFile('.cache-horaires/sncf.zip').open('feed_info.txt'); print(next(csv.DictReader(io.TextIOWrapper(f, 'utf-8-sig')))['feed_version'])")
+          echo "cle=horaires-$v-$(sha256sum horaires/*.py public/data/grille-4km.json | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
+      - name: Cache des horaires
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: public/data/tc
+          key: ${{ steps.version.outputs.cle }}
+      - name: Calculer les horaires
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: python3 -m horaires --sortie public/data/tc --source .cache-horaires/sncf.zip
       - name: Parcours dans le navigateur (Supabase simulé)
         run: |
           npx playwright install --with-deps chromium

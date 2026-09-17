@@ -16,6 +16,9 @@ npm run dev
 - `npm test` : tests unitaires.
 - `npm run e2e` : parcours dans un navigateur, Supabase simulé (ordinateur et téléphone).
 - `npm run donnees` : régénère la grille de 4 km et la liste des villes (déjà commitées).
+- `npm run horaires` : télécharge les horaires SNCF et calcule les trajets
+  entre gares dans `public/data/tc/` (quelques minutes, non commité).
+- `npm run test:horaires` : tests du calcul (Python, bibliothèque standard).
 
 Les adresses ne sont jamais dans ce dépôt : elles vivent dans Supabase, derrière le mot de passe du groupe.
 
