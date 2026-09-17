@@ -18,3 +18,12 @@ test('indiceProche arrondit au point de grille le plus proche', () => {
 test('indiceProche rend -1 hors de la grille', () => {
   expect(indiceProche(g, 10, 40)).toBe(-1)
 })
+
+test('indiceProche rend -1 pour une coordonnée invalide', () => {
+  expect(indiceProche(g, NaN, 40)).toBe(-1)
+  expect(indiceProche(g, 0, Number.POSITIVE_INFINITY)).toBe(-1)
+})
+
+test('indiceProche rend -1 au sud-ouest de la grille', () => {
+  expect(indiceProche(g, -2, 39)).toBe(-1)
+})
