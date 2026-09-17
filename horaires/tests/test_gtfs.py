@@ -1,6 +1,6 @@
 import unittest
 
-from horaires.gtfs import charger
+from horaires.gtfs import Gare, charger, liaisons_entre_gares
 from horaires.tests.fabrique import STOP_TIMES, archive
 
 
@@ -29,10 +29,31 @@ class LectureTest(unittest.TestCase):
         t2 = next(c for c in self.reseau.connexions if c.trajet == "T2")
         self.assertFalse(t2.grande_ligne)
 
-    def test_passages_a_pied_symetriques_sous_500_m(self):
-        self.assertIn((3, 0.3), [(v, round(km, 1)) for v, km in self.reseau.a_pied[2]])
-        self.assertIn((2, 0.3), [(v, round(km, 1)) for v, km in self.reseau.a_pied[3]])
-        self.assertEqual(self.reseau.a_pied[0], [])
+    def test_aucune_liaison_vers_une_gare_sans_train(self):
+        # Delta est à 300 m de Gamma mais sans train ; les autres gares sont à 78 km.
+        self.assertEqual(self.reseau.liaisons, [[], [], [], []])
+
+
+class LiaisonsTest(unittest.TestCase):
+    def test_marche_jusqu_a_1_km_puis_liaison_urbaine_jusqu_a_6_km(self):
+        # 0,9 km, 1,5 km, 5,9 km et 6,5 km au nord de la gare 0 (un degré de latitude = 111,2 km).
+        km = [0.0, 0.9, 1.5, 5.9, 6.5]
+        gares = [Gare(str(i), str(i), 45.0 + d / 111.195, 4.0) for i, d in enumerate(km)]
+        liens = dict(liaisons_entre_gares(gares, [True] * 5)[0])
+        # Marche : 0,9 x 1,3 / 4,5 h = 15,6 min -> 16 min.
+        self.assertEqual(liens[1], 16 * 60)
+        # Urbain : 15 min + 1,5 x 1,3 / 20 h = 20,85 min -> 21 min.
+        self.assertEqual(liens[2], 21 * 60)
+        self.assertEqual(liens[3], 38 * 60)
+        self.assertNotIn(4, liens)
+        self.assertEqual(sorted(liens), [1, 2, 3])
+
+    def test_symetriques_et_seulement_entre_gares_desservies(self):
+        gares = [Gare(str(i), str(i), 45.0 + i * 0.005, 4.0) for i in range(3)]
+        liens = liaisons_entre_gares(gares, [True, False, True])
+        self.assertEqual([j for j, _ in liens[0]], [2])
+        self.assertEqual([j for j, _ in liens[2]], [0])
+        self.assertEqual(liens[1], [])
 
 
 class MonteeDescenteTest(unittest.TestCase):

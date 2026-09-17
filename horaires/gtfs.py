@@ -1,9 +1,10 @@
-"""Lecture du GTFS SNCF : jour type, gares (zones d'arrêt), connexions, passages à pied."""
+"""Lecture du GTFS SNCF : jour type, gares (zones d'arrêt), connexions, liaisons à pied ou urbaines."""
 from __future__ import annotations
 
 import csv
 import datetime
 import io
+import math
 import zipfile
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -11,7 +12,13 @@ from dataclasses import dataclass, field
 from horaires.geo import haversine_km
 
 TYPES_GRANDE_LIGNE = {"TGV INOUI", "INTERCITES", "INTERCITES de nuit", "OUIGO", "ICE", "Lyria"}
-DISTANCE_A_PIED_KM = 0.5
+DISTANCE_A_PIED_KM = 1.0
+VITESSE_MARCHE_KMH = 4.5
+DETOUR = 1.3
+DISTANCE_URBAINE_KM = 6.0
+VITESSE_URBAINE_KMH = 20.0
+ATTENTE_URBAINE_S = 15 * 60
+CASES_PAR_DEGRE = 10  # 0,1° : au moins 6 km en latitude comme en longitude en France
 MARGE_PREMIERE_SEMAINE = 7
 MARDI = 1
 NB_MARDIS_CANDIDATS = 6
@@ -45,7 +52,7 @@ class Reseau:
     jour: str
     gares: list[Gare]
     connexions: list[Connexion]
-    a_pied: list[list[tuple[int, float]]] = field(default_factory=list)
+    liaisons: list[list[tuple[int, int]]] = field(default_factory=list)  # (voisine, secondes)
 
 
 def _lire(z: zipfile.ZipFile, nom: str):
@@ -81,22 +88,44 @@ def _choisir_jour(services_par_date: dict[str, set[str]], debut: str) -> str:
     return max(candidats, key=lambda d: (len(services_par_date[d]), -int(d)))
 
 
-def _passages_a_pied(gares: list[Gare]) -> list[list[tuple[int, float]]]:
+def _minute(heures: float) -> int:
+    return round(heures * 60) * 60
+
+
+def duree_liaison_s(km: float) -> int | None:
+    """Durée d'une liaison entre deux gares : à pied jusqu'à 1 km, urbaine jusqu'à 6 km."""
+    durees = []
+    if km <= DISTANCE_A_PIED_KM:
+        durees.append(_minute(km * DETOUR / VITESSE_MARCHE_KMH))
+    if km <= DISTANCE_URBAINE_KM:
+        durees.append(ATTENTE_URBAINE_S + _minute(km * DETOUR / VITESSE_URBAINE_KMH))
+    return min(durees, default=None)
+
+
+def liaisons_entre_gares(gares: list[Gare], desservies: list[bool]) -> list[list[tuple[int, int]]]:
+    """Liaisons directes (voisine, secondes) entre gares desservies, symétriques."""
+    def case(g: Gare) -> tuple[int, int]:
+        return math.floor(g.lat * CASES_PAR_DEGRE), math.floor(g.lon * CASES_PAR_DEGRE)
+
     cases: dict[tuple[int, int], list[int]] = defaultdict(list)
     for i, g in enumerate(gares):
-        cases[(round(g.lat * 100), round(g.lon * 100))].append(i)
-    voisins: list[list[tuple[int, float]]] = [[] for _ in gares]
+        if desservies[i]:
+            cases[case(g)].append(i)
+    liaisons: list[list[tuple[int, int]]] = [[] for _ in gares]
     for i, g in enumerate(gares):
-        cle = (round(g.lat * 100), round(g.lon * 100))
+        if not desservies[i]:
+            continue
+        cy, cx = case(g)
         for dy in (-1, 0, 1):
             for dx in (-1, 0, 1):
-                for j in cases.get((cle[0] + dy, cle[1] + dx), []):
+                for j in cases.get((cy + dy, cx + dx), []):
                     if j == i:
                         continue
-                    d = haversine_km(g.lat, g.lon, gares[j].lat, gares[j].lon)
-                    if d <= DISTANCE_A_PIED_KM:
-                        voisins[i].append((j, d))
-    return voisins
+                    duree = duree_liaison_s(haversine_km(g.lat, g.lon, gares[j].lat, gares[j].lon))
+                    if duree is not None:
+                        liaisons[i].append((j, duree))
+        liaisons[i].sort()
+    return liaisons
 
 
 def charger(contenu: bytes) -> Reseau:
@@ -142,4 +171,7 @@ def charger(contenu: bytes) -> Reseau:
                 )
             )
     connexions.sort(key=lambda c: (c.depart, c.arrivee))
-    return Reseau(info["feed_version"], jour, gares, connexions, _passages_a_pied(gares))
+    desservies = [False] * len(gares)
+    for c in connexions:
+        desservies[c.de] = desservies[c.vers] = True
+    return Reseau(info["feed_version"], jour, gares, connexions, liaisons_entre_gares(gares, desservies))

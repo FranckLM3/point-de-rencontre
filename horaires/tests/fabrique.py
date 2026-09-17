@@ -76,8 +76,11 @@ def heure(h: int, m: int = 0) -> int:
     return h * 3600 + m * 60
 
 
-def reseau_synthetique(n: int, trains: list[tuple], a_pied=None):
-    """n gares espacées d'un degré ; trains = (départ, arrivée, de, vers, trajet[, montée, descente])."""
+def reseau_synthetique(n: int, trains: list[tuple], liaisons=None):
+    """n gares espacées d'un degré ; trains = (départ, arrivée, de, vers, trajet[, montée, descente]).
+
+    liaisons : pour chaque gare, [(voisine, secondes)].
+    """
     from horaires.gtfs import Connexion, Gare, Reseau
 
     gares = [Gare(str(i), str(i), 45.0, 4.0 + i) for i in range(n)]
@@ -85,4 +88,4 @@ def reseau_synthetique(n: int, trains: list[tuple], a_pied=None):
         (Connexion(t[0], t[1], t[2], t[3], t[4], 10.0, False, *t[5:]) for t in trains),
         key=lambda c: (c.depart, c.arrivee),
     )
-    return Reseau("v", "j", gares, connexions, a_pied or [[] for _ in gares])
+    return Reseau("v", "j", gares, connexions, liaisons or [[] for _ in gares])

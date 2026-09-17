@@ -10,7 +10,7 @@ from multiprocessing import Pool
 from pathlib import Path
 
 from horaires.geo import haversine_km
-from horaires.gtfs import DISTANCE_A_PIED_KM, Gare, Reseau
+from horaires.gtfs import Gare, Reseau
 from horaires.parcours import INJOIGNABLE, Index, Trajet, meilleurs_trajets, preparer
 
 NB_VOISINS = 3
@@ -18,6 +18,7 @@ KM_MAX = 65535
 HECTOMETRES_MAX = 65535
 CASES_PAR_DEGRE = 2
 RAYON_MAX_CASES = 40
+DISTANCE_GARES_DISTINCTES_KM = 0.5
 
 _reseau: Reseau | None = None
 _index: Index | None = None
@@ -53,7 +54,7 @@ def _choisir_distinctes(gares: list[Gare], tries: list[tuple[float, int]]) -> li
     retenues: list[tuple[float, int]] = []
     for d, i in tries:
         g = gares[i]
-        if all(haversine_km(g.lat, g.lon, gares[j].lat, gares[j].lon) > DISTANCE_A_PIED_KM for _, j in retenues):
+        if all(haversine_km(g.lat, g.lon, gares[j].lat, gares[j].lon) > DISTANCE_GARES_DISTINCTES_KM for _, j in retenues):
             retenues.append((d, i))
             if len(retenues) == NB_VOISINS:
                 break

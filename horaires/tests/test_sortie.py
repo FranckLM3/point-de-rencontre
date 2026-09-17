@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from horaires.gtfs import Gare, _passages_a_pied, charger
+from horaires.gtfs import Gare, charger
 from horaires.parcours import INJOIGNABLE, Trajet
 from horaires.sortie import encoder_ligne, ecrire_tout, gares_desservies, index_voisins
 from horaires.tests.fabrique import archive
@@ -47,7 +47,7 @@ def _voisins(octets: bytes, k: int) -> list[int]:
 def _avec_epsilon(reseau):
     """Ajoute Epsilon, zone d'arrêt sans train à 100 m d'Alpha."""
     gares = reseau.gares + [Gare("StopArea:OCE5", "Epsilon", 45.0009, 4.0)]
-    return dataclasses.replace(reseau, gares=gares, a_pied=_passages_a_pied(gares))
+    return dataclasses.replace(reseau, gares=gares, liaisons=reseau.liaisons + [[]])
 
 
 class VoisinsTest(unittest.TestCase):

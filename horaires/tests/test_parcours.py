@@ -27,11 +27,10 @@ class ParcoursTest(unittest.TestCase):
         self.assertEqual(t[2].minutes, 30)
         self.assertFalse(t[2].grande_ligne)
 
-    def test_passage_a_pied_apres_arrivee(self):
-        # Delta n'a aucun train : on y arrive à pied depuis Gamma (300 m, 5 min).
+    def test_gare_sans_train_jamais_atteinte(self):
+        # Delta, à 300 m de Gamma, n'a aucun train : aucune liaison n'y mène.
         t = meilleurs_trajets(self.reseau, 1)
-        self.assertEqual(t[3].minutes, 35)
-        self.assertAlmostEqual(t[3].km, t[2].km + 0.3, delta=0.05)
+        self.assertEqual(t[3].minutes, INJOIGNABLE)
 
     def test_injoignable(self):
         t = meilleurs_trajets(self.reseau, 2)
