@@ -11,7 +11,7 @@ from pathlib import Path
 
 from horaires.geo import haversine_km
 from horaires.gtfs import DISTANCE_A_PIED_KM, Gare, Reseau
-from horaires.parcours import INJOIGNABLE, Trajet, meilleurs_trajets
+from horaires.parcours import INJOIGNABLE, Index, Trajet, meilleurs_trajets, preparer
 
 NB_VOISINS = 3
 KM_MAX = 65535
@@ -20,6 +20,7 @@ CASES_PAR_DEGRE = 2
 RAYON_MAX_CASES = 40
 
 _reseau: Reseau | None = None
+_index: Index | None = None
 
 
 def encoder_ligne(trajets: list[Trajet]) -> bytes:
@@ -96,13 +97,14 @@ def index_voisins(gares: list[Gare], grille: dict, desservies: list[bool]) -> by
 
 
 def _initialiser(reseau: Reseau) -> None:
-    global _reseau
+    global _reseau, _index
     _reseau = reseau
+    _index = preparer(reseau)
 
 
 def _ligne(source: int) -> tuple[int, bytes]:
     assert _reseau is not None
-    return source, encoder_ligne(meilleurs_trajets(_reseau, source))
+    return source, encoder_ligne(meilleurs_trajets(_reseau, source, _index))
 
 
 def ecrire_tout(reseau: Reseau, grille: dict, dossier: Path, processus: int) -> None:

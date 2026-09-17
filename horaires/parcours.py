@@ -1,6 +1,12 @@
-"""Parcours de connexions : durée la plus courte de la gare source vers chaque gare."""
+"""Parcours de connexions : durée la plus courte de la gare source vers chaque gare.
+
+Un parcours par heure de départ réelle depuis la source (train pris à la source,
+ou à une gare voisine en comptant la marche et la marge) : la durée retenue est
+le minimum, sur ces départs, de l'arrivée moins l'heure de départ de la source.
+"""
 from __future__ import annotations
 
+from bisect import bisect_left
 from dataclasses import dataclass
 
 from horaires.gtfs import Reseau
@@ -9,9 +15,9 @@ INJOIGNABLE = 65535
 CORRESPONDANCE_S = 300
 DEBUT_FENETRE_S = 6 * 3600
 FIN_FENETRE_S = 20 * 3600
-PAS_FENETRE_S = 20 * 60
 VITESSE_MARCHE_KMH = 4.5
 DETOUR_MARCHE = 1.3
+JAMAIS = 1 << 40
 
 
 @dataclass(frozen=True)
@@ -21,54 +27,98 @@ class Trajet:
     grande_ligne: bool
 
 
+@dataclass(frozen=True)
+class Index:
+    """Connexions à plat et départs par gare, préparés une fois par réseau."""
+
+    connexions: list[tuple]  # (départ, arrivée, de, vers, n° de trajet, km, grande ligne)
+    departs: list[int]
+    departs_par_gare: list[list[int]]
+    liaisons: list[list[tuple[int, int, float]]]  # (voisine, secondes, km)
+
+
 def _marche_s(km: float) -> int:
     return round(km * DETOUR_MARCHE / VITESSE_MARCHE_KMH * 3600 / 60) * 60
 
 
-def _un_depart(reseau: Reseau, source: int, depart: int) -> list[tuple[int, int, float, bool] | None]:
-    """Étiquettes (arrivée, heure du premier train, km, grande ligne) pour un départ donné."""
-    etiquettes: list[tuple[int, int, float, bool] | None] = [None] * len(reseau.gares)
-    etiquettes[source] = (depart, -1, 0.0, False)
-    for voisin, km in reseau.a_pied[source]:
-        etiquettes[voisin] = (depart + _marche_s(km), -1, km, False)
-    en_cours: dict[str, tuple[int, float, bool]] = {}
+def preparer(reseau: Reseau) -> Index:
+    numeros: dict[str, int] = {}
+    connexions = [
+        (c.depart, c.arrivee, c.de, c.vers, numeros.setdefault(c.trajet, len(numeros)), c.km, c.grande_ligne)
+        for c in reseau.connexions
+    ]
+    departs_par_gare: list[set[int]] = [set() for _ in reseau.gares]
     for c in reseau.connexions:
-        if c.depart < depart:
-            continue
-        pris = en_cours.get(c.trajet)
+        departs_par_gare[c.de].add(c.depart)
+    liaisons = [[(j, _marche_s(km), km) for j, km in voisins] for voisins in reseau.a_pied]
+    return Index(
+        connexions=connexions,
+        departs=[c[0] for c in connexions],
+        departs_par_gare=[sorted(s) for s in departs_par_gare],
+        liaisons=liaisons,
+    )
+
+
+def _departs_source(index: Index, source: int) -> list[int]:
+    """Heures de départ réelles de la source, dans la fenêtre, marche et marge comprises."""
+    heures = set(index.departs_par_gare[source])
+    for voisine, secondes, _ in index.liaisons[source]:
+        heures.update(d - secondes - CORRESPONDANCE_S for d in index.departs_par_gare[voisine])
+    return sorted(h for h in heures if DEBUT_FENETRE_S <= h <= FIN_FENETRE_S)
+
+
+def _un_depart(index: Index, source: int, depart: int, arrivee: list[int], info: list):
+    """Arrivée au plus tôt (et km, grande ligne) pour un départ de la source à `depart`.
+
+    `arrivee` arrive rempli de JAMAIS ; renvoie les gares atteintes, à remettre à JAMAIS.
+    """
+    atteintes = [source]
+    arrivee[source] = depart
+    info[source] = (0.0, False)
+    for voisine, secondes, km in index.liaisons[source]:
+        if depart + secondes < arrivee[voisine]:
+            arrivee[voisine] = depart + secondes
+            info[voisine] = (km, False)
+            atteintes.append(voisine)
+    en_cours: dict[int, tuple[float, bool]] = {}
+    connexions = index.connexions
+    for k in range(bisect_left(index.departs, depart), len(connexions)):
+        dep, arr, de, vers, trajet, km, gl = connexions[k]
+        pris = en_cours.get(trajet)
         if pris is None:
-            e = etiquettes[c.de]
-            if e is None:
+            marge = 0 if de == source else CORRESPONDANCE_S
+            if arrivee[de] + marge > dep:
                 continue
-            marge = 0 if c.de == source else CORRESPONDANCE_S
-            if e[0] + marge > c.depart:
-                continue
-            premier = c.depart if e[1] < 0 else e[1]
-            pris = (premier, e[2], e[3])
-        premier, km, gl = pris
-        km, gl = km + c.km, gl or c.grande_ligne
-        en_cours[c.trajet] = (premier, km, gl)
-        actuelle = etiquettes[c.vers]
-        if actuelle is None or c.arrivee < actuelle[0]:
-            etiquettes[c.vers] = (c.arrivee, premier, km, gl)
-            for voisin, pas in reseau.a_pied[c.vers]:
-                arrivee = c.arrivee + _marche_s(pas)
-                e = etiquettes[voisin]
-                if e is None or arrivee < e[0]:
-                    etiquettes[voisin] = (arrivee, premier, km + pas, gl)
-    return etiquettes
+            pris = info[de]
+        pris = (pris[0] + km, pris[1] or gl)
+        en_cours[trajet] = pris
+        if arr < arrivee[vers]:
+            arrivee[vers] = arr
+            info[vers] = pris
+            atteintes.append(vers)
+            for voisine, secondes, pas in index.liaisons[vers]:
+                if arr + secondes < arrivee[voisine]:
+                    arrivee[voisine] = arr + secondes
+                    info[voisine] = (pris[0] + pas, pris[1])
+                    atteintes.append(voisine)
+    return atteintes
 
 
-def meilleurs_trajets(reseau: Reseau, source: int) -> list[Trajet]:
-    meilleurs = [Trajet(INJOIGNABLE, 0.0, False)] * len(reseau.gares)
+def meilleurs_trajets(reseau: Reseau, source: int, index: Index | None = None) -> list[Trajet]:
+    index = index or preparer(reseau)
+    n = len(reseau.gares)
+    meilleurs = [Trajet(INJOIGNABLE, 0.0, False)] * n
     meilleurs[source] = Trajet(0, 0.0, False)
-    for depart in range(DEBUT_FENETRE_S, FIN_FENETRE_S + 1, PAS_FENETRE_S):
-        for j, e in enumerate(_un_depart(reseau, source, depart)):
-            if e is None or j == source:
-                continue
-            arrivee, premier, km, gl = e
-            debut = depart if premier < 0 else premier
-            minutes = round((arrivee - debut) / 60)
-            if minutes < meilleurs[j].minutes:
-                meilleurs[j] = Trajet(minutes, km, gl)
+    duree_min = [JAMAIS] * n
+    duree_min[source] = 0
+    arrivee = [JAMAIS] * n
+    info: list = [None] * n
+    for depart in _departs_source(index, source):
+        atteintes = _un_depart(index, source, depart, arrivee, info)
+        for j in set(atteintes):
+            duree = arrivee[j] - depart
+            if duree < duree_min[j]:
+                duree_min[j] = duree
+                meilleurs[j] = Trajet(round(duree / 60), *info[j])
+            arrivee[j] = JAMAIS
     return meilleurs
