@@ -1228,6 +1228,256 @@ git add -A && git commit -m "feat: recherche d'adresse IGN"
 
 ---
 
+### Décisions d'architecture (revue du 2026-09-17)
+
+**E1. Grille de 4 km (choix de Franck).** La grille de 2 km (321408 points,
+1,3 Mo par personne) coûterait environ 50 Mo pour 40 personnes sur un
+téléphone et retracerait les contours sur tous ces points à chaque case
+cochée. Passer à 4 km (environ 80000 points, 320 Ko par personne) :
+- `scripts/generer-grille.mjs` : `PAS_KM = 4`, sortie
+  `public/data/grille-4km.json` ; supprimer `public/data/grille-2km.json`.
+- `src/donnees/statiques.ts` : `chargerGrille` lit `data/grille-4km.json`.
+- Script `donnees` de `package.json` inchangé.
+- Réaliser cette décision en **premier** dans le lot des Tasks 10 et
+  suivantes, avec son propre commit `perf: grille de 4 km`.
+
+**E2. Réveil automatique de Supabase (choix de Franck).** Un projet gratuit
+se met en pause après 7 jours sans activité. Task 16 ajoute
+`.github/workflows/reveil.yml` :
+
+```yaml
+name: reveil
+on:
+  schedule:
+    - cron: '17 6 * * 1,4'
+  workflow_dispatch:
+permissions: {}
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Interroger la base
+        env:
+          URL: ${{ vars.SUPABASE_URL }}
+          CLE: ${{ vars.SUPABASE_ANON_KEY }}
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$URL/rest/v1/amis?select=id&limit=1" -H "apikey: $CLE")
+          echo "HTTP $code"
+          test "$code" = 200
+```
+
+La requête anonyme rend `[]` (aucune politique pour `anon`) : elle réveille
+la base sans lire aucune donnée.
+
+**E3. Rafraîchir sans perdre le focus.** `rafraichir` reconstruit le
+panneau à chaque changement ; une personne au clavier perdrait sa place.
+Dans `main.ts`, avant de reconstruire, mémoriser
+`document.activeElement?.getAttribute('data-id') ?? document.activeElement?.id`
+et, après, redonner le focus à l'élément équivalent s'il existe. Test
+Playwright : cocher une case au clavier (`Space`) laisse le focus sur
+cette case.
+
+**E4. Ne retracer les zones que si nécessaire.** Tester un lieu ou ouvrir
+une ville ne change pas les zones. `rendreCarte` garde en mémoire la clé
+`${mode}|${critere}|${max}|${ids triés}|${version des amis}` du dernier
+tracé et ne recalcule agrégat, contours et légende que si elle change.
+Test unitaire sur une fonction pure `cleZones(etat, ids, version)`.
+
+**E5. Vérifier que l'inscription est fermée.** Task 16, étape de
+vérification en ligne, ajoute :
+
+```bash
+curl -s -X POST "https://<projet>.supabase.co/auth/v1/signup" -H "apikey: <clé anon>" -H "Content-Type: application/json" -d '{"email":"essai@exemple.fr","password":"essai-123456"}'
+```
+
+Expected : une erreur « Signups not allowed ». Sinon, n'importe qui
+possédant l'adresse de la page pourrait créer un compte et lire les
+adresses.
+
+**Flux des données (plan 1).**
+
+```
+ connexion ──> Supabase Auth (compte partagé)
+                    │ session
+                    v
+ listerAmis / listerGroupes ──> Session { amis, groupes, etat }
+ grille-4km.json + villes.json ─┘            │
+                                             v
+ changement (case, filtre, lieu) ──> changer() ──> rafraichir()
+        ├─ URL (ecrireEtat)
+        ├─ panneau : amis, filtres, lieu, villes (classerVilles)
+        └─ carte : si cleZones change
+              distancesOiseau (cache par ami) ─> agreger ─> seuils ─> zones ─> légende
+```
+
+### Décisions de design (revue du 2026-09-17, s'appliquent aux Tasks 10 à 15)
+
+Ces décisions **priment** sur le code des Tasks 10 à 15 là où ils divergent.
+L'implémenteur applique le code des tâches puis ces ajustements, avec
+tests.
+
+**D1. Palette des zones : dégradé de vert (choix de Franck).** Une distance
+est une grandeur qui croît, pas un écart autour d'un centre : pas de vert,
+jaune, rouge. Dans `src/calcul/zones.ts`, remplacer `COULEURS_TRANCHES` par :
+
+```ts
+/** Du plus proche (vert profond) au plus loin (presque transparent). */
+export const COULEURS_TRANCHES = ['#0b5d2a', '#1a7f3c', '#2f9e52', '#55b86f', '#86cf95', '#b5e2bd', '#d6efd9', '#ecf8ee'] as const
+```
+
+`OPACITE_ZONES` passe à `0.5` dans `src/ui/carte.ts`.
+
+**D2. Légende obligatoire.** Nouveau module `src/ui/legende.ts`, test
+`tests/unit/legende.test.ts` :
+
+```ts
+import type { Tranche } from '../calcul/zones'
+import { km } from './format'
+
+/** Réglette horizontale : une case par tranche, bornes sous les cases. */
+export function rendreLegende(el: HTMLElement, tranches: Tranche[]): void {
+  const croissantes = [...tranches].sort((a, b) => a.seuil - b.seuil)
+  el.hidden = croissantes.length === 0
+  el.setAttribute('role', 'img')
+  el.setAttribute('aria-label', `Légende : ${croissantes.map((t) => `jusqu’à ${km(t.seuil)}`).join(', ')}`)
+  el.innerHTML = croissantes
+    .map((t) => `<span class="case"><span class="nuance" style="background:${t.couleur}"></span>${km(t.seuil)}</span>`)
+    .join('')
+}
+```
+
+Test : trois tranches données dans le désordre donnent trois cases dans
+l'ordre croissant et un `aria-label` qui contient « jusqu’à 100 km » ; une
+liste vide cache la légende. La légende est un `<div id="legende"
+class="legende">` posé sur la carte (en bas à gauche, au-dessus des
+tuiles, `z-index: 500`), rendue dans `rendreCarte`.
+
+**D3. Marqueurs.** Nouveau module pur `src/ui/marqueurs.ts`, test
+`tests/unit/marqueurs.test.ts` :
+
+```ts
+import type { Ami } from '../types'
+
+export function initiales(nom: string): string {
+  const mots = nom.trim().split(/\s+/).filter(Boolean)
+  const lettres = mots.length > 1 ? mots[0]![0]! + mots[mots.length - 1]![0]! : (mots[0] ?? '?').slice(0, 2)
+  return lettres.toUpperCase()
+}
+
+export interface Point {
+  lat: number
+  lon: number
+  amis: Ami[]
+}
+
+/** Regroupe les personnes à la même adresse (coordonnées identiques à 5 décimales). */
+export function grouperParPosition(amis: Ami[]): Point[] {
+  const points = new Map<string, Point>()
+  for (const a of amis) {
+    const cle = `${a.lat.toFixed(5)},${a.lon.toFixed(5)}`
+    const point = points.get(cle) ?? { lat: a.lat, lon: a.lon, amis: [] }
+    points.set(cle, { ...point, amis: [...point.amis, a] })
+  }
+  return [...points.values()]
+}
+
+export const etiquette = (p: Point): string => (p.amis.length > 1 ? String(p.amis.length) : initiales(p.amis[0]!.nom))
+```
+
+Tests : `initiales('Franck') === 'FR'`, `initiales('Jean Dupont') ===
+'JD'`, `initiales('  ') === '?'` ; deux amis au même endroit donnent un
+point d'étiquette `'2'`. Dans `carte.ts`, `amis()` dessine un marqueur par
+point : pastille ronde de 28 px, fond `--pastille` si au moins une personne
+du point est cochée, sinon `--texte-doux`, texte blanc 12 px gras ;
+infobulle = noms et moyens de transport de toutes les personnes du point.
+
+Le centre n'utilise plus le marqueur bleu de Leaflet : `L.divIcon` avec
+`<span class="cible"></span>` (36 px, anneau extérieur vert `--accent` de
+4 px, point central `--pastille` de 10 px). Infobulle : « Meilleur point,
+310 km au pire » ou « Meilleur point, 220 km en moyenne ».
+
+**D4. Aucune boîte de dialogue du navigateur.** Pas de `window.prompt` ni
+de `window.confirm`.
+- Groupe : le bouton « Enregistrer la sélection » affiche sous la rangée un
+  petit formulaire en ligne (champ « Nom du groupe » avec libellé visible,
+  bouton « Enregistrer le groupe », bouton « Annuler »).
+- Suppression dans la fiche : premier clic sur « Supprimer » change le
+  bouton en « Confirmer la suppression » (fond `--danger`, texte blanc) ; le
+  second clic supprime. Annuler ou fermer la fiche réarme le bouton.
+- Tests : le formulaire de groupe appelle `enregistrerGroupe` avec le nom
+  saisi et la sélection ; un seul clic sur Supprimer n'appelle pas
+  `supprimer`, deux clics l'appellent.
+
+**D5. Mobile : la carte d'abord, avec un volet (choix de Franck).** Sous
+1024 px :
+- La carte occupe tout l'écran (`position: fixed; inset: 0`).
+- Le panneau devient un volet fixé en bas, fond `--surface`, coins
+  supérieurs arrondis 18 px, ombre vers le haut. Fermé : hauteur `38dvh`.
+  Ouvert (classe `volet-ouvert` sur `.app`) : `88dvh`. La transition porte
+  sur `transform` uniquement (`translateY`), 200 ms ; aucune transition si
+  `prefers-reduced-motion`.
+- En haut du volet, une poignée : `<button id="poignee"
+  aria-expanded="false" aria-controls="panneau">Voir la liste</button>`
+  (barre de 36 x 4 px au-dessus du texte). Ouvert, le texte devient
+  « Réduire ».
+- Ordre dans le volet sous 1024 px (propriété CSS `order`) : poignée,
+  filtres et titre, première ville du classement, puis amis, lieu testé,
+  reste des villes. Sur ordinateur, l'ordre reste celui de la Task 14.
+- Le bouton flottant `#bascule` et la classe `voir-carte` sont supprimés.
+- Test Playwright mobile : la carte est visible dès l'arrivée ; toucher
+  « Voir la liste » passe `aria-expanded` à `true` et le bouton affiche
+  « Réduire ».
+
+**D6. États de l'interface.**
+
+| Situation | Ce que voit la personne |
+|---|---|
+| Chargement initial | Dans le volet ou le panneau : « Chargement de la carte… » (`role="status"`, pas en rouge). |
+| Aucune personne en base | À la place des villes : « Ajoute la première personne pour commencer. » et le bouton « Ajouter une personne ». |
+| Personne n'est cochée | À la place des villes : « Coche au moins une personne pour voir la carte. » Ni zones, ni centre, légende cachée. |
+| Aucune ville sous le maximum | « Aucune ville à moins de 300 km pour tout le monde. Choisis une distance plus grande. » (valeur réelle). |
+| Erreur de chargement | Bandeau rouge avec le message et un bouton « Réessayer » qui relance le chargement. |
+| Recherche d'adresse sans résultat | Sous le champ : « Aucune adresse trouvée. Ajoute le code postal. » |
+| Enregistrement en cours | Bouton désactivé, texte « Enregistrement… » ; il reprend son texte en cas d'erreur. |
+| Lieu testé | Carte « lieu » en tête du panneau avec un bouton « Retirer le lieu » qui vide la sélection et l'URL. |
+
+Chaque ligne a un test unitaire dans le module qui l'affiche.
+
+**D7. Accessibilité et surfaces du navigateur.**
+- Repères : `<aside id="panneau" aria-label="Recherche et résultats">`,
+  carte `role="region" aria-label="Carte des zones"`.
+- Le champ « Où se retrouver ? » a un libellé visible « Tester un lieu »
+  (le texte indicatif ne sert pas de libellé).
+- Sous 1024 px, toute cible tactile fait au moins 44 px de haut
+  (`.pastille`, cases à cocher agrandies à 22 px dans une pastille de
+  44 px).
+- Texte : 16 px minimum pour le corps, 14 px (`.875rem`) pour les
+  pastilles ; chiffres en `font-variant-numeric: tabular-nums`.
+- Pas de `aria-pressed` sur un `<select>`.
+- Surfaces thémées dans `app.css` : `::selection { background:
+  var(--accent-fond); color: var(--texte) }`, `caret-color: var(--accent)`,
+  `accent-color: var(--accent)` sur `:root`.
+- Test Playwright à 375 px : `document.documentElement.scrollWidth <=
+  window.innerWidth`.
+
+**D8. Textes.**
+
+| Avant | Après |
+|---|---|
+| Entrer | Ouvrir la carte |
+| + | Ajouter une personne |
+| Personne (tout décocher) | Aucune |
+| Ajouter un ami / Modifier un ami | Ajouter une personne / Modifier une personne |
+| Inclure X | Inclure X (inchangé) |
+
+Les tests unitaires et Playwright sont ajustés à ces libellés.
+
+**Hors périmètre (décidé) :** maquettes générées (la direction Chronotrains
+est imposée), mode sombre (usage en journée sur téléphone, à réévaluer),
+animation d'arrivée des zones.
+
+---
+
 ### Task 10 : styles et formatage
 
 **Files:**
@@ -2553,3 +2803,17 @@ Puis ouvrir `https://<login>.github.io/point-de-rencontre/` :
 - fond de carte CARTO affiché sans filigrane. Sinon, remplacer `TUILES` par
   `https://tile.openstreetmap.org/{z}/{x}/{y}.png`, retirer `subdomains`, et
   mettre l'attribution `&copy; OpenStreetMap`.
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | not run | |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | not run | |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR (PLAN) | 5 issues, 0 critical gaps : grille 4 km, réveil Supabase, focus, zones en cache, inscription fermée |
+| Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR (PLAN) | score: 5/10 → 9/10, 8 decisions |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | not run | |
+
+- **VERDICT:** ENG + DESIGN CLEARED, ready to implement Tasks 10 à 16 avec les décisions E1 à E5 et D1 à D8.
+
+NO UNRESOLVED DECISIONS
