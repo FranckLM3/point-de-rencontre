@@ -2,7 +2,7 @@ import { writeFile, mkdir } from 'node:fs/promises'
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon'
 
 const SOURCE = 'https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/metropole-version-simplifiee.geojson'
-const PAS_KM = 2
+const PAS_KM = 4
 const LAT_MOY = 46.5
 const BBOX = { lonMin: -5.3, lonMax: 9.7, latMin: 41.2, latMax: 51.2 }
 
@@ -28,5 +28,5 @@ const sortie = {
   lon0: BBOX.lonMin, lat0: BBOX.latMin, pasLon, pasLat, nx, ny,
   dedans: Buffer.from(dedans).toString('base64'),
 }
-await writeFile('public/data/grille-2km.json', JSON.stringify(sortie))
+await writeFile('public/data/grille-4km.json', JSON.stringify(sortie))
 console.log(`grille ${nx}x${ny}, ${dedans.reduce((a, b) => a + b, 0)} points en France`)

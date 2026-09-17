@@ -20,7 +20,7 @@ async function lireJson<T>(chemin: string): Promise<T> {
 }
 
 export async function chargerGrille(): Promise<Grille> {
-  return decoderGrille(await lireJson<GrilleBrute>('data/grille-2km.json'))
+  return decoderGrille(await lireJson<GrilleBrute>('data/grille-4km.json'))
 }
 
 export function chargerVilles(): Promise<Ville[]> {
