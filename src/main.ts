@@ -2,14 +2,16 @@ import '@fontsource/jost/400.css'
 import '@fontsource/jost/500.css'
 import '@fontsource/jost/800.css'
 import './styles/app.css'
-import { agreger, distancesOiseau, meilleurIndice } from './calcul/agregat'
+import { agreger, meilleurIndice } from './calcul/agregat'
+import { choisirMesure, creerChargeurTc, creerCouches, type ChargeurTc, type Couches } from './calcul/couches'
 import { coordonnees, type Grille } from './calcul/grille'
-import { uniteDe } from './calcul/unites'
-import { classerVilles, mesureOiseau } from './calcul/villes'
+import { pasTranches, uniteDe } from './calcul/unites'
+import { classerVilles, type Mesure } from './calcul/villes'
 import { seuils, zones } from './calcul/zones'
 import { ajouterAmi, listerAmis, modifierAmi, supprimerAmi } from './donnees/amis'
 import { connecter, deconnecter, estConnecte } from './donnees/auth'
 import { enregistrerGroupe, listerGroupes } from './donnees/groupes'
+import { creerHoraires } from './donnees/horaires'
 import { chargerGrille, chargerVilles } from './donnees/statiques'
 import { ecrireEtat, lireEtat } from './etat/url'
 import type { Ami, Etat, Groupe, Ville } from './types'
@@ -24,9 +26,9 @@ import { rendreRechercheLieu, rendreResultatLieu, type RechercheLieu } from './u
 import { rendreVilles } from './ui/liste-villes'
 import { infobulleCentre } from './ui/marqueurs'
 
-const PAS_KM = 100
 const NB_VILLES = 20
 const TEXTE_CHARGEMENT = 'Chargement de la carte…'
+const TEXTE_HORAIRES = 'Chargement des horaires…'
 const racine = document.querySelector<HTMLElement>('#app')!
 
 interface Session {
@@ -37,8 +39,12 @@ interface Session {
   etat: Etat
   carte: Carte
   recherche: RechercheLieu
-  /** Distances par ami, recalculées seulement si l'ami a bougé. */
-  couches: Map<string, { cle: string; valeurs: Float32Array }>
+  /** Valeurs de grille par personne, recalculées seulement si la clé change. */
+  couches: Couches
+  /** Horaires des trains, chargés à la première activation du mode transports. */
+  tc: ChargeurTc
+  /** Augmente à chaque rendu : un calcul asynchrone périmé est ignoré. */
+  rendu: number
   /** Augmente à chaque rechargement des personnes (E4). */
   version: number
   cleZones: string | null
@@ -61,15 +67,6 @@ function signaler(message: string, relancer?: () => void): void {
   bouton.textContent = 'Réessayer'
   bouton.addEventListener('click', relancer)
   bandeau.append(' ', bouton)
-}
-
-function couche(s: Session, a: Ami): Float32Array {
-  const cle = `${a.lat},${a.lon}`
-  const connue = s.couches.get(a.id)
-  if (connue?.cle === cle) return connue.valeurs
-  const valeurs = distancesOiseau(s.grille, a.lat, a.lon)
-  s.couches.set(a.id, { cle, valeurs })
-  return valeurs
 }
 
 async function recharger(s: Session): Promise<void> {
@@ -102,7 +99,7 @@ function retirerLieu(s: Session): void {
   $('#champ-lieu').focus()
 }
 
-function rendrePanneau(s: Session, choisis: Ami[]): void {
+function rendrePanneau(s: Session, choisis: Ami[], mesure: Mesure): void {
   rendreAmis($('#amis'), { amis: s.amis, groupes: s.groupes, selection: new Set(choisis.map((a) => a.id)) }, {
     changerSelection: (ids) => changer(s, { selection: ids }),
     editer: (ami) => editer(s, ami),
@@ -115,7 +112,6 @@ function rendrePanneau(s: Session, choisis: Ami[]): void {
   rendreFiltres($('#filtres'), s.etat, choisis.length, (p) => changer(s, p))
   const { lieu, mode, critere, max } = s.etat
   const unite = uniteDe(mode, s.etat.grandeur)
-  const mesure = mesureOiseau
   const details = lieu ? choisis.map((a) => mesure(a, lieu.lat, lieu.lon)) : []
   rendreResultatLieu($('#resultat-lieu'), lieu, choisis, details, unite, () => retirerLieu(s))
   const villes = classerVilles(s.villes, choisis, mesure, critere, max, NB_VILLES)
@@ -132,11 +128,11 @@ function rendreZones(s: Session, choisis: Ami[]): void {
     rendreLegende($('#legende'), [])
     return
   }
-  const valeurs = agreger(choisis.map((a) => couche(s, a)), s.etat.critere, s.grille.nx * s.grille.ny)
+  const valeurs = agreger(choisis.map((a) => s.couches.obtenir(a, s.etat, s.tc.pret())), s.etat.critere, s.grille.nx * s.grille.ny)
   let plusGrande = 0
   for (const v of valeurs) if (v > plusGrande) plusGrande = v
   const unite = uniteDe(s.etat.mode, s.etat.grandeur)
-  const tranches = zones(s.grille, valeurs, seuils(PAS_KM, s.etat.max, plusGrande))
+  const tranches = zones(s.grille, valeurs, seuils(pasTranches(unite), s.etat.max, plusGrande))
   s.carte.zones(tranches)
   rendreLegende($('#legende'), tranches, unite)
   const meilleur = meilleurIndice(valeurs)
@@ -158,15 +154,63 @@ function rendreCarte(s: Session, choisis: Ami[]): void {
   rendreZones(s, choisis)
 }
 
+function afficher(s: Session, choisis: Ami[], mesure: Mesure, focus: string | null): void {
+  rendrePanneau(s, choisis, mesure)
+  rendreCarte(s, choisis)
+  const actif = document.activeElement
+  const perdu = !actif || actif === document.body || !actif.isConnected
+  if (focus && perdu) $('#panneau').querySelector<HTMLElement>(focus)?.focus()
+}
+
+/** Pendant le premier chargement des horaires : filtres à jour, résultats et zones vidés. */
+function attendreHoraires(s: Session, choisis: Ami[]): void {
+  rendreFiltres($('#filtres'), s.etat, choisis.length, (p) => changer(s, p))
+  $('#chargement').textContent = TEXTE_HORAIRES
+  $('#villes').textContent = ''
+  $('#resultat-lieu').textContent = ''
+  s.carte.zones([])
+  s.carte.sansCentre()
+  rendreLegende($('#legende'), [])
+  s.cleZones = null
+}
+
+function echecHoraires(s: Session, e: unknown): void {
+  console.error('Horaires :', e)
+  if (s.etat.mode !== 'tc') return
+  changer(s, { mode: 'oiseau', max: null })
+  signaler((e as Error).message, () => changer(s, { mode: 'tc', max: null }))
+}
+
+function viderChargementHoraires(): void {
+  const statut = $('#chargement')
+  if (statut.textContent === TEXTE_HORAIRES) statut.textContent = ''
+}
+
+async function preparerTc(s: Session, choisis: Ami[], rendu: number): Promise<boolean> {
+  if (!s.tc.pret()) attendreHoraires(s, choisis)
+  try {
+    await (await s.tc.obtenir()).preparer(choisis)
+  } finally {
+    viderChargementHoraires()
+  }
+  return rendu === s.rendu
+}
+
 function rafraichir(s: Session): void {
   history.replaceState(null, '', ecrireEtat(s.etat))
   signaler('')
+  const rendu = ++s.rendu
   const actif = document.activeElement
-  const cle = $('#panneau').contains(actif) ? cleFocus(actif) : null
+  const focus = $('#panneau').contains(actif) ? cleFocus(actif) : null
   const choisis = amisChoisis(s.amis, s.etat.selection)
-  rendrePanneau(s, choisis)
-  rendreCarte(s, choisis)
-  if (cle && actif && !actif.isConnected) $('#panneau').querySelector<HTMLElement>(cle)?.focus()
+  if (s.etat.mode !== 'tc') {
+    viderChargementHoraires()
+    return afficher(s, choisis, choisirMesure(s.etat, null), focus)
+  }
+  preparerTc(s, choisis, rendu).then(
+    (aJour) => { if (aJour) afficher(s, choisis, choisirMesure(s.etat, s.tc.pret()), focus) },
+    (e: unknown) => { if (rendu === s.rendu) echecHoraires(s, e) },
+  )
 }
 
 const SQUELETTE = `
@@ -221,7 +265,9 @@ async function charger(carte: Carte, installer: (s: Session) => void): Promise<v
     const s: Session = {
       grille, villes, amis, groupes, etat, carte,
       recherche: rendreRechercheLieu($('#lieu'), etat.lieu, (lieu) => changer(s, { lieu })),
-      couches: new Map(),
+      couches: creerCouches(grille),
+      tc: creerChargeurTc(creerHoraires),
+      rendu: 0,
       version: 0,
       cleZones: null,
     }

@@ -136,8 +136,16 @@ function meilleurVers(h: Horaires, d: DepuisGares, ami: Ami, km: number, gares: 
   return best
 }
 
-export function versPointTc(h: Horaires, d: DepuisGares, ami: Ami, lat: number, lon: number): TrajetTc | null {
-  return meilleurVers(h, d, ami, haversineKm(ami.lat, ami.lon, lat, lon), garesProches(h.stations, lat, lon))
+/** `gares` : gares proches du point, à passer quand elles sont déjà connues (cache par ville). */
+export function versPointTc(
+  h: Horaires,
+  d: DepuisGares,
+  ami: Ami,
+  lat: number,
+  lon: number,
+  gares: Proche[] = garesProches(h.stations, lat, lon),
+): TrajetTc | null {
+  return meilleurVers(h, d, ami, haversineKm(ami.lat, ami.lon, lat, lon), gares)
 }
 
 export function coucheTc(grille: Grille, h: Horaires, d: DepuisGares, ami: Ami, grandeur: Grandeur): Float32Array {
