@@ -55,14 +55,30 @@ h1 { font-size: var(--titre); font-weight: 800; line-height: 1.1; margin: 4px 0;
 
 .ville-carte {
   display: block; background: var(--surface); border: 1px solid var(--bord); border-radius: var(--rayon-carte);
-  padding: 14px 16px; box-shadow: var(--ombre); cursor: pointer; text-align: left; width: 100%;
+  padding: 14px 16px; box-shadow: var(--ombre); text-align: left; width: 100%;
   transition: transform var(--duree);
 }
-.ville-carte:hover { transform: translateY(-2px); }
-.ville-carte:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-.ville-carte h2 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+.ville-carte:has(.ville-entete:hover) { transform: translateY(-2px); }
+.ville-entete {
+  display: grid; gap: 8px; width: 100%; padding: 0; border: 0; background: none;
+  color: inherit; text-align: left; cursor: pointer;
+}
+.ville-entete:focus-visible { outline: 3px solid var(--accent); outline-offset: 6px; border-radius: 4px; }
+.ville-carte h2, .ville-carte .titre-ville { margin: 0; font-size: 1.25rem; font-weight: 600; }
 .ville-carte .dep { color: var(--texte-doux); font-size: .875rem; }
-.ville-carte .ligne { margin-top: 8px; display: flex; gap: 8px; align-items: center; font-weight: 500; }
+.ville-carte .ligne { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-weight: 500; }
+.ville-carte.lieu { display: grid; gap: 8px; justify-items: start; border-color: var(--accent); }
+.ville-carte.lieu .detail { width: 100%; }
+.sur-titre { color: var(--accent); font-size: .875rem; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+
+.etiquette { display: block; font-weight: 500; margin: 0 0 6px 4px; }
+.aide { color: var(--texte-doux); margin: 4px 0 0 4px; font-size: .875rem; }
+.aide:empty { display: none; }
+.vide { color: var(--texte-doux); margin: 0; padding: 12px 0; display: grid; gap: 10px; justify-items: start; }
+.vide p { margin: 0; }
+form.groupe:not([hidden]) { display: grid; gap: 6px; padding: 12px; background: var(--surface); border: 1px solid var(--bord); border-radius: var(--rayon-carte); }
+form.groupe label { font-weight: 500; }
+form.groupe .champ { flex: 1 1 160px; width: auto; }
 .valeur { background: var(--accent-fond); color: var(--accent); border-radius: 6px; padding: 2px 8px; }
 
 .detail { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 1rem; }
@@ -117,8 +133,7 @@ h1 { font-size: var(--titre); font-weight: 800; line-height: 1.1; margin: 4px 0;
 .feuille label { display: grid; gap: 4px; font-weight: 500; }
 .feuille label.option { display: flex; align-items: center; gap: 8px; }
 .feuille fieldset { border: 1px solid var(--bord); border-radius: 12px; display: flex; gap: 16px; }
-.feuille .aide { color: var(--texte-doux); margin: 0; font-size: .875rem; }
-.feuille .aide:empty { display: none; }
+.feuille .aide { margin: 0; }
 
 .connexion { min-height: 100dvh; display: grid; place-items: center; padding: 16px; }
 .connexion form { background: var(--surface); border-radius: var(--rayon-volet); padding: 28px; width: min(380px, 100%); display: grid; gap: 14px; box-shadow: var(--ombre); }
@@ -160,7 +175,7 @@ h1 { font-size: var(--titre); font-weight: 800; line-height: 1.1; margin: 4px 0;
   #lieu, #resultat-lieu { order: 5; }
 
   /* Cibles tactiles d'au moins 44 px. */
-  .pastille, .champ, .propositions button, .ville-carte { min-height: var(--cible-tactile); }
+  .pastille, .champ, .propositions button, .ville-entete { min-height: var(--cible-tactile); }
   .ami input[type='checkbox'] { width: 22px; height: 22px; }
   .ami .editer { min-height: var(--cible-tactile); display: inline-flex; align-items: center; gap: 6px; }
   .rang.amis { flex-wrap: nowrap; overflow-x: auto; }
