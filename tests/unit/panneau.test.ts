@@ -119,14 +119,55 @@ test('Annuler referme le formulaire de groupe', () => {
   expect(el.querySelector<HTMLFormElement>('form.groupe')!.hidden).toBe(true)
 })
 
-test('les modes pas encore livrés sont désactivés', () => {
+test('filtres : seuls « Chacun son moyen » et « Tous en voiture » restent désactivés', () => {
   const el = document.createElement('div')
   rendreFiltres(el, ETAT_DEFAUT, 2, vi.fn())
-  for (const m of ['mixte', 'voiture', 'tc']) {
+  for (const m of ['mixte', 'voiture']) {
     expect(el.querySelector<HTMLButtonElement>(`[data-mode="${m}"]`)!.disabled).toBe(true)
   }
+  expect(el.querySelector<HTMLButtonElement>('[data-mode="tc"]')!.disabled).toBe(false)
   expect(el.querySelector('h1')!.textContent).toContain('à 2')
   expect(el.querySelector('select')!.hasAttribute('aria-pressed')).toBe(false)
+})
+
+test('filtres : changer de mode remet le maximum à zéro', () => {
+  const el = document.createElement('div')
+  const changer = vi.fn()
+  rendreFiltres(el, { ...ETAT_DEFAUT, max: 300 }, 2, changer)
+  cliquer(el, '[data-mode="tc"]')
+  expect(changer).toHaveBeenCalledWith({ mode: 'tc', max: null })
+  const tc = document.createElement('div')
+  rendreFiltres(tc, { ...ETAT_DEFAUT, mode: 'tc' }, 2, changer)
+  cliquer(tc, '[data-mode="oiseau"]')
+  expect(changer).toHaveBeenCalledWith({ mode: 'oiseau', max: null })
+})
+
+test('filtres : le mode actif est en tête de la rangée', () => {
+  const el = document.createElement('div')
+  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'tc' }, 2, vi.fn())
+  const modes = [...el.querySelectorAll<HTMLButtonElement>('[data-mode]')].map((b) => b.dataset.mode)
+  expect(modes[0]).toBe('tc')
+  expect(el.querySelector('[data-mode="tc"]')!.getAttribute('aria-pressed')).toBe('true')
+  expect(el.querySelector('[data-mode="oiseau"]')!.getAttribute('aria-pressed')).toBe('false')
+})
+
+test('filtres : pastilles Temps et Prix en transports seulement', () => {
+  const oiseauEl = document.createElement('div')
+  rendreFiltres(oiseauEl, ETAT_DEFAUT, 2, vi.fn())
+  expect(oiseauEl.querySelector('[aria-label="Grandeur"]')).toBeNull()
+
+  const el = document.createElement('div')
+  const changer = vi.fn()
+  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'tc', max: 120 }, 2, changer)
+  const groupe = el.querySelector('[role="group"][aria-label="Grandeur"]')!
+  const temps = groupe.querySelector('[data-grandeur="temps"]')!
+  const prix = groupe.querySelector('[data-grandeur="prix"]')!
+  expect(temps.textContent).toBe('Temps')
+  expect(prix.textContent).toBe('Prix')
+  expect(temps.getAttribute('aria-pressed')).toBe('true')
+  expect(prix.getAttribute('aria-pressed')).toBe('false')
+  cliquer(el, '[data-grandeur="prix"]')
+  expect(changer).toHaveBeenCalledWith({ grandeur: 'prix', max: null })
 })
 
 test('filtres : critère et distance maximum', () => {
@@ -136,9 +177,29 @@ test('filtres : critère et distance maximum', () => {
   cliquer(el, '[data-critere="moyenne"]')
   expect(changer).toHaveBeenCalledWith({ critere: 'moyenne' })
   const select = el.querySelector('select')!
+  expect(select.getAttribute('aria-label')).toBe('Distance maximum')
+  expect([...select.options].map((o) => o.textContent)).toContain('300 km max')
   select.value = '300'
   select.dispatchEvent(new Event('change'))
   expect(changer).toHaveBeenCalledWith({ max: 300 })
+})
+
+test('filtres : maximum en durée ou en prix selon la grandeur', () => {
+  const el = document.createElement('div')
+  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'tc', max: 180 }, 3, vi.fn())
+  const select = el.querySelector('select')!
+  expect(select.getAttribute('aria-label')).toBe('Durée maximum')
+  expect(select.options[0]!.textContent).toBe('Durée maximum')
+  expect([...select.options].map((o) => o.textContent)).toContain('3 h max')
+  expect(select.value).toBe('180')
+  expect(el.querySelector('h1')!.textContent).toBe('Où se retrouver à 3, en transports, sans dépasser 3 h')
+
+  const prix = document.createElement('div')
+  rendreFiltres(prix, { ...ETAT_DEFAUT, mode: 'tc', grandeur: 'prix' }, 3, vi.fn())
+  const menu = prix.querySelector('select')!
+  expect(menu.getAttribute('aria-label')).toBe('Prix maximum')
+  expect([...menu.options].map((o) => o.textContent)).toContain('40 € max')
+  expect(prix.querySelector('h1')!.textContent).toContain('en transports')
 })
 
 const ville = { nom: 'Dijon', dep: '21', lat: 47.3, lon: 5.04, population: 1 }

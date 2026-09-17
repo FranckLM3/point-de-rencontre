@@ -12,7 +12,7 @@ export function amisChoisis(amis: Ami[], selection: string[] | null): Ami[] {
   return amis.filter((a) => voulus.has(a.id))
 }
 
-const ATTRIBUTS_FOCUS = ['data-id', 'data-edit', 'data-action', 'data-critere', 'data-mode', 'id', 'aria-label'] as const
+const ATTRIBUTS_FOCUS = ['data-id', 'data-edit', 'data-action', 'data-critere', 'data-mode', 'data-grandeur', 'id', 'aria-label'] as const
 
 const guillemets = (v: string): string => `"${v.replace(/["\\]/g, '\\$&')}"`
 
