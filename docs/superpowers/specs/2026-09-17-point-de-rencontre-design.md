@@ -42,6 +42,22 @@ n'est alors pas classé pour ce mode tant que le calcul manque.
 
 ## 3. Interface (inspirée de Chronotrains)
 
+### Accès par mot de passe
+
+- Premier écran : un seul champ « Mot de passe du groupe ». Rien d'autre
+  n'est affiché ni chargé depuis Supabase avant la connexion.
+- Le mot de passe ouvre une session sur le compte Supabase partagé ; la
+  session reste ouverte sur l'appareil (bouton « Se déconnecter » dans le
+  panneau).
+- Changer le mot de passe se fait dans la console Supabase ; toutes les
+  sessions sont alors coupées.
+- Limite connue : GitHub Pages ne sait pas protéger les fichiers eux-mêmes.
+  Le code de la page et la matrice gare → gare restent publics, mais ils ne
+  contiennent aucune donnée sur le groupe. Noms, adresses et temps par ami
+  ne sortent de Supabase qu'après connexion.
+- Supabase limite déjà les tentatives de connexion par adresse IP.
+
+
 ### Ordinateur (≥ 1024 px)
 
 - Panneau à gauche (~ 460 px), carte à droite sur le reste. Fond gris-bleu
