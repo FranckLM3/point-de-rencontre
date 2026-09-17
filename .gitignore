@@ -12,3 +12,6 @@ data/cache/
 test-results/
 playwright-report/
 .mcp.json
+public/data/tc/
+__pycache__/
+.cache-horaires/
