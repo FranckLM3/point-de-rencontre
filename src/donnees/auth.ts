@@ -25,5 +25,7 @@ export async function connecter(motDePasse: string): Promise<string | null> {
 
 export async function deconnecter(): Promise<void> {
   const { error } = await supabase().auth.signOut()
-  if (error) throw new Error(`Impossible de se déconnecter : ${error.message}`)
+  if (!error) return
+  console.error('Échec de déconnexion Supabase :', error)
+  throw new Error('Déconnexion impossible. Réessaie.')
 }

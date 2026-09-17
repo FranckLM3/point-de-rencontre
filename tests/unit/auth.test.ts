@@ -64,7 +64,11 @@ test('deconnecter réussit sans erreur', async () => {
   await expect(deconnecter()).resolves.toBeUndefined()
 })
 
-test('deconnecter relance une erreur lisible en cas d’échec', async () => {
+test('deconnecter relance un message lisible sans le texte brut de Supabase', async () => {
+  const journal = vi.spyOn(console, 'error').mockImplementation(() => {})
   signOut.mockResolvedValue({ error: { message: 'Session absente' } })
-  await expect(deconnecter()).rejects.toThrow('Impossible de se déconnecter')
+  const echec = await deconnecter().catch((e: Error) => e)
+  expect((echec as Error).message).toBe('Déconnexion impossible. Réessaie.')
+  expect(journal).toHaveBeenCalledWith('Échec de déconnexion Supabase :', { message: 'Session absente' })
+  journal.mockRestore()
 })

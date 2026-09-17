@@ -1,4 +1,5 @@
 const LIBELLE_BOUTON = 'Ouvrir la carte'
+const MESSAGE_ECHEC = 'Connexion impossible.'
 
 export function afficherConnexion(
   racine: HTMLElement,
@@ -28,7 +29,7 @@ export function afficherConnexion(
     try {
       message = await connecter(champ.value)
     } catch (e) {
-      message = (e as Error).message
+      message = e instanceof Error && e.message ? e.message : MESSAGE_ECHEC
     }
     bouton.disabled = false
     if (message) {

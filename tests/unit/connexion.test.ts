@@ -41,3 +41,25 @@ test('le bouton est désactivé pendant la connexion puis réactivé après un r
   await vi.waitFor(() => expect(bouton.disabled).toBe(false))
   expect(bouton.textContent).toBe('Ouvrir la carte')
 })
+
+test.each([
+  ['une erreur sans message', () => Promise.reject(new Error(''))],
+  ['une valeur qui n’est pas une erreur', () => Promise.reject('panne')],
+])('connecter rejeté avec %s : message générique, jamais succes', async (_nom, connecter) => {
+  const racine = document.createElement('div')
+  const succes = vi.fn()
+  afficherConnexion(racine, connecter, succes)
+  racine.querySelector('form')!.dispatchEvent(new Event('submit'))
+  await vi.waitFor(() => expect(racine.querySelector('.erreur')!.textContent).toBe('Connexion impossible.'))
+  expect(succes).not.toHaveBeenCalled()
+  expect(racine.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(false)
+})
+
+test('connecter rejeté avec un message : ce message est affiché', async () => {
+  const racine = document.createElement('div')
+  const succes = vi.fn()
+  afficherConnexion(racine, () => Promise.reject(new Error('Configuration absente.')), succes)
+  racine.querySelector('form')!.dispatchEvent(new Event('submit'))
+  await vi.waitFor(() => expect(racine.querySelector('.erreur')!.textContent).toBe('Configuration absente.'))
+  expect(succes).not.toHaveBeenCalled()
+})

@@ -39,17 +39,19 @@ h1 { font-size: var(--titre); font-weight: 800; line-height: 1.1; margin: 4px 0;
 .ami .editer { all: unset; cursor: pointer; }
 .ami .editer:focus-visible { outline: 2px solid var(--accent); }
 .ami .ville, .ami .moyen { color: var(--texte-doux); }
-.ami .moyen { font-size: .75rem; border: 1px solid var(--bord); border-radius: 6px; padding: 0 5px; }
+.ami .moyen { font-size: .875rem; border: 1px solid var(--bord); border-radius: 6px; padding: 0 5px; }
 
 .champ {
   width: 100%; border: 1px solid var(--bord); border-radius: 999px;
   padding: 11px 16px; background: var(--surface); font-size: 1rem;
 }
-.champ:focus { outline: 3px solid var(--accent-fond); border-color: var(--accent); }
+.champ:focus { border-color: var(--accent); background: var(--surface); }
+.champ:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .propositions { list-style: none; margin: 4px 0 0; padding: 0; background: var(--surface); border-radius: 12px; box-shadow: var(--ombre); }
 .propositions:empty { display: none; }
 .propositions button { width: 100%; text-align: left; border: 0; background: none; padding: 10px 14px; cursor: pointer; }
 .propositions button:hover, .propositions button:focus-visible { background: var(--fond); }
+.propositions button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 .ville-carte {
   display: block; background: var(--surface); border: 1px solid var(--bord); border-radius: var(--rayon-carte);
@@ -63,7 +65,7 @@ h1 { font-size: var(--titre); font-weight: 800; line-height: 1.1; margin: 4px 0;
 .ville-carte .ligne { margin-top: 8px; display: flex; gap: 8px; align-items: center; font-weight: 500; }
 .valeur { background: var(--accent-fond); color: var(--accent); border-radius: 6px; padding: 2px 8px; }
 
-.detail { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: .9rem; }
+.detail { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 1rem; }
 .detail td { padding: 4px 0; border-top: 1px solid var(--bord); }
 .detail td:last-child { text-align: right; }
 
@@ -80,11 +82,12 @@ h1 { font-size: var(--titre); font-weight: 800; line-height: 1.1; margin: 4px 0;
   position: absolute; left: 12px; bottom: 12px; z-index: 500;
   display: flex; gap: 2px; padding: 8px 10px; background: var(--surface);
   border-radius: var(--rayon-pastille); box-shadow: var(--ombre);
-  font-size: .75rem; color: var(--texte-doux);
+  font-size: .875rem; color: var(--texte-doux);
 }
 .legende[hidden] { display: none; }
 .legende .case { display: grid; gap: 3px; justify-items: end; min-width: 44px; }
-.legende .nuance { display: block; width: 100%; height: 10px; border-radius: 2px; }
+/* Même opacité que le remplissage des zones (0.5) pour que la nuance corresponde à la carte. */
+.legende .nuance { display: block; width: 100%; height: 10px; border-radius: 2px; border: 1px solid rgb(0 0 0 / 15%); opacity: .5; }
 
 /* Meilleur point : anneau vert et point central sombre. */
 .cible {
@@ -93,9 +96,26 @@ h1 { font-size: var(--titre); font-weight: 800; line-height: 1.1; margin: 4px 0;
 }
 .cible::after { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--pastille); }
 
-.feuille { position: fixed; inset: 0; background: rgb(0 0 0 / 35%); display: grid; place-items: end center; z-index: 1000; }
-.feuille form { background: var(--surface); width: min(520px, 100%); border-radius: var(--rayon-volet) var(--rayon-volet) 0 0; padding: 20px; display: grid; gap: 12px; }
+/* Pastille d'une personne (ou d'un groupe à la même adresse) : 2 lettres, c'est une étiquette. */
+.marqueur-personne {
+  display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  background: var(--pastille); color: #ffffff; border: 2px solid #ffffff;
+  font-size: 13px; font-weight: 800; line-height: 1; box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
+}
+.marqueur-personne.inactif { background: var(--texte-doux); }
+
+.feuille {
+  position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none;
+  margin: 0; padding: 0; border: 0; background: rgb(0 0 0 / 35%); z-index: 1000;
+}
+.feuille[open] { display: grid; place-items: end center; }
+.feuille::backdrop { background: transparent; }
+.feuille form {
+  background: var(--surface); width: min(520px, 100%); max-height: 90dvh; overflow-y: auto;
+  border-radius: var(--rayon-volet) var(--rayon-volet) 0 0; padding: 20px; display: grid; gap: 12px;
+}
 .feuille label { display: grid; gap: 4px; font-weight: 500; }
+.feuille label.option { display: flex; align-items: center; gap: 8px; }
 .feuille fieldset { border: 1px solid var(--bord); border-radius: 12px; display: flex; gap: 16px; }
 .feuille .aide { color: var(--texte-doux); margin: 0; font-size: .875rem; }
 .feuille .aide:empty { display: none; }
@@ -144,8 +164,9 @@ h1 { font-size: var(--titre); font-weight: 800; line-height: 1.1; margin: 4px 0;
   .ami input[type='checkbox'] { width: 22px; height: 22px; }
   .ami .editer { min-height: var(--cible-tactile); display: inline-flex; align-items: center; gap: 6px; }
   .rang.amis { flex-wrap: nowrap; overflow-x: auto; }
-  .feuille { place-items: end stretch; }
-  .feuille form { max-height: 92dvh; overflow-y: auto; }
+  .feuille[open] { place-items: end stretch; }
+  .feuille label.option { min-height: var(--cible-tactile); }
+  .feuille label.option input { width: 22px; height: 22px; margin: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
