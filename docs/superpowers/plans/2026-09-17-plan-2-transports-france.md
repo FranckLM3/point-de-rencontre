@@ -828,7 +828,7 @@ Run: `npm run test:horaires` puis `npm run horaires`
 Expected: tests OK ; la commande affiche le nombre de gares (environ
 3389) et de connexions, puis une durée de quelques minutes. Contrôle :
 `ls public/data/tc/lignes | wc -l` = nombre de gares ;
-`du -sh public/data/tc` environ 18 Mo.
+`du -sh public/data/tc` environ 57 Mo (17 Ko par gare, 8 Ko compressé).
 
 - [ ] **Step 4 : commit**
 
@@ -1227,6 +1227,7 @@ export interface Station {
   nom: string
   lat: number
   lon: number
+  desservie: boolean
 }
 
 export interface Ligne {
@@ -1351,6 +1352,8 @@ Règles (spec 5.3, écarts ci-dessus) :
 - prix du chemin le plus rapide = prix du train + 2 € par trajet en bus
   (accès et sortie) ; prix du train = max(5 €, km x taux), taux 0,10 si
   une grande ligne est empruntée, sinon 0,12 ; pas de train = 0 €.
+- `garesProches` ne retient que les gares desservies (`desservie`), avec la
+  même règle d'écart de 500 m que l'index des voisins.
 
 - [ ] **Step 1 : tests qui échouent**
 

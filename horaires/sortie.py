@@ -3,19 +3,21 @@ from __future__ import annotations
 
 import base64
 import datetime
-import heapq
 import json
+import math
 import struct
 from multiprocessing import Pool
 from pathlib import Path
 
 from horaires.geo import haversine_km
-from horaires.gtfs import Gare, Reseau
+from horaires.gtfs import DISTANCE_A_PIED_KM, Gare, Reseau
 from horaires.parcours import INJOIGNABLE, Trajet, meilleurs_trajets
 
 NB_VOISINS = 3
 KM_MAX = 65535
 HECTOMETRES_MAX = 65535
+CASES_PAR_DEGRE = 2
+RAYON_MAX_CASES = 40
 
 _reseau: Reseau | None = None
 
@@ -33,36 +35,63 @@ def _dedans(grille: dict) -> list[int]:
     return list(base64.b64decode(brut)) if isinstance(brut, str) else list(brut)
 
 
-def index_voisins(gares: list[Gare], grille: dict) -> bytes:
-    """Pour chaque point de grille : les 3 gares les plus proches et leur distance en hectomètres."""
+def gares_desservies(reseau: Reseau) -> list[bool]:
+    """Vrai pour chaque gare de départ ou d'arrivée d'au moins une connexion du jour type."""
+    desservies = [False] * len(reseau.gares)
+    for c in reseau.connexions:
+        desservies[c.de] = desservies[c.vers] = True
+    return desservies
+
+
+def _case(lat: float, lon: float) -> tuple[int, int]:
+    return math.floor(lat * CASES_PAR_DEGRE), math.floor(lon * CASES_PAR_DEGRE)
+
+
+def _choisir_distinctes(gares: list[Gare], tries: list[tuple[float, int]]) -> list[tuple[float, int]]:
+    """Les plus proches d'abord, en sautant celles à moins de 500 m d'une gare déjà retenue."""
+    retenues: list[tuple[float, int]] = []
+    for d, i in tries:
+        g = gares[i]
+        if all(haversine_km(g.lat, g.lon, gares[j].lat, gares[j].lon) > DISTANCE_A_PIED_KM for _, j in retenues):
+            retenues.append((d, i))
+            if len(retenues) == NB_VOISINS:
+                break
+    return retenues
+
+
+def _voisines(gares: list[Gare], cases: dict[tuple[int, int], list[int]], lat: float, lon: float):
+    cy, cx = _case(lat, lon)
+    retenues: list[tuple[float, int]] = []
+    for rayon in range(1, RAYON_MAX_CASES + 1):
+        candidats = (
+            i for dy in range(-rayon, rayon + 1) for dx in range(-rayon, rayon + 1) for i in cases.get((cy + dy, cx + dx), [])
+        )
+        tries = sorted((haversine_km(lat, lon, gares[i].lat, gares[i].lon), i) for i in candidats)
+        retenues = _choisir_distinctes(gares, tries)
+        if len(retenues) == NB_VOISINS:
+            break
+    return retenues
+
+
+def index_voisins(gares: list[Gare], grille: dict, desservies: list[bool]) -> bytes:
+    """Pour chaque point de grille : 3 gares desservies et distinctes, les plus proches, en hectomètres."""
     dedans = _dedans(grille)
     cases: dict[tuple[int, int], list[int]] = {}
     for i, g in enumerate(gares):
-        cases.setdefault((int(g.lat * 2), int(g.lon * 2)), []).append(i)
+        if desservies[i]:
+            cases.setdefault(_case(g.lat, g.lon), []).append(i)
+    vide = struct.pack("<HH", INJOIGNABLE, 0)
     sortie = bytearray()
     for k in range(grille["nx"] * grille["ny"]):
         if not dedans[k]:
-            sortie += struct.pack("<HH", INJOIGNABLE, 0) * NB_VOISINS
+            sortie += vide * NB_VOISINS
             continue
         lon = grille["lon0"] + (k % grille["nx"]) * grille["pasLon"]
         lat = grille["lat0"] + (k // grille["nx"]) * grille["pasLat"]
-        candidats: list[int] = []
-        rayon = 1
-        while len(candidats) < NB_VOISINS and rayon <= 40:
-            cy, cx = int(lat * 2), int(lon * 2)
-            candidats = [
-                i
-                for dy in range(-rayon, rayon + 1)
-                for dx in range(-rayon, rayon + 1)
-                for i in cases.get((cy + dy, cx + dx), [])
-            ]
-            rayon += 1
-        proches = heapq.nsmallest(
-            NB_VOISINS, ((haversine_km(lat, lon, gares[i].lat, gares[i].lon), i) for i in candidats)
-        )
-        for d, i in proches:
+        retenues = _voisines(gares, cases, lat, lon)
+        for d, i in retenues:
             sortie += struct.pack("<HH", i, min(HECTOMETRES_MAX, round(d * 10)))
-        sortie += struct.pack("<HH", INJOIGNABLE, 0) * (NB_VOISINS - len(proches))
+        sortie += vide * (NB_VOISINS - len(retenues))
     return bytes(sortie)
 
 
@@ -78,9 +107,12 @@ def _ligne(source: int) -> tuple[int, bytes]:
 
 def ecrire_tout(reseau: Reseau, grille: dict, dossier: Path, processus: int) -> None:
     (dossier / "lignes").mkdir(parents=True, exist_ok=True)
-    stations = [{"nom": g.nom, "lat": g.lat, "lon": g.lon} for g in reseau.gares]
+    desservies = gares_desservies(reseau)
+    stations = [
+        {"nom": g.nom, "lat": g.lat, "lon": g.lon, "desservie": d} for g, d in zip(reseau.gares, desservies)
+    ]
     (dossier / "stations.json").write_text(json.dumps(stations, ensure_ascii=False))
-    (dossier / "voisins-4km.bin").write_bytes(index_voisins(reseau.gares, grille))
+    (dossier / "voisins-4km.bin").write_bytes(index_voisins(reseau.gares, grille, desservies))
     sources = range(len(reseau.gares))
     if processus == 1:
         _initialiser(reseau)
