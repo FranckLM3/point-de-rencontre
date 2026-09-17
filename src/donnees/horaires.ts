@@ -2,6 +2,8 @@ export interface Station {
   nom: string
   lat: number
   lon: number
+  /** Au moins un train ou car s'y arrête le jour type. */
+  desservie: boolean
 }
 
 export interface Ligne {

@@ -35,7 +35,7 @@ test('decoderVoisins lit gares et distances', () => {
 
 test('les lignes sont chargées une seule fois', async () => {
   const f = vi.fn(async (url: string) => {
-    if (url.endsWith('stations.json')) return new Response(JSON.stringify([{ nom: 'A', lat: 45, lon: 4 }]))
+    if (url.endsWith('stations.json')) return new Response(JSON.stringify([{ nom: 'A', lat: 45, lon: 4, desservie: true }]))
     if (url.endsWith('voisins-4km.bin')) return new Response(new ArrayBuffer(12))
     return new Response(ligneBinaire([[0, 0, 0]]))
   })
