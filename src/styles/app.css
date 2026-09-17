@@ -78,7 +78,7 @@ h1 { font-size: var(--titre); font-weight: 800; line-height: 1.1; margin: 4px 0;
 .vide p { margin: 0; }
 form.groupe:not([hidden]) { display: grid; gap: 6px; padding: 12px; background: var(--surface); border: 1px solid var(--bord); border-radius: var(--rayon-carte); }
 form.groupe label { font-weight: 500; }
-form.groupe .champ { flex: 1 1 160px; width: auto; }
+form.groupe .champ { flex: 1 1 100%; }
 .valeur { background: var(--accent-fond); color: var(--accent); border-radius: 6px; padding: 2px 8px; }
 
 .detail { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 1rem; }
@@ -95,20 +95,22 @@ form.groupe .champ { flex: 1 1 160px; width: auto; }
 
 /* Légende posée sur la carte, en bas à gauche. */
 .legende {
-  position: absolute; left: 12px; bottom: 12px; z-index: 500;
-  display: flex; gap: 2px; padding: 8px 10px; background: var(--surface);
+  position: absolute; left: 12px; bottom: 24px; z-index: 500;
+  display: flex; align-items: end; gap: 2px; padding: 8px 10px; background: var(--surface);
   border-radius: var(--rayon-pastille); box-shadow: var(--ombre);
-  font-size: .875rem; color: var(--texte-doux);
+  font: 500 .75rem/1 var(--police); color: var(--texte-doux); white-space: nowrap;
 }
 .legende[hidden] { display: none; }
-.legende .case { display: grid; gap: 3px; justify-items: end; min-width: 44px; }
+.legende .case { display: grid; gap: 4px; justify-items: end; flex: 1 1 0; min-width: 40px; }
 /* Même opacité que le remplissage des zones (0.5) pour que la nuance corresponde à la carte. */
 .legende .nuance { display: block; width: 100%; height: 10px; border-radius: 2px; border: 1px solid rgb(0 0 0 / 15%); opacity: .5; }
+.legende .unite { padding-left: 4px; }
 
 /* Meilleur point : anneau vert et point central sombre. */
 .cible {
   display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
-  border: 4px solid var(--accent); background: rgb(255 255 255 / 70%); box-shadow: var(--ombre);
+  border: 4px solid var(--accent); background: rgb(255 255 255 / 55%);
+  box-shadow: 0 0 0 2px #ffffff, var(--ombre);
 }
 .cible::after { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--pastille); }
 
@@ -153,7 +155,9 @@ form.groupe .champ { flex: 1 1 160px; width: auto; }
     transition: transform var(--duree-volet) ease-out;
   }
   .app.volet-ouvert .panneau { transform: translateY(0); }
-  .legende { top: 12px; bottom: auto; }
+  /* En haut, à droite du zoom, sur toute la largeur restante. */
+  .legende { top: 12px; bottom: auto; left: 56px; right: 12px; }
+  .legende .case { min-width: 0; }
 
   #poignee {
     display: grid; justify-items: center; gap: 6px; position: sticky; top: 0; z-index: 1;

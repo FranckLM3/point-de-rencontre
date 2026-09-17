@@ -9,7 +9,8 @@ test('les tranches sont affichées dans l’ordre croissant avec un libellé acc
   el.hidden = true
   rendreLegende(el, [tranche(300, '#ccc'), tranche(100, '#0b5d2a'), tranche(200, '#999')])
   const cases = [...el.querySelectorAll('.case')]
-  expect(cases.map((c) => c.textContent)).toEqual(['100 km', '200 km', '300 km'])
+  expect(cases.map((c) => c.textContent)).toEqual(['100', '200', '300'])
+  expect(el.querySelector('.unite')!.textContent).toBe('km')
   expect(el.hidden).toBe(false)
   expect(el.getAttribute('role')).toBe('img')
   expect(el.getAttribute('aria-label')).toContain('jusqu’à 100 km')
