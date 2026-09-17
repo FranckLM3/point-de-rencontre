@@ -4,6 +4,7 @@ import '@fontsource/jost/800.css'
 import './styles/app.css'
 import { agreger, distancesOiseau, meilleurIndice } from './calcul/agregat'
 import { coordonnees, type Grille } from './calcul/grille'
+import { uniteDe } from './calcul/unites'
 import { classerVilles } from './calcul/villes'
 import { seuils, zones } from './calcul/zones'
 import { ajouterAmi, listerAmis, modifierAmi, supprimerAmi } from './donnees/amis'
@@ -130,16 +131,17 @@ function rendreZones(s: Session, choisis: Ami[]): void {
   const valeurs = agreger(choisis.map((a) => couche(s, a)), s.etat.critere, s.grille.nx * s.grille.ny)
   let plusGrande = 0
   for (const v of valeurs) if (v > plusGrande) plusGrande = v
+  const unite = uniteDe(s.etat.mode, s.etat.grandeur)
   const tranches = zones(s.grille, valeurs, seuils(PAS_KM, s.etat.max, plusGrande))
   s.carte.zones(tranches)
-  rendreLegende($('#legende'), tranches)
+  rendreLegende($('#legende'), tranches, unite)
   const meilleur = meilleurIndice(valeurs)
   if (meilleur < 0) {
     s.carte.sansCentre()
     return
   }
   const [lon, lat] = coordonnees(s.grille, meilleur)
-  s.carte.centre(lat, lon, infobulleCentre(valeurs[meilleur]!, s.etat.critere))
+  s.carte.centre(lat, lon, infobulleCentre(valeurs[meilleur]!, s.etat.critere, unite))
 }
 
 function rendreCarte(s: Session, choisis: Ami[]): void {

@@ -1,3 +1,4 @@
+import { uniteDe } from '../calcul/unites'
 import type { Etat } from '../types'
 import { titre } from './format'
 
@@ -21,7 +22,7 @@ export function rendreFiltres(el: HTMLElement, e: Etat, nombre: number, changer:
         ${MAX_KM.map((m) => `<option value="${m}" ${e.max === m ? 'selected' : ''}>${m} km max</option>`).join('')}
       </select>
     </div>
-    <h1>${titre(nombre, e.critere, e.max)}</h1>`
+    <h1>${titre({ nombre, mode: e.mode, unite: uniteDe(e.mode, e.grandeur), critere: e.critere, max: e.max })}</h1>`
   el.querySelectorAll<HTMLButtonElement>('[data-critere]').forEach((b) =>
     b.addEventListener('click', () => changer({ critere: b.dataset.critere as Etat['critere'] })),
   )

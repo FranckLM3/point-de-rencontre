@@ -1,5 +1,6 @@
+import type { Unite } from '../calcul/unites'
 import type { Ami, Critere } from '../types'
-import { echapper, km, libelleTransport } from './format'
+import { echapper, libelleTransport, valeur } from './format'
 
 export function initiales(nom: string): string {
   const mots = nom.trim().split(/\s+/).filter(Boolean)
@@ -30,5 +31,5 @@ export const etiquette = (p: Point): string => (p.amis.length > 1 ? String(p.ami
 export const infobulleMarqueur = (p: Point): string =>
   p.amis.map((a) => `${echapper(a.nom)} (${libelleTransport(a.transport)})`).join('<br>')
 
-export const infobulleCentre = (valeur: number, critere: Critere): string =>
-  `Meilleur point, ${km(valeur)} ${critere === 'pire' ? 'au pire' : 'en moyenne'}`
+export const infobulleCentre = (v: number, critere: Critere, unite: Unite = 'km'): string =>
+  `Meilleur point, ${valeur(v, unite)} ${critere === 'pire' ? 'au pire' : 'en moyenne'}`

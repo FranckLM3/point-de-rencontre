@@ -22,3 +22,11 @@ test('une liste vide cache la légende', () => {
   expect(el.hidden).toBe(true)
   expect(el.innerHTML).toBe('')
 })
+
+test('en minutes, chaque case porte sa valeur et il n’y a pas d’unité finale', () => {
+  const el = document.createElement('div')
+  rendreLegende(el, [tranche(60, '#ccc'), tranche(120, '#999')], 'min')
+  const cases = [...el.querySelectorAll('.case')]
+  expect(cases.map((c) => c.textContent)).toEqual(['1 h', '2 h'])
+  expect(el.querySelector('.unite')).toBeNull()
+})

@@ -1,15 +1,39 @@
 import { expect, test } from 'vitest'
-import { echapper, km, libelleTransport, titre } from '../../src/ui/format'
+import { duree, echapper, euros, km, libelleTransport, titre, valeur } from '../../src/ui/format'
 
 test('km sans espace des milliers, arrondi', () => {
   expect(km(1234.4)).toBe('1234 km')
   expect(km(8.26)).toBe('8 km')
 })
 
-test('titre selon critère et maximum', () => {
-  expect(titre(12, 'pire', 300)).toBe('Où se retrouver à 12, à vol d’oiseau, sans dépasser 300 km')
-  expect(titre(1, 'moyenne', null)).toBe('Où se retrouver à 1, à vol d’oiseau, au plus court en moyenne')
-  expect(titre(3, 'pire', null)).toBe('Où se retrouver à 3, à vol d’oiseau, au pire trajet le plus court')
+test('durées lisibles', () => {
+  expect(duree(45)).toBe('45 min')
+  expect(duree(60)).toBe('1 h')
+  expect(duree(194)).toBe('3 h 14')
+  expect(duree(125.6)).toBe('2 h 06')
+})
+
+test('prix arrondis à l’euro, sans espace des milliers', () => {
+  expect(euros(61.4)).toBe('61 €')
+  expect(euros(1234)).toBe('1234 €')
+})
+
+test('valeur selon l’unité', () => {
+  expect(valeur(120, 'km')).toBe('120 km')
+  expect(valeur(120, 'min')).toBe('2 h')
+  expect(valeur(40, 'eur')).toBe('40 €')
+})
+
+test('titre selon le mode, la grandeur et le maximum', () => {
+  expect(titre({ nombre: 3, mode: 'tc', unite: 'min', critere: 'pire', max: 180 })).toBe(
+    'Où se retrouver à 3, en transports, sans dépasser 3 h',
+  )
+  expect(titre({ nombre: 3, mode: 'tc', unite: 'eur', critere: 'moyenne', max: null })).toBe(
+    'Où se retrouver à 3, en transports, au moins cher en moyenne',
+  )
+  expect(titre({ nombre: 2, mode: 'oiseau', unite: 'km', critere: 'pire', max: null })).toBe(
+    'Où se retrouver à 2, à vol d’oiseau, au pire trajet le plus court',
+  )
 })
 
 test('libellés de transport', () => {

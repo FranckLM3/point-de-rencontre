@@ -34,3 +34,7 @@ test('infobulle du centre selon le critère', () => {
   expect(infobulleCentre(310.4, 'pire')).toBe('Meilleur point, 310 km au pire')
   expect(infobulleCentre(220, 'moyenne')).toBe('Meilleur point, 220 km en moyenne')
 })
+
+test('infobulle du centre en minutes', () => {
+  expect(infobulleCentre(194, 'pire', 'min')).toBe('Meilleur point, 3 h 14 au pire')
+})
