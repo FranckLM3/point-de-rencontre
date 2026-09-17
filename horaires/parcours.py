@@ -113,15 +113,26 @@ def _un_depart(index: Index, source: int, depart: int, e: _Etiquettes) -> list[i
     for k in range(bisect_left(index.departs, depart), len(connexions)):
         dep, arr, de, vers, trajet, km, gl, montee, descente = connexions[k]
         pris = en_cours.get(trajet)
-        if montee:
-            # État le moins changé qui permet de monter ici (liaison sans marge, train avec).
-            avant = info_libre[de] if libre[de] <= dep else None
-            if par_train[de] + CORRESPONDANCE_S <= dep and (avant is None or info_train[de][2] < avant[2]):
-                avant = info_train[de]
-            if avant is not None and (pris is None or avant[2] + 1 < pris[2]):
-                pris = (avant[0], avant[1], avant[2] + 1)
         if pris is None:
-            continue
+            if not montee:
+                continue
+            if libre[de] <= dep:
+                avant = info_libre[de]
+                if par_train[de] + CORRESPONDANCE_S <= dep and info_train[de][2] < avant[2]:
+                    avant = info_train[de]
+            elif par_train[de] + CORRESPONDANCE_S <= dep:
+                avant = info_train[de]
+            else:
+                continue
+            pris = (avant[0], avant[1], avant[2] + 1)
+        elif montee and pris[2] > 1:
+            # Déjà à bord : remonter ici avec moins de trains, à durée égale, compte moins de correspondances.
+            n = pris[2] - 1
+            if libre[de] <= dep and info_libre[de][2] < n:
+                n = info_libre[de][2]
+                pris = (info_libre[de][0], info_libre[de][1], n + 1)
+            if par_train[de] + CORRESPONDANCE_S <= dep and info_train[de][2] < n:
+                pris = (info_train[de][0], info_train[de][1], info_train[de][2] + 1)
         pris = (pris[0] + km, pris[1] or gl, pris[2])
         en_cours[trajet] = pris
         if descente and (arr < par_train[vers] or (arr == par_train[vers] and pris[2] < info_train[vers][2])):
@@ -150,8 +161,11 @@ def meilleurs_trajets(reseau: Reseau, source: int, index: Index | None = None) -
     e = _Etiquettes([JAMAIS] * n, [JAMAIS] * n, [None] * n, [None] * n)
     for depart in _departs_source(index, source):
         for j in set(_un_depart(index, source, depart, e)):
-            candidats = [(e.par_train[j], e.info_train[j]), (e.libre[j], e.info_libre[j])]
-            arrivee, (km, gl, trains) = min((c for c in candidats if c[0] < JAMAIS), key=lambda c: (c[0], c[1][2]))
+            par_train, libre = e.par_train[j], e.libre[j]
+            if par_train < libre or (par_train == libre and e.info_train[j][2] <= e.info_libre[j][2]):
+                arrivee, (km, gl, trains) = par_train, e.info_train[j]
+            else:
+                arrivee, (km, gl, trains) = libre, e.info_libre[j]
             duree = arrivee - depart
             correspondances = max(0, trains - 1)
             if duree < duree_min[j] or (duree == duree_min[j] and correspondances < meilleurs[j].correspondances):
