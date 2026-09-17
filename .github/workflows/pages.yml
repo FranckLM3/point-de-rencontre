@@ -1,0 +1,50 @@
+name: pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  construire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Parcours dans le navigateur (Supabase simulé)
+        run: |
+          npx playwright install --with-deps chromium
+          npm run e2e
+      - name: Vérifier la configuration
+        env:
+          URL: ${{ vars.SUPABASE_URL }}
+          CLE: ${{ vars.SUPABASE_ANON_KEY }}
+          EMAIL: ${{ vars.COMPTE_EMAIL }}
+        run: |
+          for v in URL CLE EMAIL; do
+            if [ -z "${!v}" ]; then echo "Variable de dépôt manquante ($v) : voir le README, section Publier."; exit 1; fi
+          done
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+          VITE_COMPTE_EMAIL: ${{ vars.COMPTE_EMAIL }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  publier:
+    needs: construire
+    runs-on: ubuntu-latest
+    environment: github-pages
+    steps:
+      - uses: actions/deploy-pages@v4

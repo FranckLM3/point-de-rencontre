@@ -1,0 +1,21 @@
+name: reveil
+# Un projet Supabase gratuit se met en pause après 7 jours sans activité.
+# Cette requête anonyme rend [] (aucune politique pour anon) : elle réveille la base sans lire de données.
+on:
+  schedule:
+    - cron: '17 6 * * 1,4'
+  workflow_dispatch:
+permissions: {}
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Interroger la base
+        env:
+          URL: ${{ vars.SUPABASE_URL }}
+          CLE: ${{ vars.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$URL" ]; then echo "Supabase pas encore configuré, rien à réveiller."; exit 0; fi
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$URL/rest/v1/amis?select=id&limit=1" -H "apikey: $CLE")
+          echo "HTTP $code"
+          test "$code" = 200
