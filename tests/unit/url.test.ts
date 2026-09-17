@@ -21,3 +21,20 @@ test('sélection vide conservée', () => {
 test('valeurs invalides ignorées', () => {
   expect(lireEtat('?mode=avion&critere=x&max=-3&lieu=abc')).toEqual(ETAT_DEFAUT)
 })
+
+test('lieu avec des parties vides rejeté', () => {
+  expect(lireEtat('?lieu=,,x').lieu).toBeNull()
+})
+
+test('lieu hors bornes rejeté', () => {
+  expect(lireEtat('?lieu=91,2,Nord').lieu).toBeNull()
+  expect(lireEtat('?lieu=45,181,Est').lieu).toBeNull()
+})
+
+test('aller-retour avec un label contenant & et =', () => {
+  const e: Etat = {
+    ...ETAT_DEFAUT,
+    lieu: { lat: 45.75, lon: 4.85, label: 'Lyon & Villeurbanne = agglo' },
+  }
+  expect(lireEtat(ecrireEtat(e))).toEqual(e)
+})

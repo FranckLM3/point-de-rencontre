@@ -9,9 +9,11 @@ const CRITERES: Critere[] = ['moyenne', 'pire']
 function lireLieu(brut: string | null): Lieu | null {
   if (!brut) return null
   const [lat, lon, ...reste] = brut.split(',')
+  if (!lat || !lon) return null
   const la = Number(lat)
   const lo = Number(lon)
   if (!Number.isFinite(la) || !Number.isFinite(lo) || reste.length === 0) return null
+  if (Math.abs(la) > 90 || Math.abs(lo) > 180) return null
   return { lat: la, lon: lo, label: reste.join(',') }
 }
 

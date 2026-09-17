@@ -11,6 +11,10 @@ test('sans maximum, seuils jusqu’à la plus grande valeur, bornés au nombre d
   expect(seuils(100, null, 5000).length).toBe(COULEURS_TRANCHES.length)
 })
 
+test('plusGrande non fini traité comme 0', () => {
+  expect(seuils(100, null, NaN)).toEqual([0])
+})
+
 test('zones rend une tranche par seuil, en lon/lat, de la plus large à la plus étroite', () => {
   const g: Grille = { lon0: 0, lat0: 40, pasLon: 1, pasLat: 1, nx: 3, ny: 3, dedans: new Uint8Array(9).fill(1) }
   const v = Float32Array.from([9, 9, 9, 9, 1, 9, 9, 9, 9])
@@ -23,4 +27,16 @@ test('zones rend une tranche par seuil, en lon/lat, de la plus large à la plus 
     expect(lat).toBeGreaterThanOrEqual(40)
     expect(lat).toBeLessThanOrEqual(42)
   }
+})
+
+test('la couleur suit le rang du seuil dans une liste croissante, indépendamment de l’ordre passé', () => {
+  const g: Grille = { lon0: 0, lat0: 40, pasLon: 1, pasLat: 1, nx: 3, ny: 3, dedans: new Uint8Array(9).fill(1) }
+  const v = Float32Array.from([9, 9, 9, 9, 1, 9, 9, 9, 9])
+  const t1 = zones(g, v, [5, 10])
+  expect(t1.find((z) => z.seuil === 5)!.couleur).toBe(COULEURS_TRANCHES[0])
+  expect(t1.find((z) => z.seuil === 10)!.couleur).toBe(COULEURS_TRANCHES[1])
+
+  const t2 = zones(g, v, [10, 5])
+  expect(t2.map((z) => z.seuil)).toEqual(t1.map((z) => z.seuil))
+  expect(t2.map((z) => z.couleur)).toEqual(t1.map((z) => z.couleur))
 })
