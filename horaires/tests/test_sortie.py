@@ -18,6 +18,10 @@ class SortieTest(unittest.TestCase):
         self.assertEqual(struct.unpack_from("<HHB", octets, 5), (100, 157, 1))
         self.assertEqual(struct.unpack_from("<HHB", octets, 10), (INJOIGNABLE, 0, 0))
 
+    def test_drapeaux_grande_ligne_et_correspondances(self):
+        octets = encoder_ligne([Trajet(100, 10.0, True, 2), Trajet(100, 10.0, False, 3), Trajet(100, 10.0, True, 40)])
+        self.assertEqual([octets[k * 5 + 4] for k in range(3)], [0b101, 0b110, 0b11111])
+
     def test_index_voisins(self):
         reseau = charger(archive())
         grille = {"lon0": 4.0, "lat0": 45.0, "pasLon": 1.0, "pasLat": 1.0, "nx": 3, "ny": 1, "dedans": [1, 1, 0]}

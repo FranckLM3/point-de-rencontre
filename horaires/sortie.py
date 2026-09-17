@@ -14,6 +14,7 @@ from horaires.gtfs import Gare, Reseau
 from horaires.parcours import INJOIGNABLE, Index, Trajet, meilleurs_trajets, preparer
 
 NB_VOISINS = 3
+CORRESPONDANCES_MAX = 15  # bits 1 à 4 des drapeaux
 KM_MAX = 65535
 HECTOMETRES_MAX = 65535
 CASES_PAR_DEGRE = 2
@@ -28,7 +29,8 @@ def encoder_ligne(trajets: list[Trajet]) -> bytes:
     sortie = bytearray()
     for t in trajets:
         km = 0 if t.minutes == INJOIGNABLE else min(KM_MAX, round(t.km))
-        sortie += struct.pack("<HHB", t.minutes, km, 1 if t.grande_ligne else 0)
+        drapeaux = (1 if t.grande_ligne else 0) | min(CORRESPONDANCES_MAX, t.correspondances) << 1
+        sortie += struct.pack("<HHB", t.minutes, km, drapeaux)
     return bytes(sortie)
 
 

@@ -88,8 +88,13 @@ src/
 
 - `lignes/<i>.bin` : pour chaque gare `j` dans l'ordre de `stations.json`,
   5 octets : `minutes` (uint16, 65535 = injoignable), `km` (uint16,
-  kilomètres ferroviaires arrondis), `drapeaux` (uint8, bit 0 = une grande
-  ligne est empruntée). Taille = 5 x nombre de gares.
+  kilomètres ferroviaires arrondis, liaisons exclues), `drapeaux` (uint8 :
+  bit 0 = une grande ligne est empruntée ; bits 1 à 4 = nombre de
+  correspondances entre trains du trajet le plus rapide, 0 à 15, plafonné ;
+  bits 5 à 7 à 0). Lecture : `grandeLigne = d & 1`,
+  `correspondances = (d >> 1) & 15`. Une liaison à pied ou urbaine n'est
+  pas une correspondance ; à durée égale, le trajet retenu est celui qui en
+  compte le moins. Taille = 5 x nombre de gares.
 - `voisins-4km.bin` : pour chaque point `k` de la grille de 4 km (ordre de
   la grille, `nx * ny` points, y compris hors de France), 3 fois
   (`gare` uint16, `hectometres` uint16). Hors de France : gare 65535.

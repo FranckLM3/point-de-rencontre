@@ -22,6 +22,7 @@ DEBUT_FENETRE_S = 6 * 3600
 FIN_FENETRE_S = 20 * 3600
 LIAISONS_MAX_S = 3600
 JAMAIS = 1 << 40
+AUCUN_TRAIN = (0.0, False, 0)  # km, grande ligne, nombre de trains
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,7 @@ class Trajet:
     minutes: int
     km: float
     grande_ligne: bool
+    correspondances: int = 0
 
 
 @dataclass(frozen=True)
@@ -100,35 +102,36 @@ def _un_depart(index: Index, source: int, depart: int, e: _Etiquettes) -> list[i
     par_train, libre, info_train, info_libre = e.par_train, e.libre, e.info_train, e.info_libre
     touchees = [source]
     libre[source] = depart
-    info_libre[source] = (0.0, False)
+    info_libre[source] = AUCUN_TRAIN
     for voisine, secondes in index.fermeture[source]:
         libre[voisine] = depart + secondes
-        info_libre[voisine] = (0.0, False)
+        info_libre[voisine] = AUCUN_TRAIN
         touchees.append(voisine)
-    en_cours: dict[int, tuple[float, bool]] = {}
+    en_cours: dict[int, tuple[float, bool, int]] = {}
     fermeture = index.fermeture
     connexions = index.connexions
     for k in range(bisect_left(index.departs, depart), len(connexions)):
         dep, arr, de, vers, trajet, km, gl, montee, descente = connexions[k]
         pris = en_cours.get(trajet)
+        if montee:
+            # État le moins changé qui permet de monter ici (liaison sans marge, train avec).
+            avant = info_libre[de] if libre[de] <= dep else None
+            if par_train[de] + CORRESPONDANCE_S <= dep and (avant is None or info_train[de][2] < avant[2]):
+                avant = info_train[de]
+            if avant is not None and (pris is None or avant[2] + 1 < pris[2]):
+                pris = (avant[0], avant[1], avant[2] + 1)
         if pris is None:
-            if not montee:
-                continue
-            if libre[de] <= dep:
-                pris = info_libre[de]
-            elif par_train[de] + CORRESPONDANCE_S <= dep:
-                pris = info_train[de]
-            else:
-                continue
-        pris = (pris[0] + km, pris[1] or gl)
+            continue
+        pris = (pris[0] + km, pris[1] or gl, pris[2])
         en_cours[trajet] = pris
-        if descente and arr < par_train[vers]:
+        if descente and (arr < par_train[vers] or (arr == par_train[vers] and pris[2] < info_train[vers][2])):
             par_train[vers] = arr
             info_train[vers] = pris
             touchees.append(vers)
             for voisine, secondes in fermeture[vers]:
-                if arr + secondes < libre[voisine]:
-                    libre[voisine] = arr + secondes
+                u = arr + secondes
+                if u < libre[voisine] or (u == libre[voisine] and pris[2] < info_libre[voisine][2]):
+                    libre[voisine] = u
                     info_libre[voisine] = pris
                     touchees.append(voisine)
     return touchees
@@ -147,12 +150,12 @@ def meilleurs_trajets(reseau: Reseau, source: int, index: Index | None = None) -
     e = _Etiquettes([JAMAIS] * n, [JAMAIS] * n, [None] * n, [None] * n)
     for depart in _departs_source(index, source):
         for j in set(_un_depart(index, source, depart, e)):
-            if e.par_train[j] <= e.libre[j]:
-                duree, info = e.par_train[j] - depart, e.info_train[j]
-            else:
-                duree, info = e.libre[j] - depart, e.info_libre[j]
-            if duree < duree_min[j]:
+            candidats = [(e.par_train[j], e.info_train[j]), (e.libre[j], e.info_libre[j])]
+            arrivee, (km, gl, trains) = min((c for c in candidats if c[0] < JAMAIS), key=lambda c: (c[0], c[1][2]))
+            duree = arrivee - depart
+            correspondances = max(0, trains - 1)
+            if duree < duree_min[j] or (duree == duree_min[j] and correspondances < meilleurs[j].correspondances):
                 duree_min[j] = duree
-                meilleurs[j] = Trajet(round(duree / 60), *info)
+                meilleurs[j] = Trajet(round(duree / 60), km, gl, correspondances)
             e.par_train[j] = e.libre[j] = JAMAIS
     return meilleurs

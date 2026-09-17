@@ -100,5 +100,46 @@ class LiaisonsTest(unittest.TestCase):
         self.assertEqual(t[3].minutes, 150)
 
 
+class CorrespondancesTest(unittest.TestCase):
+    def test_direct_zero_puis_une_correspondance(self):
+        trains = [(H(8), H(9), 0, 1, "A"), (H(9, 10), H(10), 1, 2, "B")]
+        t = meilleurs_trajets(reseau_synthetique(3, trains), 0)
+        self.assertEqual((t[1].correspondances, t[2].correspondances), (0, 1))
+
+    def test_meme_duree_moins_de_correspondances(self):
+        trains = [
+            (H(8), H(9), 0, 1, "A"),
+            (H(9, 10), H(10), 1, 2, "B"),
+            (H(8), H(9), 0, 3, "C"),
+            (H(9), H(10), 3, 2, "C"),
+        ]
+        t = meilleurs_trajets(reseau_synthetique(4, trains), 0)
+        self.assertEqual((t[2].minutes, t[2].correspondances), (120, 0))
+
+    def test_plus_rapide_prime_sur_moins_de_correspondances(self):
+        trains = [(H(8), H(11), 0, 2, "LENT"), (H(8), H(8, 30), 0, 1, "A"), (H(8, 40), H(9), 1, 2, "B")]
+        t = meilleurs_trajets(reseau_synthetique(3, trains), 0)
+        self.assertEqual((t[2].minutes, t[2].correspondances), (60, 1))
+
+    def test_liaison_ne_compte_pas_mais_le_changement_oui(self):
+        liens = _lien(4, (1, 2, 600))
+        trains = [(H(8), H(9), 0, 1, "T"), (H(9, 10), H(10), 2, 3, "U")]
+        t = meilleurs_trajets(reseau_synthetique(4, trains, liaisons=liens), 0)
+        self.assertEqual((t[2].correspondances, t[3].correspondances), (0, 1))
+
+    def test_rester_dans_le_train_ne_compte_pas(self):
+        trains = [(H(8), H(9), 0, 1, "T"), (H(9), H(10), 1, 2, "T")]
+        t = meilleurs_trajets(reseau_synthetique(3, trains), 0)
+        self.assertEqual(t[2].correspondances, 0)
+
+    def test_remonter_dans_un_train_deja_pris_avec_moins_de_changements(self):
+        # Départ 8 h : A mène en 5, d'où T part à 8 h 10 (2 trains). Mais 30 min de liaison
+        # mènent aussi en 6, où T passe à 8 h 30 : même départ, un seul train.
+        liens = _lien(7, (0, 6, 1800))
+        trains = [(H(8), H(8, 5), 0, 5, "A"), (H(8, 10), H(8, 20), 5, 6, "T"), (H(8, 30), H(9), 6, 2, "T")]
+        t = meilleurs_trajets(reseau_synthetique(7, trains, liaisons=liens), 0)
+        self.assertEqual((t[2].minutes, t[2].correspondances), (60, 0))
+
+
 if __name__ == "__main__":
     unittest.main()
