@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
 import type { Ami, Groupe } from '../../src/types'
+import { simulerHoraires } from './horaires-simules'
 
 const MOT_DE_PASSE = 'secret'
 const MARSEILLE = { geometry: { coordinates: [5.3698, 43.2965] }, properties: { label: '1 La Canebière 13001 Marseille' } }
@@ -232,4 +233,69 @@ test('sur mobile, la carte est visible en arrivant et le volet s’ouvre sans d�
 
   const sansDebordement = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
   expect(sansDebordement).toBe(true)
+})
+
+/** Le mode transports calcule de façon asynchrone : on attend la fin du chargement, pas un délai. */
+async function passerEnTransports(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Tous en transports' }).click()
+  await expect(page.locator('#chargement')).toHaveText('Chargement des horaires…')
+  await expect(page.locator('#chargement')).toBeEmpty()
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('en transports')
+}
+
+test('mode transports : zones en heures, gares et liens de réservation', async ({ page }) => {
+  await simuler(page)
+  await simulerHoraires(page)
+  await page.goto('./')
+  await entrer(page)
+  await ouvrirVoletSiVisible(page)
+
+  await passerEnTransports(page)
+  await expect(page).toHaveURL(/mode=tc/)
+  await expect(page.locator('#legende .case').first()).toContainText('h')
+
+  const premiere = page.locator('#villes .ville-carte').first()
+  await expect(premiere).toBeVisible()
+  await premiere.locator('.ville-entete').click()
+  const detail = premiere.locator('.zone-detail')
+  await expect(detail).toContainText('Paris Gare de Lyon')
+  await expect(detail).toContainText('Lyon-Part-Dieu')
+  // Les numéros de hall sont retirés des noms de gare.
+  await expect(detail).not.toContainText('Hall')
+  await expect(detail.getByRole('link', { name: 'SNCF Connect' })).toHaveAttribute('target', '_blank')
+  await expect(detail.getByRole('link', { name: 'SNCF Connect' })).toHaveAttribute('rel', 'noopener')
+  await expect(detail.getByRole('link', { name: 'Trainline' })).toBeVisible()
+})
+
+test('mode transports en prix : légende et menu en euros', async ({ page }) => {
+  await simuler(page)
+  await simulerHoraires(page)
+  await page.goto('./')
+  await entrer(page)
+  await ouvrirVoletSiVisible(page)
+
+  await passerEnTransports(page)
+  await page.getByRole('button', { name: 'Prix', exact: true }).click()
+  await expect(page.getByRole('combobox', { name: 'Prix maximum' })).toBeVisible()
+  await expect(page.locator('#legende .case').first()).toContainText('€')
+  await expect(page).toHaveURL(/grandeur=prix/)
+})
+
+test('horaires indisponibles : bandeau, repli en vol d’oiseau, puis réessai', async ({ page }) => {
+  await simuler(page)
+  const horaires = await simulerHoraires(page)
+  horaires.disponibles = false
+  await page.goto('./')
+  await entrer(page)
+  await ouvrirVoletSiVisible(page)
+
+  await page.getByRole('button', { name: 'Tous en transports' }).click()
+  await expect(page.locator('#message')).toContainText('Horaires des trains indisponibles pour le moment.')
+  await expect(page.getByRole('button', { name: 'Vol d’oiseau' })).toHaveAttribute('aria-pressed', 'true')
+
+  horaires.disponibles = true
+  await page.getByRole('button', { name: 'Réessayer' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('en transports')
+  await expect(page.locator('#legende .case').first()).toContainText('h')
+  await expect(page.locator('#message')).toBeEmpty()
 })
