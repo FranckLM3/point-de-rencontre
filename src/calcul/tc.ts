@@ -14,6 +14,14 @@ const TAUX_GRANDE_LIGNE = 0.1
 const TAUX_REGIONAL = 0.12
 /** Deux gares plus proches que cela comptent pour une seule (même règle que l'index Python). */
 const ECART_MIN_KM = 0.5
+/** Au-delà, une gare ne sert ni au départ ni à l'arrivée (la Corse n'a pas de train dans ces données). */
+export const GARE_MAX_KM = 50
+
+const distanceGare = (lat: number, lon: number, s: Station): number => {
+  if (!s.desservie) return Number.POSITIVE_INFINITY
+  const km = haversineKm(lat, lon, s.lat, s.lon)
+  return km <= GARE_MAX_KM ? km : Number.POSITIVE_INFINITY
+}
 
 const minutesA = (km: number, vitesse: number): number => ((km * DETOUR) / vitesse) * 60
 
@@ -38,9 +46,9 @@ export interface Proche {
 const tropPres = (stations: Station[], s: Station, retenues: Proche[]): boolean =>
   retenues.some((r) => haversineKm(s.lat, s.lon, stations[r.gare]!.lat, stations[r.gare]!.lon) <= ECART_MIN_KM)
 
-/** Gares desservies les plus proches, distinctes de plus de 500 m, la plus proche d'abord. */
+/** Gares desservies à 50 km au plus, distinctes de plus de 500 m, la plus proche d'abord. */
 export function garesProches(stations: Station[], lat: number, lon: number, n = NB_VOISINS): Proche[] {
-  const distances = stations.map((s) => (s.desservie ? haversineKm(lat, lon, s.lat, s.lon) : Number.POSITIVE_INFINITY))
+  const distances = stations.map((s) => distanceGare(lat, lon, s))
   const ecartees = new Uint8Array(stations.length)
   const retenues: Proche[] = []
   // n passages linéaires plutôt qu'un tri complet : appelé pour chaque ville.
@@ -141,7 +149,8 @@ export function coucheTc(grille: Grille, h: Horaires, d: DepuisGares, ami: Ami, 
     const gares: Proche[] = []
     for (let v = 0; v < NB_VOISINS; v++) {
       const gare = h.voisins.gares[k * NB_VOISINS + v]!
-      if (gare !== INJOIGNABLE) gares.push({ gare, km: h.voisins.hectometres[k * NB_VOISINS + v]! / 10 })
+      const kmGare = h.voisins.hectometres[k * NB_VOISINS + v]! / 10
+      if (gare !== INJOIGNABLE && kmGare <= GARE_MAX_KM) gares.push({ gare, km: kmGare })
     }
     const t = meilleurVers(h, d, ami, haversineKm(ami.lat, ami.lon, lat, lon), gares)
     if (t) sortie[k] = grandeur === 'temps' ? t.minutes : t.euros

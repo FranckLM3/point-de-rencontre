@@ -38,7 +38,11 @@ test('prix du train', () => {
 })
 
 test('garesProches trie par distance', () => {
-  const g = garesProches(horaires.stations, 48.85, 2.35, 2)
+  const stations: Station[] = [
+    { nom: 'loin', lat: 48.5, lon: 2.35, desservie: true },
+    { nom: 'près', lat: 48.8, lon: 2.35, desservie: true },
+  ]
+  const g = garesProches(stations, 48.85, 2.35, 2)
   expect(g.map((x) => x.gare)).toEqual([1, 0])
 })
 
@@ -91,4 +95,36 @@ test('coucheTc : NaN hors de France, valeurs ailleurs', () => {
   expect(Number.isNaN(temps[1])).toBe(true)
   const prix = coucheTc(grille, h, d, franck, 'prix')
   expect(prix[0]).toBeCloseTo(75 + 2)
+})
+
+test('garesProches ignore les gares à plus de 50 km', () => {
+  // Ajaccio : la gare desservie la plus proche est sur le continent.
+  expect(garesProches(horaires.stations, 41.93, 8.74)).toEqual([])
+  const g = garesProches(horaires.stations, 43.6, 5.38)
+  expect(g.map((x) => x.gare)).toEqual([0])
+})
+
+test('depuisGares : personne à plus de 50 km de toute gare, aucune gare joignable', () => {
+  const isole: Ami = { ...franck, lat: 41.93, lon: 8.74 }
+  const d = depuisGares(horaires, isole)
+  expect(d.proches).toEqual([])
+  expect(Number.isFinite(d.minutes[1])).toBe(false)
+  // Seul le trajet direct reste possible.
+  expect(versPointTc(horaires, d, isole, 41.95, 8.75)!.depart).toBeNull()
+  expect(versPointTc(horaires, d, isole, 48.8566, 2.3522)).toBeNull()
+})
+
+test('versPointTc : lieu à plus de 50 km de toute gare, injoignable', () => {
+  const d = depuisGares(horaires, franck)
+  expect(versPointTc(horaires, d, franck, 41.93, 8.74)).toBeNull()
+})
+
+test('coucheTc : gare voisine à plus de 50 km ignorée', () => {
+  const grille: Grille = { lon0: 2.3522, lat0: 48.8566, pasLon: 1, pasLat: 1, nx: 1, ny: 1, dedans: new Uint8Array([1]) }
+  const h: Horaires = {
+    ...horaires,
+    voisins: { gares: Uint16Array.from([1, 65535, 65535]), hectometres: Uint16Array.from([501, 0, 0]) },
+  }
+  const temps = coucheTc(grille, h, depuisGares(h, franck), franck, 'temps')
+  expect(Number.isNaN(temps[0])).toBe(true)
 })
