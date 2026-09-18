@@ -168,11 +168,20 @@ function changer(s: Session, p: Partial<Etat>): void {
   rafraichir(s)
 }
 
+/** Décision 6 : la fiche déclenche le calcul voiture après enregistrement, seulement quand
+ * l'adresse (la clé du calcul, cf. donnees/voiture.ts) ou le transport a changé. */
+function demanderVoitureSiBesoin(s: Session, avant: Ami | null, apres: Ami): void {
+  if (apres.transport !== 'voiture') return
+  const change = !avant || avant.lat !== apres.lat || avant.lon !== apres.lon || avant.transport !== apres.transport
+  if (change) void s.fileVoiture.demander(apres.id)
+}
+
 function ajouter(s: Session): void {
   ouvrirFicheAmi(null, {
     enregistrer: async (x) => {
       const cree = await ajouterAmi(x)
       s.recemment = cree.id
+      demanderVoitureSiBesoin(s, null, cree)
       await recharger(s)
     },
   })
@@ -183,6 +192,7 @@ function editer(s: Session, ami: Ami): void {
     enregistrer: async (x) => {
       const maj = await modifierAmi(ami.id, x)
       s.recemment = maj.id
+      demanderVoitureSiBesoin(s, ami, maj)
       await recharger(s)
     },
     supprimer: async () => { await supprimerAmi(ami.id); await recharger(s) },
