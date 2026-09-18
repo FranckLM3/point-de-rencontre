@@ -6,7 +6,7 @@ import type { Ami, Lieu } from '../types'
 import { COULEUR_CONTOUR_ZONE, EPAISSEUR_CONTOUR_ZONE, OPACITE_CONTOUR_ZONE, OPACITE_ZONE } from './rendu-zones'
 import 'leaflet/dist/leaflet.css'
 import { echapper, nomCourt } from './format'
-import type { EtiquetteVille } from './etiquettes'
+import { placerEtiquette, type BoiteEtiquette, type CercleEcran, type EtiquetteVille, type PlacementEtiquette } from './etiquettes'
 import { ICONE_PLEIN_ECRAN } from './icones'
 import { grouperEcran, listeNoms } from './grappes'
 import { etiquette, grouperParPosition, infobulleMarqueur, type Point } from './marqueurs'
@@ -77,6 +77,9 @@ export interface Carte {
 const icone = (html: string, taille: number): L.DivIcon =>
   L.divIcon({ className: '', html, iconSize: [taille, taille] })
 
+const chevauchent = (a: BoiteEtiquette, b: BoiteEtiquette): boolean =>
+  a.x < b.x + b.largeur && a.x + a.largeur > b.x && a.y < b.y + b.hauteur && a.y + a.hauteur > b.y
+
 const ControlePleinEcran = L.Control.extend({
   options: { position: 'topleft' },
   onAdd(carte: L.Map) {
@@ -115,11 +118,14 @@ export function creerCarte(element: HTMLElement): Carte {
 
   let dernierRendu: { liste: Ami[]; selection: Set<string>; misEnAvant: string | null } | null = null
   let dernieresEtiquettes: { candidats: EtiquetteVille[]; choisir: (v: VilleClassee) => void } | null = null
+  /** Marqueurs de personnes/grappes en espace écran (layerPoint), pour que les étiquettes de ville les évitent. */
+  let dernierEcranAmis: CercleEcran[] = []
 
   function dessinerAmis(): void {
     if (!dernierRendu) return
     const { liste, selection, misEnAvant } = dernierRendu
     coucheAmis.clearLayers()
+    const ecranAmis: CercleEcran[] = []
     const points = grouperParPosition(liste)
     const ecran: { id: string; x: number; y: number }[] = points.map((p, i) => {
       const pt = carte.latLngToContainerPoint([p.lat, p.lon])
@@ -133,16 +139,20 @@ export function creerCarte(element: HTMLElement): Carte {
       const pulse = misEnAvant ? amis.some((a) => a.id === misEnAvant) : false
       const grappe = membres.length > 1
       const latlng = carte.containerPointToLatLng([g.x, g.y])
+      const taille = grappe ? TAILLE_GRAPPE : TAILLE_MARQUEUR
       const classe = `marqueur-personne${actif ? '' : ' inactif'}${pulse ? ' pulse' : ''}${grappe ? ' grappe' : ''}`
       const html = `<span class="${classe}">${echapper(grappe ? String(amis.length) : etiquette(membres[0]!))}</span>`
       L.marker(latlng, {
-        icon: icone(html, grappe ? TAILLE_GRAPPE : TAILLE_MARQUEUR),
+        icon: icone(html, taille),
         title: amis.map((a) => a.nom).join(', '),
         zIndexOffset: actif ? 100 : 0,
       })
         .bindTooltip(grappe ? echapper(listeNoms(amis)) : infobulleMarqueur(membres[0]!))
         .addTo(coucheAmis)
+      const pt = carte.latLngToLayerPoint(latlng)
+      ecranAmis.push({ x: pt.x, y: pt.y, rayon: taille / 2 })
     }
+    dernierEcranAmis = ecranAmis
   }
 
   function dessinerEtiquettes(): void {
@@ -150,16 +160,18 @@ export function creerCarte(element: HTMLElement): Carte {
     if (!dernieresEtiquettes) return
     const { candidats, choisir } = dernieresEtiquettes
     const limite = window.innerWidth < SEUIL_MOBILE_ETIQUETTES ? MAX_ETIQUETTES_MOBILE : MAX_ETIQUETTES
-    const boites: { id: number; x: number; y: number; largeur: number; hauteur: number }[] = []
-    const placees: { id: number; x: number; y: number; c: EtiquetteVille }[] = []
+    const boites: BoiteEtiquette[] = []
+    const placees: { placement: PlacementEtiquette; c: EtiquetteVille }[] = []
     for (const [i, c] of candidats.slice(0, limite).entries()) {
       const pt = carte.latLngToLayerPoint([c.ville.ville.lat, c.ville.ville.lon])
       const hauteur = c.prix ? 56 : 40
       const largeur = Math.max(72, c.ville.ville.nom.length * 7 + 24)
-      const boite = { id: i, x: pt.x - largeur / 2, y: pt.y - hauteur - 10, largeur, hauteur }
-      if (boites.some((b) => boite.x < b.x + b.largeur && boite.x + boite.largeur > b.x && boite.y < b.y + b.hauteur && boite.y + boite.hauteur > b.y)) continue
-      boites.push(boite)
-      placees.push({ id: i, x: pt.x, y: pt.y, c })
+      // La pointe s'appuie sur le point visé, décalée vers le haut si un marqueur de personne
+      // ou une grappe gêne (D9) ; l'étiquette est omise plutôt que dessinée cachée derrière lui.
+      const placement = placerEtiquette(String(i), pt.x, pt.y, largeur, hauteur, dernierEcranAmis)
+      if (!placement || boites.some((b) => chevauchent(b, placement.boite))) continue
+      boites.push(placement.boite)
+      placees.push({ placement, c })
     }
     for (const p of placees) {
       const el = document.createElement('button')
@@ -167,8 +179,8 @@ export function creerCarte(element: HTMLElement): Carte {
       el.className = `etiquette-ville${p.c.meilleure ? ' meilleure' : ''}`
       el.setAttribute('aria-hidden', 'true')
       el.tabIndex = -1
-      el.style.left = `${p.x}px`
-      el.style.top = `${p.y}px`
+      el.style.left = `${p.placement.x}px`
+      el.style.top = `${p.placement.y}px`
       el.innerHTML = `<span class="nom">${echapper(p.c.ville.ville.nom)}</span><span class="valeur">${echapper(p.c.valeurAffichee ?? '')}</span>${p.c.prix ? `<span class="prix">${echapper(p.c.prix)}</span>` : ''}`
       el.addEventListener('click', () => choisir(p.c.ville))
       paneEtiquettes.append(el)
