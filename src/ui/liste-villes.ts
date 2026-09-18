@@ -1,6 +1,6 @@
 import type { Unite } from '../calcul/unites'
 import type { Detail, VilleClassee } from '../calcul/villes'
-import type { Ami, Mode } from '../types'
+import type { Ami, Critere, Mode } from '../types'
 import { echapper, valeur } from './format'
 
 export interface DonneesVilles {
@@ -12,6 +12,8 @@ export interface DonneesVilles {
   max: number | null
   unite: Unite
   mode: Mode
+  /** Critère actif : sa valeur est mise en avant sur chaque carte. */
+  critere: Critere
 }
 
 export interface ActionsVilles {
@@ -49,13 +51,20 @@ export function detailParAmi(amis: Ami[], details: (Detail | null)[], unite: Uni
 const liensReservation = (): string =>
   `<p class="reservation">${RESERVATION.map((l) => `<a href="${l.url}" target="_blank" rel="noopener">${l.libelle}</a>`).join(' ')}</p>`
 
+/** Pire trajet toujours affiché ; le second nombre suit le critère actif (Total au pire, Moyenne sinon). */
+function ligneCritere(c: VilleClassee, unite: Unite, critere: Critere): string {
+  const pire = `Pire trajet ${valeur(c.pire, unite)}`
+  if (critere === 'pire') return `<span class="valeur">${pire}</span> · Total ${valeur(c.total, unite)}`
+  return `${pire} · <span class="valeur">Moyenne ${valeur(c.moyenne, unite)}</span>`
+}
+
 function carteVille(c: VilleClassee, i: number, d: DonneesVilles): string {
   const liens = d.mode === 'tc' ? liensReservation() : ''
   return `
   <article class="ville-carte">
     <button type="button" class="ville-entete" data-i="${i}" aria-expanded="false" aria-controls="detail-ville-${i}">
       <span class="nom"><span class="titre-ville">${echapper(c.ville.nom)}</span> <span class="dep">${echapper(c.ville.dep)}</span></span>
-      <span class="ligne">Pire trajet ${valeur(c.pire, d.unite)} · <span class="valeur">Total ${valeur(c.total, d.unite)}</span></span>
+      <span class="ligne">${ligneCritere(c, d.unite, d.critere)}</span>
     </button>
     <div class="zone-detail" id="detail-ville-${i}" hidden>${detailParAmi(d.amis, c.parAmi, d.unite)}${liens}</div>
   </article>`

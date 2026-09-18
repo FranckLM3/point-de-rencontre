@@ -133,7 +133,7 @@ function rendrePanneau(s: Session, choisis: Ami[], mesure: Mesure): void {
   const details = lieu ? choisis.map((a) => mesure(a, lieu.lat, lieu.lon)) : []
   rendreResultatLieu($('#resultat-lieu'), lieu, choisis, details, unite, () => retirerLieu(s))
   const villes = classerVilles(s.villes, choisis, mesure, critere, max, NB_VILLES)
-  rendreVilles($('#villes'), { villes, amis: choisis, nbPersonnes: s.amis.length, max, unite, mode }, {
+  rendreVilles($('#villes'), { villes, amis: choisis, nbPersonnes: s.amis.length, max, unite, mode, critere }, {
     choisir: (c) => s.carte.lignes(choisis, { lat: c.ville.lat, lon: c.ville.lon, label: c.ville.nom }),
     ajouter: () => ajouter(s),
   })

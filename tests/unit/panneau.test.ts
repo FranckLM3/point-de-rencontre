@@ -219,8 +219,8 @@ const enTrain = {
   pire: 194,
 }
 const actionsVilles = () => ({ choisir: vi.fn(), ajouter: vi.fn() })
-const oiseau = { unite: 'km', mode: 'oiseau' } as const
-const transports = { unite: 'min', mode: 'tc' } as const
+const oiseau = { unite: 'km', mode: 'oiseau', critere: 'pire' } as const
+const transports = { unite: 'min', mode: 'tc', critere: 'pire' } as const
 
 test('une carte de ville affiche pire trajet et total, et se déplie', () => {
   const el = document.createElement('div')
@@ -233,6 +233,22 @@ test('une carte de ville affiche pire trajet et total, et se déplie', () => {
   expect(bouton.getAttribute('aria-expanded')).toBe('true')
   expect(el.querySelector<HTMLElement>('.zone-detail')!.hidden).toBe(false)
   expect(a.choisir).toHaveBeenCalledWith(classee)
+})
+
+test('critère « pire » actif : le pire trajet est mis en avant, le total en texte simple', () => {
+  const el = document.createElement('div')
+  rendreVilles(el, { villes: [classee], amis, nbPersonnes: 2, max: null, ...oiseau, critere: 'pire' }, actionsVilles())
+  const pastilleVerte = el.querySelector('.valeur')!
+  expect(pastilleVerte.textContent).toBe('Pire trajet 270 km')
+  expect(el.textContent).toContain('Total 440 km')
+})
+
+test('critère « moyenne » actif : la moyenne est mise en avant, le pire trajet en texte simple', () => {
+  const el = document.createElement('div')
+  rendreVilles(el, { villes: [classee], amis, nbPersonnes: 2, max: null, ...oiseau, critere: 'moyenne' }, actionsVilles())
+  const pastilleVerte = el.querySelector('.valeur')!
+  expect(pastilleVerte.textContent).toBe('Moyenne 220 km')
+  expect(el.textContent).toContain('Pire trajet 270 km')
 })
 
 test('une carte de ville en minutes affiche des durées', () => {
@@ -290,7 +306,7 @@ test('aucune ville sous le maximum : message avec la valeur réelle', () => {
   expect(el.textContent).toBe('Aucune ville à moins de 150 km pour tout le monde. Choisis une distance plus grande.')
   rendreVilles(el, { villes: [], amis, nbPersonnes: 2, max: 180, ...transports }, actionsVilles())
   expect(el.textContent).toBe('Aucune ville à moins de 3 h pour tout le monde. Choisis une durée plus longue.')
-  rendreVilles(el, { villes: [], amis, nbPersonnes: 2, max: 40, unite: 'eur', mode: 'tc' }, actionsVilles())
+  rendreVilles(el, { villes: [], amis, nbPersonnes: 2, max: 40, unite: 'eur', mode: 'tc', critere: 'pire' }, actionsVilles())
   expect(el.textContent).toBe('Aucune ville à moins de 40 € pour tout le monde. Choisis un prix plus élevé.')
 })
 
