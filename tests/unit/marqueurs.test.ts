@@ -21,13 +21,16 @@ test('deux personnes à la même adresse donnent un seul point étiqueté 2', ()
   expect(etiquette(points[1]!)).toBe('ZO')
 })
 
-test('infobulle d’un point : noms échappés et moyens de transport', () => {
+test('infobulle d’un point : noms échappés et moyens de transport en pictogrammes', () => {
   const [p] = grouperParPosition([ami('a', '<b>Léa</b>', 1, 1), ami('b', 'Tom', 1, 1, 'voiture')])
   const html = infobulleMarqueur(p!)
   expect(html).not.toContain('<b>')
   expect(html).toContain('&#60;b&#62;Léa')
-  expect(html).toContain('transports')
-  expect(html).toContain('Tom (voiture)')
+  expect(html).toContain('<svg')
+  const el = document.createElement('div')
+  el.innerHTML = html
+  expect(el.textContent).toContain('Tom')
+  expect(el.textContent).toContain('voiture')
 })
 
 test('infobulle du centre selon le critère', () => {

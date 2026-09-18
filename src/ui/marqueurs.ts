@@ -1,6 +1,7 @@
 import type { Unite } from '../calcul/unites'
 import type { Ami, Critere } from '../types'
-import { echapper, libelleTransport, valeur } from './format'
+import { echapper, valeur } from './format'
+import { pictoTransport } from './icones'
 
 export function initiales(nom: string): string {
   const mots = nom.trim().split(/\s+/).filter(Boolean)
@@ -27,9 +28,9 @@ export function grouperParPosition(amis: Ami[]): Point[] {
 
 export const etiquette = (p: Point): string => (p.amis.length > 1 ? String(p.amis.length) : initiales(p.amis[0]!.nom))
 
-/** HTML sûr : un nom et son moyen de transport par ligne. */
+/** HTML sûr : un nom et son moyen de transport (pictogramme) par ligne. */
 export const infobulleMarqueur = (p: Point): string =>
-  p.amis.map((a) => `${echapper(a.nom)} (${libelleTransport(a.transport)})`).join('<br>')
+  p.amis.map((a) => `${echapper(a.nom)} ${pictoTransport(a.transport)}`).join('<br>')
 
 export const infobulleCentre = (v: number, critere: Critere, unite: Unite = 'km'): string =>
   `Le repaire : ${valeur(v, unite)} ${critere === 'pire' ? 'au pire' : 'en moyenne'}`

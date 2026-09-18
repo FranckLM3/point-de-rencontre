@@ -55,7 +55,17 @@ h1 { font-size: var(--titre); font-weight: 800; line-height: 1.1; margin: 4px 0;
 .ami .editer { all: unset; cursor: pointer; }
 .ami .editer:focus-visible { outline: 2px solid var(--accent); }
 .ami .ville, .ami .moyen { color: var(--texte-doux); }
-.ami .moyen { font-size: .875rem; border: 1px solid var(--bord); border-radius: 6px; padding: 0 5px; }
+.ami .moyen { font-size: .875rem; border: 1px solid var(--bord); border-radius: 6px; padding: 3px 5px; }
+
+/* Pictogramme voiture / train : même style de trait, taille d'icône de texte. */
+.picto-transport { display: inline-flex; align-items: center; }
+.picto-transport svg { display: block; }
+
+/* Texte réservé aux lecteurs d'écran : présent dans le DOM, invisible à l'écran. */
+.invisible {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
 
 .champ {
   width: 100%; border: 1px solid var(--bord); border-radius: 999px;

@@ -1,5 +1,6 @@
 import type { Ami, Groupe } from '../types'
-import { echapper, libelleTransport } from './format'
+import { echapper } from './format'
+import { pictoTransport } from './icones'
 
 export interface DonneesAmis {
   amis: Ami[]
@@ -25,7 +26,7 @@ const pastille = (x: Ami, coche: boolean): string => `
     <input type="checkbox" data-id="${echapper(x.id)}" aria-label="Inclure ${echapper(x.nom)}" ${coche ? 'checked' : ''} />
     <button type="button" class="editer" data-edit="${echapper(x.id)}" aria-label="Modifier ${echapper(x.nom)}">
       ${echapper(x.nom)} <span class="ville">${echapper(ville(x.adresse))}</span>
-      <span class="moyen">${libelleTransport(x.transport)}</span>
+      <span class="moyen">${pictoTransport(x.transport)}</span>
     </button>
   </span>`
 
