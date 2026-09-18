@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import type { Ami } from '../../src/types'
-import { correspond, regrouperParVille, villeCourte, villeDeGroupe } from '../../src/ui/personnes'
+import { codePostalDe, correspond, navigoDisponible, regrouperParVille, villeCourte, villeDeGroupe } from '../../src/ui/personnes'
 
 const ami = (nom: string, adresse: string): Ami => ({
   id: nom, nom, adresse, lat: 0, lon: 0, transport: 'tc', navigo: false,
@@ -64,4 +64,17 @@ test('correspond : recherche sur la ville (avec ou sans arrondissement) et texte
   expect(correspond(zoe, '19e')).toBe(true)
   expect(correspond(zoe, '')).toBe(true)
   expect(correspond(zoe, '  ')).toBe(true)
+})
+
+test('codePostalDe : dernier nombre à 5 chiffres du texte', () => {
+  expect(codePostalDe('4 Rue Armand Carrel 75019 Paris')).toBe('75019')
+  expect(codePostalDe('sans code postal')).toBe('')
+})
+
+test('navigoDisponible : Île-de-France seulement (75, 77, 78, 91 à 95)', () => {
+  expect(navigoDisponible('4 Rue Armand Carrel 75019 Paris')).toBe(true)
+  expect(navigoDisponible('1 rue X 77100 Meaux')).toBe(true)
+  expect(navigoDisponible('1 rue X 95000 Cergy')).toBe(true)
+  expect(navigoDisponible('89 Boulevard Chave 13005 Marseille')).toBe(false)
+  expect(navigoDisponible('sans code postal')).toBe(false)
 })

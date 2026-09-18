@@ -34,7 +34,8 @@ const TAILLE_CIBLE = 36
 const RAYON_LIEU = 8
 
 export interface Carte {
-  amis(liste: Ami[], selection: Set<string>): void
+  /** `misEnAvant` : identifiant d'une personne dont le marqueur reçoit une brève pulsation (ajout/édition). */
+  amis(liste: Ami[], selection: Set<string>, misEnAvant?: string | null): void
   zones(tranches: Tranche[]): void
   centre(lat: number, lon: number, libelle: string): void
   sansCentre(): void
@@ -61,11 +62,12 @@ export function creerCarte(element: HTMLElement): Carte {
   let dejaCadre = false
 
   return {
-    amis(liste, selection) {
+    amis(liste, selection, misEnAvant) {
       coucheAmis.clearLayers()
       for (const p of grouperParPosition(liste)) {
         const actif = p.amis.some((a) => selection.has(a.id))
-        const html = `<span class="marqueur-personne${actif ? '' : ' inactif'}">${echapper(etiquette(p))}</span>`
+        const pulse = misEnAvant ? p.amis.some((a) => a.id === misEnAvant) : false
+        const html = `<span class="marqueur-personne${actif ? '' : ' inactif'}${pulse ? ' pulse' : ''}">${echapper(etiquette(p))}</span>`
         L.marker([p.lat, p.lon], {
           icon: icone(html, TAILLE_MARQUEUR),
           title: p.amis.map((a) => a.nom).join(', '),

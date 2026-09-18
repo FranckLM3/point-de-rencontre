@@ -45,13 +45,13 @@ test('la fiche est un dialogue modal nommé par son titre', () => {
   const dialogue = $<HTMLDialogElement>('dialog.feuille')
   expect(dialogue.open).toBe(true)
   expect(dialogue.getAttribute('aria-labelledby')).toBe('fiche-titre')
-  expect($('#fiche-titre').textContent).toBe('Ajouter un Croco')
+  expect($('#fiche-titre').textContent).toBe('Nouveau Croco')
   expect(document.querySelector('[data-action="supprimer"]')).toBeNull()
 })
 
-test('titre « Modifier un Croco », sans aria-pressed', () => {
+test('titre « Modifier <nom> », sans aria-pressed', () => {
   ouvrirFicheAmi(lea, { enregistrer: vi.fn(), supprimer: vi.fn() })
-  expect($('#fiche-titre').textContent).toBe('Modifier un Croco')
+  expect($('#fiche-titre').textContent).toBe('Modifier Léa')
   expect(document.querySelector('[aria-pressed]')).toBeNull()
 })
 
@@ -133,8 +133,8 @@ test('supprimer demande deux clics, sans boîte de dialogue du navigateur', asyn
 
   boutonSupprimer().click()
   expect(supprimer).not.toHaveBeenCalled()
-  expect(boutonSupprimer().textContent).toBe('Confirmer la suppression')
-  expect(boutonSupprimer().classList.contains('danger')).toBe(true)
+  expect(boutonSupprimer().textContent).toBe('Confirmer le retrait')
+  expect(boutonSupprimer().classList.contains('danger-texte')).toBe(true)
 
   boutonSupprimer().click()
   await vi.waitFor(() => expect(supprimer).toHaveBeenCalledOnce())
@@ -148,8 +148,8 @@ test('enregistrer désarme la suppression', async () => {
   ouvrirFicheAmi(lea, { enregistrer: () => attente.promesse, supprimer })
   boutonSupprimer().click()
   soumettre()
-  expect(boutonSupprimer().textContent).toBe('Supprimer')
-  expect(boutonSupprimer().classList.contains('danger')).toBe(false)
+  expect(boutonSupprimer().textContent).toBe('Retirer ce Croco')
+  expect(boutonSupprimer().classList.contains('danger-texte')).toBe(false)
   attente.rejeter(new Error('Réseau indisponible.'))
   await vi.waitFor(() => expect(boutonSupprimer().disabled).toBe(false))
   boutonSupprimer().click()
@@ -164,7 +164,7 @@ test('échec de la suppression : message affiché, fiche gardée, bouton réarma
   await vi.waitFor(() => expect($('.feuille .erreur').textContent).toBe('Suppression refusée.'))
   expect(document.querySelector('.feuille')).not.toBeNull()
   expect(boutonSupprimer().disabled).toBe(false)
-  expect(boutonSupprimer().textContent).toBe('Supprimer')
+  expect(boutonSupprimer().textContent).toBe('Retirer ce Croco')
   expect(boutonEnregistrer().disabled).toBe(false)
 })
 
@@ -247,4 +247,65 @@ test('choisir une proposition permet d’enregistrer la nouvelle personne', asyn
   await vi.advanceTimersByTimeAsync(0)
   expect(enregistrer).toHaveBeenCalledOnce()
   expect(enregistrer.mock.calls[0]![0]).toMatchObject({ nom: 'Tom', lat: 45.757, transport: 'tc', navigo: false })
+})
+
+test('l’avatar affiche les initiales, mises à jour au fil de la saisie du nom', () => {
+  ouvrirFicheAmi(null, { enregistrer: vi.fn() })
+  const avatar = $('.avatar-ami.apercu')
+  expect(avatar.textContent).toBe('?')
+  const champNom = $<HTMLInputElement>('input[name="nom"]')
+  champNom.value = 'Zoé'
+  champNom.dispatchEvent(new Event('input'))
+  expect(avatar.textContent).toBe('ZO')
+})
+
+test('choisir une adresse en Île-de-France confirme le choix et révèle Navigo', async () => {
+  vi.useFakeTimers()
+  const rivoli: Lieu = { label: '10 Rue de Rivoli 75004 Paris', lat: 48.8555, lon: 2.36041 }
+  chercherAdresses.mockResolvedValue([rivoli])
+  ouvrirFicheAmi(null, { enregistrer: vi.fn() })
+  expect($<HTMLLabelElement>('label.navigo').hidden).toBe(true)
+  await taper('rivoli')
+  $<HTMLButtonElement>('.propositions button').click()
+  expect($('.adresse-retenue').textContent).toBe('Adresse retenue : 10 Rue de Rivoli 75004 Paris')
+  expect($<HTMLLabelElement>('label.navigo').hidden).toBe(false)
+})
+
+test('une adresse hors Île-de-France garde Navigo masqué', async () => {
+  vi.useFakeTimers()
+  chercherAdresses.mockResolvedValue([brest])
+  ouvrirFicheAmi(null, { enregistrer: vi.fn() })
+  await taper('siam')
+  $<HTMLButtonElement>('.propositions button').click()
+  expect($<HTMLLabelElement>('label.navigo').hidden).toBe(true)
+})
+
+test('modifier une personne d’Île-de-France affiche Navigo et la confirmation dès l’ouverture', () => {
+  ouvrirFicheAmi(lea, { enregistrer: vi.fn(), supprimer: vi.fn() })
+  expect($<HTMLLabelElement>('label.navigo').hidden).toBe(false)
+  expect($('.adresse-retenue').textContent).toBe('Adresse retenue : 10 Rue de Rivoli 75004 Paris')
+})
+
+test('un enregistrement réussi affiche un toast « <nom> modifiée » accessible', async () => {
+  const enregistrer = vi.fn().mockResolvedValue(undefined)
+  ouvrirFicheAmi(lea, { enregistrer })
+  soumettre()
+  await vi.waitFor(() => expect(document.querySelector('.toast')).not.toBeNull())
+  const toast = document.querySelector('.toast')!
+  expect(toast.textContent).toBe('Léa modifiée')
+  expect(toast.getAttribute('role')).toBe('status')
+})
+
+test('un ajout réussi affiche « <nom> ajoutée »', async () => {
+  vi.useFakeTimers()
+  chercherAdresses.mockResolvedValue([lyon])
+  const enregistrer = vi.fn().mockResolvedValue(undefined)
+  ouvrirFicheAmi(null, { enregistrer })
+  $<HTMLInputElement>('input[name="nom"]').value = 'Zoé'
+  await taper('bellecour')
+  $<HTMLButtonElement>('.propositions button').click()
+  soumettre()
+  await vi.advanceTimersByTimeAsync(0)
+  const toast = document.querySelector('.toast')!
+  expect(toast.textContent).toBe('Zoé ajoutée')
 })

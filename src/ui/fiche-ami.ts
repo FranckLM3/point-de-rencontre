@@ -1,15 +1,19 @@
 import { chercherAdresses, LONGUEUR_MIN } from '../donnees/geocodage'
 import type { Ami, Lieu, NouvelAmi, Transport } from '../types'
 import { echapper } from './format'
+import { ICONE_COCHE, svgTransport } from './icones'
+import { initiales } from './marqueurs'
+import { navigoDisponible } from './personnes'
+import { afficherToast } from './toast'
 
 const DELAI_FRAPPE_MS = 250
 
 const TEXTE = {
   enregistrer: 'Enregistrer',
   enregistrement: 'Enregistrement…',
-  supprimer: 'Supprimer',
-  confirmer: 'Confirmer la suppression',
-  suppression: 'Suppression…',
+  retirer: 'Retirer ce Croco',
+  confirmerRetrait: 'Confirmer le retrait',
+  retrait: 'Retrait…',
   aucuneAdresse: 'Aucune adresse trouvée. Ajoute le code postal.',
   choisirAdresse: 'Choisis une adresse dans la liste proposée.',
 } as const
@@ -19,24 +23,39 @@ export interface ActionsFiche {
   supprimer?: () => Promise<void>
 }
 
-const gabarit = (titre: string, modifiable: boolean): string => `
+const SEGMENTS_TRANSPORT: { valeur: Transport; libelle: string }[] = [
+  { valeur: 'tc', libelle: 'Transports' },
+  { valeur: 'voiture', libelle: 'Voiture' },
+]
+
+const segmentTransport = (t: { valeur: Transport; libelle: string }, coche: Transport): string => `
+  <label class="segment">
+    <input type="radio" name="transport" value="${t.valeur}" ${t.valeur === coche ? 'checked' : ''} />
+    ${svgTransport(t.valeur)}<span>${t.libelle}</span>
+  </label>`
+
+const gabarit = (titre: string, modifiable: boolean, transportCoche: Transport): string => `
   <form method="dialog">
-    <h2 id="fiche-titre">${titre}</h2>
-    <label>Nom <input class="champ" name="nom" required maxlength="60" /></label>
+    <header class="fiche-entete">
+      <span class="avatar-ami apercu" aria-hidden="true"></span>
+      <h2 id="fiche-titre">${titre}</h2>
+    </header>
+    <label>Prénom ou surnom <input class="champ" name="nom" required maxlength="60" /></label>
     <label>Adresse <input class="champ" name="adresse" required autocomplete="off" /></label>
     <ul class="propositions"></ul>
     <p class="aide" role="status"></p>
-    <fieldset>
-      <legend>Se déplace en</legend>
-      <label class="option"><input type="radio" name="transport" value="voiture" /> Voiture</label>
-      <label class="option"><input type="radio" name="transport" value="tc" /> Transports en commun</label>
+    <p class="adresse-retenue"></p>
+    <fieldset class="segmente transport-segmente" role="radiogroup" aria-label="Se déplace en">
+      ${SEGMENTS_TRANSPORT.map((t) => segmentTransport(t, transportCoche)).join('')}
     </fieldset>
-    <label class="option"><input type="checkbox" name="navigo" /> Abonné Navigo</label>
+    <label class="option navigo" hidden><input type="checkbox" name="navigo" /> Abonné Navigo</label>
     <p class="erreur" role="alert"></p>
-    <div class="rang">
-      <button class="pastille" type="submit">${TEXTE.enregistrer}</button>
-      <button class="pastille secondaire" type="button" data-action="annuler">Annuler</button>
-      ${modifiable ? `<button class="pastille secondaire pousse" type="button" data-action="supprimer">${TEXTE.supprimer}</button>` : ''}
+    <div class="pied-fiche">
+      <div class="rang actions-principales">
+        <button class="pastille" type="submit">${TEXTE.enregistrer}</button>
+        <button class="pastille secondaire" type="button" data-action="annuler">Annuler</button>
+      </div>
+      ${modifiable ? `<button class="lien-discret" type="button" data-action="supprimer">${TEXTE.retirer}</button>` : ''}
     </div>
   </form>`
 
@@ -96,7 +115,7 @@ export function ouvrirFicheAmi(ami: Ami | null, actions: ActionsFiche): boolean 
   const dialogue = document.createElement('dialog')
   dialogue.className = 'feuille'
   dialogue.setAttribute('aria-labelledby', 'fiche-titre')
-  dialogue.innerHTML = gabarit(ami ? 'Modifier un Croco' : 'Ajouter un Croco', ami !== null && actions.supprimer !== undefined)
+  dialogue.innerHTML = gabarit(ami ? `Modifier ${ami.nom}` : 'Nouveau Croco', ami !== null && actions.supprimer !== undefined, transportConnu(ami?.transport))
   document.body.append(dialogue)
   // jsdom n'implémente pas showModal : l'attribut open suffit alors.
   if (typeof dialogue.showModal === 'function') dialogue.showModal()
@@ -105,27 +124,39 @@ export function ouvrirFicheAmi(ami: Ami | null, actions: ActionsFiche): boolean 
   const form = dialogue.querySelector('form')!
   const champ = (n: string) => form.querySelector<HTMLInputElement>(`[name="${n}"]`)!
   const erreur = form.querySelector<HTMLParagraphElement>('.erreur')!
+  const avatar = form.querySelector<HTMLElement>('.avatar-ami.apercu')!
+  const adresseRetenue = form.querySelector<HTMLParagraphElement>('.adresse-retenue')!
+  const champNavigo = form.querySelector<HTMLLabelElement>('label.navigo')!
   const boutonEnregistrer = form.querySelector<HTMLButtonElement>('button[type="submit"]')!
   const boutonSupprimer = form.querySelector<HTMLButtonElement>('[data-action="supprimer"]')
   let choisi: Lieu | null = ami ? { lat: ami.lat, lon: ami.lon, label: ami.adresse } : null
   let occupe = false
   let arme = false
 
+  const majAvatar = () => { avatar.textContent = initiales(champ('nom').value || '?') }
+  const majAdresseRetenue = () => {
+    adresseRetenue.innerHTML = choisi ? `${ICONE_COCHE}Adresse retenue : ${echapper(choisi.label)}` : ''
+    const eligible = choisi ? navigoDisponible(choisi.label) : false
+    champNavigo.hidden = !eligible
+    if (!eligible) champ('navigo').checked = false
+  }
+
   champ('nom').value = ami?.nom ?? ''
   champ('adresse').value = ami?.adresse ?? ''
   champ('navigo').checked = ami?.navigo ?? false
-  form.querySelector<HTMLInputElement>(`input[name="transport"][value="${transportConnu(ami?.transport)}"]`)!.checked = true
+  majAvatar()
+  majAdresseRetenue()
+  champ('nom').addEventListener('input', majAvatar)
   brancherAutocompletion(
     { champ: champ('adresse'), liste: form.querySelector('.propositions')!, aide: form.querySelector('.aide')!, erreur },
-    (l) => { choisi = l },
+    (l) => { choisi = l; majAdresseRetenue() },
   )
 
   const armerSuppression = (valeur: boolean) => {
     arme = valeur
     if (!boutonSupprimer) return
-    boutonSupprimer.textContent = valeur ? TEXTE.confirmer : TEXTE.supprimer
-    boutonSupprimer.classList.toggle('danger', valeur)
-    boutonSupprimer.classList.toggle('secondaire', !valeur)
+    boutonSupprimer.textContent = valeur ? TEXTE.confirmerRetrait : TEXTE.retirer
+    boutonSupprimer.classList.toggle('danger-texte', valeur)
   }
   const bloquer = (valeur: boolean) => {
     occupe = valeur
@@ -143,7 +174,7 @@ export function ouvrirFicheAmi(ami: Ami | null, actions: ActionsFiche): boolean 
   }
 
   /** Lance l'action, bloque les boutons pendant l'attente et les rend en cas d'erreur. */
-  const tenter = async (bouton: HTMLButtonElement, texteAttente: string, action: () => Promise<void>) => {
+  const tenter = async (bouton: HTMLButtonElement, texteAttente: string, action: () => Promise<void>, apresSucces?: () => void) => {
     const texteInitial = bouton.textContent
     erreur.textContent = ''
     bouton.textContent = texteAttente
@@ -152,6 +183,7 @@ export function ouvrirFicheAmi(ami: Ami | null, actions: ActionsFiche): boolean 
       await action()
       bloquer(false)
       fermer()
+      apresSucces?.()
     } catch (e) {
       erreur.textContent = (e as Error).message
       bouton.textContent = texteInitial
@@ -172,7 +204,7 @@ export function ouvrirFicheAmi(ami: Ami | null, actions: ActionsFiche): boolean 
       armerSuppression(true)
       return
     }
-    void tenter(boutonSupprimer, TEXTE.suppression, supprimer)
+    void tenter(boutonSupprimer, TEXTE.retrait, supprimer)
   })
   form.addEventListener('submit', (evt) => {
     evt.preventDefault()
@@ -183,16 +215,21 @@ export function ouvrirFicheAmi(ami: Ami | null, actions: ActionsFiche): boolean 
       return
     }
     const lieu = choisi
+    const nom = champ('nom').value.trim()
     const transport = transportConnu(form.querySelector<HTMLInputElement>('input[name="transport"]:checked')?.value)
-    void tenter(boutonEnregistrer, TEXTE.enregistrement, () =>
-      actions.enregistrer({
-        nom: champ('nom').value,
-        adresse: lieu.label,
-        lat: lieu.lat,
-        lon: lieu.lon,
-        transport,
-        navigo: champ('navigo').checked,
-      }),
+    void tenter(
+      boutonEnregistrer,
+      TEXTE.enregistrement,
+      () =>
+        actions.enregistrer({
+          nom: champ('nom').value,
+          adresse: lieu.label,
+          lat: lieu.lat,
+          lon: lieu.lon,
+          transport,
+          navigo: champ('navigo').checked,
+        }),
+      () => afficherToast(`${nom} ${ami ? 'modifiée' : 'ajoutée'}`),
     )
   })
   champ('nom').focus()

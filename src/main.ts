@@ -54,6 +54,8 @@ interface Session {
   rendu: number
   /** Augmente à chaque rechargement des personnes (E4). */
   version: number
+  /** Identifiant à mettre brièvement en avant sur la carte (vient d'être ajouté ou modifié) ; consommé au rendu suivant. */
+  recemment: string | null
   cleZones: string | null
   /** Résumé du meilleur point, recalculé en même temps que les zones (même clé). */
   repaire: (Repaire & { lat: number; lon: number }) | null
@@ -92,12 +94,22 @@ function changer(s: Session, p: Partial<Etat>): void {
 }
 
 function ajouter(s: Session): void {
-  ouvrirFicheAmi(null, { enregistrer: async (x) => { await ajouterAmi(x); await recharger(s) } })
+  ouvrirFicheAmi(null, {
+    enregistrer: async (x) => {
+      const cree = await ajouterAmi(x)
+      s.recemment = cree.id
+      await recharger(s)
+    },
+  })
 }
 
 function editer(s: Session, ami: Ami): void {
   ouvrirFicheAmi(ami, {
-    enregistrer: async (x) => { await modifierAmi(ami.id, x); await recharger(s) },
+    enregistrer: async (x) => {
+      const maj = await modifierAmi(ami.id, x)
+      s.recemment = maj.id
+      await recharger(s)
+    },
     supprimer: async () => { await supprimerAmi(ami.id); await recharger(s) },
   })
 }
@@ -178,7 +190,8 @@ function rendreZones(s: Session, choisis: Ami[]): void {
 
 function rendreCarte(s: Session, choisis: Ami[]): void {
   const ids = choisis.map((a) => a.id)
-  s.carte.amis(s.amis, new Set(ids))
+  s.carte.amis(s.amis, new Set(ids), s.recemment)
+  s.recemment = null
   s.carte.lignes(choisis, s.etat.lieu)
   const cle = cleZones(s.etat, ids, s.version)
   if (cle === s.cleZones) return
@@ -313,6 +326,7 @@ async function charger(carte: Carte, installer: (s: Session) => void): Promise<v
       tc: creerChargeurTc(creerHoraires),
       rendu: 0,
       version: 0,
+      recemment: null,
       cleZones: null,
       repaire: null,
     }

@@ -45,6 +45,20 @@ export interface GroupeVille {
   amis: Ami[]
 }
 
+/** Code postal (5 chiffres) trouvé en fin de texte, chaîne vide si aucun. */
+export function codePostalDe(adresse: string): string {
+  return decouperAdresse(adresse).codePostal
+}
+
+/** Départements où le Navigo existe : Paris et petite/grande couronne. */
+const DEPARTEMENTS_NAVIGO = ['75', '77', '78', '91', '92', '93', '94', '95']
+
+/** Abonnement Navigo pertinent seulement pour une adresse en Île-de-France. */
+export function navigoDisponible(adresse: string): boolean {
+  const cp = codePostalDe(adresse)
+  return DEPARTEMENTS_NAVIGO.includes(cp.slice(0, 2))
+}
+
 /** Trie par ville de regroupement puis par nom ; une entrée par ville, dans l'ordre alphabétique. */
 export function regrouperParVille(amis: Ami[]): GroupeVille[] {
   const tries = [...amis].sort(

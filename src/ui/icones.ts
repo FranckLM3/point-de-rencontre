@@ -13,10 +13,12 @@ const VOITURE =
   `<svg viewBox="0 0 24 24" width="14" height="14" ${TRAIT} aria-hidden="true" focusable="false">` +
   '<path d="M4 16v-4.5L6.5 6h11L20 11.5V16"/><path d="M2 16h20"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/></svg>'
 
+/** Le tracé seul, décoratif : à poser à côté d'un texte qui porte déjà le nom accessible. */
+export const svgTransport = (t: Transport): string => (t === 'voiture' ? VOITURE : TRAIN)
+
 /** Icône + texte visuellement masqué (repris par les lecteurs d'écran) : jamais d'émoji. */
 export function pictoTransport(t: Transport): string {
-  const svg = t === 'voiture' ? VOITURE : TRAIN
-  return `<span class="picto-transport">${svg}<span class="invisible">${libelleTransport(t)}</span></span>`
+  return `<span class="picto-transport">${svgTransport(t)}<span class="invisible">${libelleTransport(t)}</span></span>`
 }
 
 /** Crayon : bouton « Modifier X » porte déjà son nom accessible, l'icône reste décorative. */
