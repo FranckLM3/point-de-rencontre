@@ -32,7 +32,7 @@ def encoder_ligne(trajets: list[Trajet]) -> bytes:
     for t in trajets:
         km = 0 if t.minutes == INJOIGNABLE else min(KM_MAX, round(t.km))
         drapeaux = (1 if t.grande_ligne else 0) | min(CORRESPONDANCES_MAX, t.correspondances) << 1
-        sortie += struct.pack("<HHB", t.minutes, km, drapeaux)
+        sortie += struct.pack("<HHBH", t.minutes, km, drapeaux, t.precedente)
     return bytes(sortie)
 
 

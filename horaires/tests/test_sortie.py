@@ -13,14 +13,20 @@ from horaires.tests.fabrique import archive, reseau_synthetique
 
 class SortieTest(unittest.TestCase):
     def test_encoder_ligne(self):
-        octets = encoder_ligne([Trajet(0, 0.0, False), Trajet(100, 157.4, True), Trajet(INJOIGNABLE, 0.0, False)])
-        self.assertEqual(len(octets), 15)
-        self.assertEqual(struct.unpack_from("<HHB", octets, 5), (100, 157, 1))
-        self.assertEqual(struct.unpack_from("<HHB", octets, 10), (INJOIGNABLE, 0, 0))
+        octets = encoder_ligne(
+            [Trajet(0, 0.0, False, 0, INJOIGNABLE), Trajet(100, 157.4, True, 0, 3), Trajet(INJOIGNABLE, 0.0, False)]
+        )
+        self.assertEqual(len(octets), 21)
+        self.assertEqual(struct.unpack_from("<HHBH", octets, 7), (100, 157, 1, 3))
+        self.assertEqual(struct.unpack_from("<HHBH", octets, 14), (INJOIGNABLE, 0, 0, INJOIGNABLE))
 
     def test_drapeaux_grande_ligne_et_correspondances(self):
         octets = encoder_ligne([Trajet(100, 10.0, True, 2), Trajet(100, 10.0, False, 3), Trajet(100, 10.0, True, 40)])
-        self.assertEqual([octets[k * 5 + 4] for k in range(3)], [0b101, 0b110, 0b11111])
+        self.assertEqual([octets[k * 7 + 4] for k in range(3)], [0b101, 0b110, 0b11111])
+
+    def test_precedente_encodee(self):
+        octets = encoder_ligne([Trajet(60, 10.0, False, 0, 5)])
+        self.assertEqual(struct.unpack_from("<H", octets, 5)[0], 5)
 
     def test_index_voisins(self):
         reseau = charger(archive())
@@ -39,7 +45,7 @@ class SortieTest(unittest.TestCase):
             stations = json.loads((Path(d) / "stations.json").read_text())
             self.assertEqual(stations[0], {"nom": "Alpha", "lat": 45.0, "lon": 4.0, "desservie": True, "train": True})
             self.assertFalse(stations[3]["desservie"])
-            self.assertEqual(len((Path(d) / "lignes" / "0.bin").read_bytes()), 5 * 4)
+            self.assertEqual(len((Path(d) / "lignes" / "0.bin").read_bytes()), 7 * 4)
             version = json.loads((Path(d) / "version.json").read_text())
             self.assertEqual(version["jour"], "20261006")
     def test_ecriture_atomique_et_lignes_perimees_retirees(self):

@@ -31,6 +31,9 @@ class Trajet:
     km: float
     grande_ligne: bool
     correspondances: int = 0
+    # Gare précédente sur le trajet le plus rapide : le `de` de la dernière connexion en train,
+    # ou la gare quittée par une liaison à pied/urbaine ; INJOIGNABLE pour la source et l'injoignable.
+    precedente: int = INJOIGNABLE
 
 
 @dataclass(frozen=True)
@@ -40,12 +43,17 @@ class Index:
     connexions: list[tuple]  # (départ, arrivée, de, vers, n° de trajet, km, grande ligne, montée, descente)
     departs: list[int]
     departs_par_gare: list[list[int]]
-    fermeture: list[list[tuple[int, int]]]  # (gare, secondes) par la plus courte chaîne de liaisons
+    fermeture: list[list[tuple[int, int, int]]]  # (gare, secondes, précédente) par la plus courte chaîne de liaisons
 
 
-def _fermeture(liaisons: list[list[tuple[int, int]]], depart: int) -> list[tuple[int, int]]:
-    """Dijkstra borné à LIAISONS_MAX_S sur le graphe des liaisons."""
+def _fermeture(liaisons: list[list[tuple[int, int]]], depart: int) -> list[tuple[int, int, int]]:
+    """Dijkstra borné à LIAISONS_MAX_S sur le graphe des liaisons.
+
+    `précédente` est le prédécesseur dans l'arbre des plus courts chemins (racine `depart`) :
+    la gare immédiatement avant sur la chaîne de liaisons, pas forcément `depart` lui-même.
+    """
     meilleur = {depart: 0}
+    precedente = {depart: depart}
     tas = [(0, depart)]
     while tas:
         t, g = heapq.heappop(tas)
@@ -55,9 +63,10 @@ def _fermeture(liaisons: list[list[tuple[int, int]]], depart: int) -> list[tuple
             u = t + s
             if u <= LIAISONS_MAX_S and u < meilleur.get(v, JAMAIS):
                 meilleur[v] = u
+                precedente[v] = g
                 heapq.heappush(tas, (u, v))
     del meilleur[depart]
-    return sorted(meilleur.items())
+    return sorted((g, s, precedente[g]) for g, s in meilleur.items())
 
 
 def preparer(reseau: Reseau) -> Index:
@@ -81,7 +90,7 @@ def preparer(reseau: Reseau) -> Index:
 def _departs_source(index: Index, source: int) -> list[int]:
     """Heures de départ réelles de la source, dans la fenêtre, temps de liaison compris."""
     heures = set(index.departs_par_gare[source])
-    for voisine, secondes in index.fermeture[source]:
+    for voisine, secondes, _ in index.fermeture[source]:
         heures.update(d - secondes for d in index.departs_par_gare[voisine])
     return sorted(h for h in heures if DEBUT_FENETRE_S <= h <= FIN_FENETRE_S)
 
@@ -100,6 +109,8 @@ class _Etiquettes:
     libre: list[int]
     info_train: list
     info_libre: list
+    prec_train: list[int]
+    prec_libre: list[int]
 
 
 def _un_depart(index: Index, source: int, depart: int, e: _Etiquettes) -> list[int]:
@@ -108,12 +119,15 @@ def _un_depart(index: Index, source: int, depart: int, e: _Etiquettes) -> list[i
     Les étiquettes arrivent à JAMAIS ; renvoie les gares touchées, à remettre à JAMAIS.
     """
     par_train, libre, info_train, info_libre = e.par_train, e.libre, e.info_train, e.info_libre
+    prec_train, prec_libre = e.prec_train, e.prec_libre
     touchees = [source]
     libre[source] = depart
     info_libre[source] = AUCUN_TRAIN
-    for voisine, secondes in index.fermeture[source]:
+    prec_libre[source] = INJOIGNABLE
+    for voisine, secondes, precedente in index.fermeture[source]:
         libre[voisine] = depart + secondes
         info_libre[voisine] = AUCUN_TRAIN
+        prec_libre[voisine] = precedente
         touchees.append(voisine)
     en_cours: dict[int, tuple[float, bool, int]] = {}
     fermeture = index.fermeture
@@ -146,12 +160,14 @@ def _un_depart(index: Index, source: int, depart: int, e: _Etiquettes) -> list[i
         if descente and (arr < par_train[vers] or (arr == par_train[vers] and pris[2] < info_train[vers][2])):
             par_train[vers] = arr
             info_train[vers] = pris
+            prec_train[vers] = de
             touchees.append(vers)
-            for voisine, secondes in fermeture[vers]:
+            for voisine, secondes, precedente in fermeture[vers]:
                 u = arr + secondes
                 if u < libre[voisine] or (u == libre[voisine] and pris[2] < info_libre[voisine][2]):
                     libre[voisine] = u
                     info_libre[voisine] = pris
+                    prec_libre[voisine] = precedente
                     touchees.append(voisine)
     return touchees
 
@@ -160,24 +176,26 @@ def meilleurs_trajets(reseau: Reseau, source: int, index: Index | None = None) -
     index = index or preparer(reseau)
     n = len(reseau.gares)
     meilleurs = [Trajet(INJOIGNABLE, 0.0, False)] * n
-    meilleurs[source] = Trajet(0, 0.0, False)
+    meilleurs[source] = Trajet(0, 0.0, False, 0, INJOIGNABLE)
     duree_min = [JAMAIS] * n
     duree_min[source] = 0
-    for voisine, secondes in index.fermeture[source]:
+    for voisine, secondes, precedente in index.fermeture[source]:
         duree_min[voisine] = secondes
-        meilleurs[voisine] = Trajet(round(secondes / 60), 0.0, False)
-    e = _Etiquettes([JAMAIS] * n, [JAMAIS] * n, [None] * n, [None] * n)
+        meilleurs[voisine] = Trajet(round(secondes / 60), 0.0, False, 0, precedente)
+    e = _Etiquettes([JAMAIS] * n, [JAMAIS] * n, [None] * n, [None] * n, [INJOIGNABLE] * n, [INJOIGNABLE] * n)
     for depart in _departs_source(index, source):
         for j in set(_un_depart(index, source, depart, e)):
             par_train, libre = e.par_train[j], e.libre[j]
             if par_train < libre or (par_train == libre and e.info_train[j][2] <= e.info_libre[j][2]):
                 arrivee, (km, gl, trains) = par_train, e.info_train[j]
+                precedente = e.prec_train[j]
             else:
                 arrivee, (km, gl, trains) = libre, e.info_libre[j]
+                precedente = e.prec_libre[j]
             duree = arrivee - depart
             correspondances = max(0, trains - 1)
             if duree < duree_min[j] or (duree == duree_min[j] and correspondances < meilleurs[j].correspondances):
                 duree_min[j] = duree
-                meilleurs[j] = Trajet(round(duree / 60), km, gl, correspondances)
+                meilleurs[j] = Trajet(round(duree / 60), km, gl, correspondances, precedente)
             e.par_train[j] = e.libre[j] = JAMAIS
     return meilleurs
