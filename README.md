@@ -1,9 +1,12 @@
-# Point de rencontre
+# Les Crocos
 
-Où se retrouver entre amis : la carte de France colorée selon la distance de chacun, le meilleur point, les villes classées et le détail d'un lieu testé. Vol d'oiseau pour l'instant, voiture et transports ensuite.
+Où se retrouver entre Crocos : la carte de France colorée selon le trajet de
+chacun, le meilleur point (« le repaire »), les villes classées et le détail
+d'un lieu testé. À vol d'oiseau et en transports (horaires SNCF, temps ou
+prix) ; la voiture et les transports urbains suivent.
 
 Spécification : `docs/superpowers/specs/2026-09-17-point-de-rencontre-design.md`.
-Plan en cours : `docs/superpowers/plans/2026-09-17-plan-1-socle-vol-oiseau.md`.
+Plans : `docs/superpowers/plans/` (plan 1 en ligne, plan 2 transports).
 
 ## Développer
 

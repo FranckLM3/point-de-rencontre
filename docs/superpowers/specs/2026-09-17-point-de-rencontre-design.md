@@ -193,11 +193,17 @@ est la distance en km. Prix : non applicable (la pastille Prix est grisée).
 - Action hebdomadaire : télécharge les horaires ouverts SNCF (TER,
   Intercités, TGV) sur transport.data.gouv.fr, retient un mardi type.
 - Algorithme : parcours de connexions (Connection Scan) depuis chaque gare,
-  départs toutes les 15 min entre 7 h et 10 h, temps retenu = durée minimale.
-  Correspondance minimale 5 min, transferts à pied entre gares à moins de
-  500 m (vitesse 4,5 km/h × 1,3 de détour).
-- Sortie : `data/tc/stations.bin` (id, nom, lat, lon) et une ligne par gare
-  `data/tc/lignes/<id>.bin` (`uint16` minutes et `uint16` km par gare cible).
+  un calcul par départ réel entre 6 h et 20 h (le premier train part dans
+  la fenêtre), temps retenu = durée minimale depuis le départ de la source.
+  Montée et descente interdites respectées. Correspondance minimale 5 min
+  entre deux trains ; liaisons enchaînables entre gares desservies : à pied
+  jusqu'à 1 km (4,5 km/h × 1,3), urbaine jusqu'à 6 km (15 min + 20 km/h),
+  60 min de liaison au plus (voir 5.4 ter).
+- Sortie : `data/tc/stations.json` (nom, lat, lon, desservie),
+  `data/tc/voisins-4km.bin` et une ligne par gare `data/tc/lignes/<i>.bin`
+  (5 octets par gare cible : minutes, km, drapeaux grande ligne et nombre de
+  correspondances). Gares au-delà de 50 km ignorées (la Corse n'a pas de
+  train dans ces horaires).
 - Trajet d'un ami vers une gare cible G :
   min sur les 3 gares les plus proches de l'ami A de
   (accès(ami, A) + ligne[A][G]). Accès = vol d'oiseau × 1,3, à pied si
