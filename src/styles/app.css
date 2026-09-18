@@ -51,12 +51,75 @@ h1 { font-family: var(--police-marque); font-size: var(--titre); font-weight: 70
 .segmente .pastille:last-child { border-right: 0; }
 .segmente .pastille:hover, .segmente .pastille:active { transform: none; }
 
-.ami { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); color: var(--texte); border: 1px solid var(--bord); }
-.ami input { accent-color: var(--accent); }
-.ami .editer { all: unset; cursor: pointer; }
-.ami .editer:focus-visible { outline: 2px solid var(--accent); }
-.ami .ville, .ami .moyen { color: var(--texte-doux); }
-.ami .moyen { font-size: .875rem; border: 1px solid var(--bord); border-radius: 6px; padding: 3px 5px; }
+/* Liste compacte des Crocos (D1). */
+.entete-liste-amis { font-family: var(--police-marque); }
+.entete-liste-amis strong { font-weight: 700; }
+.compte-amis { color: var(--texte-doux); font-family: var(--police); font-weight: 500; font-size: .875rem; }
+.puces-groupes { row-gap: 6px; }
+.puce-groupe {
+  border: 1px solid var(--bord); border-radius: 999px; padding: 5px 12px; background: var(--surface);
+  color: var(--texte); font-size: .8125rem; font-weight: 500; cursor: pointer;
+}
+.puce-groupe[aria-pressed='true'] { background: var(--accent-fond); color: var(--accent); border-color: var(--accent); }
+.puce-groupe:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.lien-discret { border: 0; background: none; color: var(--accent); font-weight: 500; font-size: .8125rem; cursor: pointer; padding: 5px 4px; }
+.lien-discret:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.champ-recherche {
+  display: flex; align-items: center; gap: 8px; border: 1px solid var(--bord); border-radius: 999px;
+  padding: 8px 14px; background: var(--surface); color: var(--texte-doux);
+}
+.champ-recherche svg { flex: none; }
+.champ-recherche input { flex: 1; border: 0; background: none; font-size: 1rem; color: var(--texte); outline: none; }
+.champ-recherche:focus-within { border-color: var(--accent); }
+
+.conteneur-liste-amis { border: 1px solid var(--bord); border-radius: var(--rayon-carte); background: var(--surface); overflow: hidden; }
+.entete-fixe { display: grid; gap: 8px; padding: 12px 14px 8px; }
+.liste-amis { list-style: none; margin: 0; padding: 0; }
+.entete-ville:first-child .bouton-ville { border-top: 0; }
+.bouton-ville {
+  width: 100%; display: flex; justify-content: space-between; gap: 8px; border: 0; border-top: 1px solid var(--bord);
+  background: var(--fond); color: var(--texte-doux); font-weight: 500; font-size: .8125rem;
+  padding: 6px 14px; cursor: pointer; text-align: left;
+}
+.bouton-ville:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.compte-ville { font-variant-numeric: tabular-nums; }
+
+.ligne-ami {
+  display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-top: 1px solid var(--bord);
+  cursor: pointer; transition: background var(--duree);
+}
+.ligne-ami:hover { background: var(--fond); }
+.avatar-ami {
+  flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
+  background: var(--pastille); color: #ffffff; font-size: 13px; font-weight: 800; line-height: 1;
+}
+.avatar-ami.inactif { background: var(--texte-doux); }
+.info-ami { display: grid; flex: 1; min-width: 0; }
+.nom-ami { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ville-ami { color: var(--texte-doux); font-size: .8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ligne-ami .picto-transport { flex: none; color: var(--texte-doux); }
+.ligne-ami.exclu .nom-ami, .ligne-ami.exclu .ville-ami { color: var(--texte-doux); }
+.crayon {
+  flex: none; border: 0; background: none; color: var(--texte-doux); cursor: pointer; border-radius: 8px;
+  display: grid; place-items: center; width: 32px; height: 32px;
+}
+.crayon:hover { color: var(--texte); background: var(--fond); }
+.crayon:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+
+/* Interrupteur (switch) : piste + curseur, jetons palette uniquement. */
+.interrupteur {
+  flex: none; position: relative; width: 40px; height: 24px; border-radius: 999px; border: 1px solid var(--bord);
+  background: var(--fond); cursor: pointer; padding: 0; transition: background var(--duree);
+}
+.interrupteur::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+  background: #ffffff; box-shadow: 0 1px 2px rgb(0 0 0 / 25%); transition: transform var(--duree);
+}
+.interrupteur[aria-checked='true'] { background: var(--accent); border-color: var(--accent); }
+.interrupteur[aria-checked='true']::after { transform: translateX(16px); }
+.interrupteur:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.ajouter-croco { width: 100%; text-align: center; justify-content: center; }
 
 /* Pictogramme voiture / train : même style de trait, taille d'icône de texte. */
 .picto-transport { display: inline-flex; align-items: center; }
@@ -230,12 +293,21 @@ form.groupe .champ { flex: 1 1 100%; }
 
   /* Cibles tactiles d'au moins 44 px. */
   .pastille, .champ, .propositions button, .ville-entete { min-height: var(--cible-tactile); }
-  .ami input[type='checkbox'] { width: 22px; height: 22px; }
-  .ami .editer { min-height: var(--cible-tactile); display: inline-flex; align-items: center; gap: 6px; }
-  .rang.amis { flex-wrap: nowrap; overflow-x: auto; }
+  .ligne-ami, .bouton-ville, .puce-groupe, .lien-discret { min-height: var(--cible-tactile); }
+  .crayon { width: var(--cible-tactile); height: var(--cible-tactile); }
+  .interrupteur { width: 46px; height: 28px; }
+  .interrupteur::after { width: 22px; height: 22px; }
+  .interrupteur[aria-checked='true']::after { transform: translateX(18px); }
   .feuille[open] { place-items: end stretch; }
   .feuille label.option { min-height: var(--cible-tactile); }
   .feuille label.option input { width: 22px; height: 22px; margin: 0; }
+}
+
+/* Ordinateur : la liste défile dans sa propre boîte au-delà de 8 lignes ; l'en-tête,
+   la recherche et les puces de groupe restent visibles pendant le défilement. */
+@media (min-width: 1024px) {
+  .conteneur-liste-amis { max-height: 460px; overflow-y: auto; }
+  .entete-fixe { position: sticky; top: 0; z-index: 1; background: var(--surface); padding-bottom: 6px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

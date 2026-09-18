@@ -18,3 +18,23 @@ export function pictoTransport(t: Transport): string {
   const svg = t === 'voiture' ? VOITURE : TRAIN
   return `<span class="picto-transport">${svg}<span class="invisible">${libelleTransport(t)}</span></span>`
 }
+
+/** Crayon : bouton « Modifier X » porte déjà son nom accessible, l'icône reste décorative. */
+export const ICONE_CRAYON =
+  `<svg viewBox="0 0 24 24" width="16" height="16" ${TRAIT} aria-hidden="true" focusable="false">` +
+  '<path d="M4 20l1-4.5L15.5 5 19 8.5 8.5 19 4 20Z"/><path d="M13.5 6.5 17.5 10.5"/></svg>'
+
+/** Coche : confirmation d'adresse retenue dans la fiche d'un Croco. */
+export const ICONE_COCHE =
+  `<svg viewBox="0 0 24 24" width="14" height="14" ${TRAIT} aria-hidden="true" focusable="false">` +
+  '<path d="M4 12.5 9.5 18 20 6"/></svg>'
+
+/** Loupe : champ de recherche de la liste des Crocos. */
+export const ICONE_RECHERCHE =
+  `<svg viewBox="0 0 24 24" width="16" height="16" ${TRAIT} aria-hidden="true" focusable="false">` +
+  '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.35-4.35"/></svg>'
+
+/** Plein écran : quatre coins qui se rejoignent, posé sur la carte à côté du zoom. */
+export const ICONE_PLEIN_ECRAN =
+  `<svg viewBox="0 0 24 24" width="16" height="16" ${TRAIT} aria-hidden="true" focusable="false">` +
+  '<path d="M8 4H4v4M16 4h4v4M8 20H4v-4M16 20h4v-4"/></svg>'

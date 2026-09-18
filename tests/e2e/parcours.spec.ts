@@ -109,6 +109,12 @@ async function ouvrirVoletSiVisible(page: Page): Promise<void> {
   if (await poignee.isVisible()) await poignee.click()
 }
 
+/** Bascule l'interrupteur « Inclure X » (D1) jusqu'à l'état voulu, sans dépendre de l'état de départ. */
+async function definirInclusion(page: Page, nom: string, inclure: boolean): Promise<void> {
+  const interrupteur = page.getByRole('switch', { name: `Inclure ${nom}` })
+  if ((await interrupteur.getAttribute('aria-checked')) !== String(inclure)) await interrupteur.click()
+}
+
 test('connexion, sélection, ajout d’une personne, test d’un lieu', async ({ page }) => {
   const erreurs: string[] = []
   page.on('pageerror', (e) => erreurs.push(e.message))
@@ -134,22 +140,22 @@ test('connexion, sélection, ajout d’une personne, test d’un lieu', async ({
   // Voir sur la carte referme le volet sur mobile (D1) : on le rouvre pour continuer.
   await ouvrirVoletSiVisible(page)
 
-  await page.getByLabel('Inclure Tom').uncheck()
+  await definirInclusion(page, 'Tom', false)
   await expect(page.getByRole('heading', { level: 1 })).toContainText('entre 1')
   await expect(page).toHaveURL(/sel=a/)
   await expect(page.locator('.marqueur-personne.inactif')).toHaveCount(1)
 
-  await page.getByRole('button', { name: 'Tout le monde' }).click()
+  await page.locator('[data-action="tous"]').click()
   await expect(page.getByRole('heading', { level: 1 })).toContainText('entre 2')
 
-  await page.locator('#amis').getByRole('button', { name: 'Ajouter un Croco' }).click()
+  await page.locator('#amis').getByRole('button', { name: '+ Ajouter un Croco' }).click()
   await page.getByLabel('Nom', { exact: true }).fill('Zoé')
   await page.getByLabel('Adresse').fill('canebiere')
   await page.getByRole('button', { name: MARSEILLE.properties.label }).click()
   await page.getByLabel('Voiture').check()
   await page.getByRole('button', { name: 'Enregistrer', exact: true }).click()
-  await expect(page.getByLabel('Inclure Zoé')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Modifier Zoé' })).toContainText('voiture')
+  await expect(page.getByRole('switch', { name: 'Inclure Zoé' })).toBeVisible()
+  await expect(page.locator('.ligne-ami', { hasText: 'Zoé' })).toContainText('voiture')
 
   await page.getByLabel('Tester un lieu').fill('canebiere')
   await page.getByRole('button', { name: MARSEILLE.properties.label }).click()
@@ -170,10 +176,10 @@ test('le focus reste sur la case cochée après le rafraîchissement au clavier'
   await page.goto('./')
   await entrer(page)
 
-  const caseTom = page.getByLabel('Inclure Tom')
-  await caseTom.focus()
+  const interrupteurTom = page.getByRole('switch', { name: 'Inclure Tom' })
+  await interrupteurTom.focus()
   await page.keyboard.press('Space')
-  await expect(caseTom).toBeFocused()
+  await expect(interrupteurTom).toBeFocused()
 })
 
 test('suppression d’une personne, avec confirmation', async ({ page }) => {
@@ -183,11 +189,11 @@ test('suppression d’une personne, avec confirmation', async ({ page }) => {
   await ouvrirVoletSiVisible(page)
 
   await page.getByRole('button', { name: 'Modifier Tom' }).click()
-  await page.getByRole('button', { name: 'Supprimer', exact: true }).click()
-  await expect(page.getByLabel('Inclure Tom')).toBeVisible()
+  await page.getByRole('button', { name: 'Retirer ce Croco', exact: true }).click()
+  await expect(page.getByRole('switch', { name: 'Inclure Tom' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Confirmer la suppression' }).click()
-  await expect(page.getByLabel('Inclure Tom')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Confirmer le retrait' }).click()
+  await expect(page.getByRole('switch', { name: 'Inclure Tom' })).toHaveCount(0)
 })
 
 test('enregistrer un groupe', async ({ page }, testInfo) => {
@@ -196,8 +202,8 @@ test('enregistrer un groupe', async ({ page }, testInfo) => {
   await page.goto('./')
   await entrer(page)
 
-  await page.getByLabel('Inclure Tom').uncheck()
-  await page.getByRole('button', { name: 'Enregistrer la sélection' }).click()
+  await definirInclusion(page, 'Tom', false)
+  await page.locator('[data-action="groupe"]').click()
   await page.getByLabel('Nom du groupe').fill('Sud')
   await page.getByRole('button', { name: 'Enregistrer le groupe' }).click()
   await expect(page.getByLabel('Groupe enregistré')).toContainText('Sud')
@@ -217,7 +223,7 @@ test('états vide et erreur', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toContainText('entre 2')
   await ouvrirVoletSiVisible(page)
 
-  await page.getByRole('button', { name: 'Aucune' }).click()
+  await page.locator('[data-action="aucun"]').click()
   await expect(page.locator('#villes')).toContainText('Coche au moins un Croco pour voir la carte.')
   await expect(page.locator('#legende')).toBeHidden()
   await expect(page.locator('#repaire')).toBeEmpty()

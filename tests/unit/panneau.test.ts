@@ -32,27 +32,66 @@ const actions = (): ActionsAmis => ({
 
 const cliquer = (el: Element, sel: string) => el.querySelector<HTMLElement>(sel)!.click()
 
-test('décocher un ami rend la sélection sans lui', () => {
+test('éteindre l’interrupteur d’un ami rend la sélection sans lui', () => {
   const el = document.createElement('div')
   const a = actions()
   rendreAmis(el, { amis, groupes: [], selection: new Set(['a', 'b']) }, a)
-  const caseLea = el.querySelector<HTMLInputElement>('input[data-id="a"]')!
-  caseLea.checked = false
-  caseLea.dispatchEvent(new Event('change'))
+  el.querySelector<HTMLButtonElement>('.interrupteur[data-id="a"]')!.click()
   expect(a.changerSelection).toHaveBeenCalledWith(['b'])
 })
 
-test('choisir un groupe coche ses membres encore présents', () => {
+test('toucher la ligne (hors crayon) bascule aussi l’interrupteur', () => {
+  const el = document.createElement('div')
+  const a = actions()
+  rendreAmis(el, { amis, groupes: [], selection: new Set(['a', 'b']) }, a)
+  el.querySelector<HTMLElement>('.ligne-ami[data-personne="a"] .nom-ami')!.click()
+  expect(a.changerSelection).toHaveBeenCalledWith(['b'])
+})
+
+test('l’interrupteur est un vrai switch accessible, la ligne exclue est visuellement atténuée', () => {
+  const el = document.createElement('div')
+  rendreAmis(el, { amis, groupes: [], selection: new Set(['a']) }, actions())
+  const bTom = el.querySelector<HTMLButtonElement>('.interrupteur[data-id="b"]')!
+  expect(bTom.getAttribute('role')).toBe('switch')
+  expect(bTom.getAttribute('aria-checked')).toBe('false')
+  expect(bTom.getAttribute('aria-label')).toBe('Inclure <b>Tom</b>')
+  expect(el.querySelector('.ligne-ami[data-personne="b"]')!.classList.contains('exclu')).toBe(true)
+})
+
+test('cliquer le crayon appelle éditer sans basculer l’interrupteur', () => {
+  const el = document.createElement('div')
+  const a = actions()
+  rendreAmis(el, { amis, groupes: [], selection: new Set(['a', 'b']) }, a)
+  el.querySelector<HTMLButtonElement>('[data-edit="b"]')!.click()
+  expect(a.editer).toHaveBeenCalledWith(amis[1])
+  expect(a.changerSelection).not.toHaveBeenCalled()
+})
+
+test('choisir une puce de groupe coche ses membres encore présents', () => {
   const el = document.createElement('div')
   const a = actions()
   rendreAmis(el, { amis, groupes: [{ id: 'g', nom: 'Sud', amis: ['b', 'disparu'] }], selection: new Set() }, a)
-  const select = el.querySelector('select')!
-  select.value = 'g'
-  select.dispatchEvent(new Event('change'))
+  el.querySelector<HTMLButtonElement>('[data-groupe="g"]')!.click()
   expect(a.changerSelection).toHaveBeenCalledWith(['b'])
 })
 
-test('pastille : nom échappé, ville et moyen de transport visibles', () => {
+test('la puce « Tous » sélectionne tout le monde et se met en avant quand tout est coché', () => {
+  const el = document.createElement('div')
+  const a = actions()
+  rendreAmis(el, { amis, groupes: [], selection: new Set(['a', 'b']) }, a)
+  const tous = el.querySelector<HTMLButtonElement>('[data-groupe=""]')!
+  expect(tous.getAttribute('aria-pressed')).toBe('true')
+  tous.click()
+  expect(a.changerSelection).toHaveBeenCalledWith(['a', 'b'])
+})
+
+test('en-tête : nombre de personnes cochées sur le total', () => {
+  const el = document.createElement('div')
+  rendreAmis(el, { amis, groupes: [], selection: new Set(['a']) }, actions())
+  expect(el.querySelector('.compte-amis')!.textContent).toBe('1/2')
+})
+
+test('ligne : nom échappé, ville et moyen de transport visibles', () => {
   const el = document.createElement('div')
   rendreAmis(el, { amis, groupes: [], selection: new Set() }, actions())
   expect(el.querySelector('b')).toBeNull()
@@ -61,18 +100,59 @@ test('pastille : nom échappé, ville et moyen de transport visibles', () => {
   expect(el.textContent).toContain('voiture')
 })
 
-test('libellés : Aucune, Ajouter un Croco, pas d’aria-pressed sur une liste', () => {
+test('les personnes sont regroupées par ville, avec un en-tête qui bascule tout le groupe', () => {
+  const el = document.createElement('div')
+  const a = actions()
+  const paris2: Ami = { id: 'c', nom: 'Zoé', adresse: '3 rue Z 75011 Paris', lat: 48.86, lon: 2.38, transport: 'tc', navigo: false }
+  rendreAmis(el, { amis: [...amis, paris2], groupes: [], selection: new Set(['a']) }, a)
+  const entetes = [...el.querySelectorAll<HTMLButtonElement>('.bouton-ville')]
+  expect(entetes.map((b) => b.dataset.ville)).toEqual(['Lyon', 'Paris'])
+  const paris = entetes.find((b) => b.dataset.ville === 'Paris')!
+  expect(paris.textContent).toContain('1/2')
+  paris.click()
+  expect(a.changerSelection).toHaveBeenCalledWith(['a', 'c'])
+})
+
+test('libellés : Aucun, + Ajouter un Croco', () => {
   const el = document.createElement('div')
   const a = actions()
   rendreAmis(el, { amis, groupes: [], selection: new Set(['a']) }, a)
-  expect(el.querySelector('[data-action="aucun"]')!.textContent).toBe('Aucune')
-  expect(el.querySelector('select')!.hasAttribute('aria-pressed')).toBe(false)
+  expect(el.querySelector('[data-action="aucun"]')!.textContent).toBe('Aucun')
   cliquer(el, '[data-action="aucun"]')
   expect(a.changerSelection).toHaveBeenCalledWith([])
   const ajouter = el.querySelector<HTMLButtonElement>('[data-action="ajouter"]')!
-  expect(ajouter.textContent).toBe('Ajouter un Croco')
+  expect(ajouter.textContent).toBe('+ Ajouter un Croco')
   ajouter.click()
   expect(a.ajouter).toHaveBeenCalled()
+})
+
+test('la recherche n’apparaît qu’au-delà de 8 personnes, filtre par nom ou ville', () => {
+  const el = document.createElement('div')
+  rendreAmis(el, { amis, groupes: [], selection: new Set() }, actions())
+  expect(el.querySelector('#recherche-amis')).toBeNull()
+
+  const beaucoup: Ami[] = Array.from({ length: 9 }, (_, i) => ({
+    id: `x${i}`, nom: `Personne ${i}`, adresse: '1 rue A 75001 Paris', lat: 48.85, lon: 2.35, transport: 'tc', navigo: false,
+  }))
+  const el2 = document.createElement('div')
+  rendreAmis(el2, { amis: beaucoup, groupes: [], selection: new Set() }, actions())
+  const champ = el2.querySelector<HTMLInputElement>('#recherche-amis')!
+  expect(champ).not.toBeNull()
+  champ.value = 'personne 3'
+  champ.dispatchEvent(new Event('input'))
+  expect([...el2.querySelectorAll('.nom-ami')].map((n) => n.textContent)).toEqual(['Personne 3'])
+})
+
+test('recherche sans résultat : message dédié', () => {
+  const el = document.createElement('div')
+  const beaucoup: Ami[] = Array.from({ length: 9 }, (_, i) => ({
+    id: `x${i}`, nom: `Personne ${i}`, adresse: '1 rue A 75001 Paris', lat: 48.85, lon: 2.35, transport: 'tc', navigo: false,
+  }))
+  rendreAmis(el, { amis: beaucoup, groupes: [], selection: new Set() }, actions())
+  const champ = el.querySelector<HTMLInputElement>('#recherche-amis')!
+  champ.value = 'introuvable'
+  champ.dispatchEvent(new Event('input'))
+  expect(el.querySelector('.vide')!.textContent).toContain('introuvable')
 })
 
 test('le formulaire de groupe enregistre le nom saisi et la sélection, sans boîte du navigateur', async () => {
