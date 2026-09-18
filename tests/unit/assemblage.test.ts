@@ -12,7 +12,7 @@ test('cleZones ne dépend ni du lieu ni de l’ordre des personnes', () => {
 
 test('cleZones change avec le critère, le maximum, la sélection et la version', () => {
   const base = cleZones(ETAT_DEFAUT, ['a', 'b'], 1)
-  expect(cleZones({ ...ETAT_DEFAUT, critere: 'moyenne' }, ['a', 'b'], 1)).not.toBe(base)
+  expect(cleZones({ ...ETAT_DEFAUT, critere: 'pire' }, ['a', 'b'], 1)).not.toBe(base)
   expect(cleZones({ ...ETAT_DEFAUT, max: 300 }, ['a', 'b'], 1)).not.toBe(base)
   expect(cleZones(ETAT_DEFAUT, ['a'], 1)).not.toBe(base)
   expect(cleZones(ETAT_DEFAUT, ['a', 'b'], 2)).not.toBe(base)

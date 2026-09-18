@@ -1,5 +1,6 @@
 import type { Segment, TrajetTc } from '../calcul/tc'
 import type { Unite } from '../calcul/unites'
+import { prixVoiture, type ParametresPrix, type ValeurVoiture } from '../calcul/voiture'
 import type { Critere, Mode, Transport } from '../types'
 
 export const km = (valeur: number): string => `${Math.round(valeur)} km`
@@ -53,6 +54,11 @@ export function descriptionTrajet(t: TrajetTc): string {
 
 export const libelleTransport = (t: Transport): string => (t === 'voiture' ? 'voiture' : 'transports')
 
+/** Détail d'un trajet en voiture, quelle que soit la grandeur affichée : « 3 h 12 de route · 468 km · ≈ 71 € ». */
+export function descriptionVoiture(v: ValeurVoiture, p: ParametresPrix): string {
+  return `${duree(v.minutes)} de route · ${km(v.km)} · ≈ ${euros(prixVoiture(v.km, p))}`
+}
+
 const LIBELLE_MODE: Record<Mode, string> = {
   oiseau: 'à vol d’oiseau',
   tc: 'en transports',
@@ -79,10 +85,10 @@ function phraseCritere(o: OptionsTitre): string {
   return o.critere === 'pire' ? 'au pire trajet le plus court' : 'au plus court en moyenne'
 }
 
-/** Sous-titre sous le h1 : mode, critère, et maximum s'il y en a un. */
+/** Sous-titre sous le h1 : mode, critère, et maximum s'il y en a un (toujours sur le pire trajet, décision 4). */
 export function sousTitre(o: OptionsTitre): string {
   const debut = `${majuscule(LIBELLE_MODE[o.mode])}, ${phraseCritere(o)}`
-  return o.max !== null ? `${debut}, sans dépasser ${valeur(o.max, o.unite)}` : debut
+  return o.max !== null ? `${debut}, sans que personne ne dépasse ${valeur(o.max, o.unite)}` : debut
 }
 
 /** Échappe le texte avant insertion dans le HTML. */

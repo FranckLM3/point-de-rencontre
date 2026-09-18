@@ -1,6 +1,9 @@
 import { expect, test } from 'vitest'
 import type { TrajetTc } from '../../src/calcul/tc'
-import { descriptionTrajet, duree, echapper, euros, km, libelleTransport, nomCourt, sousTitre, titreCourt, valeur } from '../../src/ui/format'
+import type { ParametresPrix } from '../../src/calcul/voiture'
+import {
+  descriptionTrajet, descriptionVoiture, duree, echapper, euros, km, libelleTransport, nomCourt, sousTitre, titreCourt, valeur,
+} from '../../src/ui/format'
 
 test('km sans espace des milliers, arrondi', () => {
   expect(km(1234.4)).toBe('1234 km')
@@ -32,13 +35,19 @@ test('titreCourt : le nombre de Crocos, singulier ou pluriel', () => {
 
 test('sousTitre selon le mode, le critère et le maximum', () => {
   expect(sousTitre({ mode: 'tc', unite: 'min', critere: 'pire', max: 180 })).toBe(
-    'En transports, au pire trajet le plus court, sans dépasser 3 h',
+    'En transports, au pire trajet le plus court, sans que personne ne dépasse 3 h',
   )
   expect(sousTitre({ mode: 'tc', unite: 'eur', critere: 'moyenne', max: null })).toBe(
     'En transports, au moins cher en moyenne',
   )
   expect(sousTitre({ mode: 'oiseau', unite: 'km', critere: 'pire', max: null })).toBe(
     'À vol d’oiseau, au pire trajet le plus court',
+  )
+})
+
+test('sousTitre : le maximum porte toujours sur le pire trajet, même en critère moyenne', () => {
+  expect(sousTitre({ mode: 'mixte', unite: 'min', critere: 'moyenne', max: 240 })).toBe(
+    'Chacun avec son moyen, au plus court en moyenne, sans que personne ne dépasse 4 h',
   )
 })
 
@@ -102,4 +111,10 @@ test('sousTitre : au plus court en moyenne, à vol d’oiseau', () => {
   expect(sousTitre({ mode: 'oiseau', unite: 'km', critere: 'moyenne', max: null })).toBe(
     'À vol d’oiseau, au plus court en moyenne',
   )
+})
+
+test('descriptionVoiture : durée, distance et prix estimé, quelle que soit la grandeur affichée', () => {
+  // carburant : 100 km x 10 L/100 x 2 € = 20 € ; péage : (100 - 80) x 0.7 x 0.09 = 1.26 € → 21 €.
+  const parametres: ParametresPrix = { consommationL100: 10, prixLitre: 2, personnesParVoiture: 1 }
+  expect(descriptionVoiture({ minutes: 192, km: 100 }, parametres)).toBe('3 h 12 de route · 100 km · ≈ 21 €')
 })

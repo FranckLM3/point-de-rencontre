@@ -56,9 +56,11 @@ export function classerVilles(
   limite: number,
 ): VilleClassee[] {
   if (amis.length === 0) return []
+  // Le maximum s'applique toujours au pire trajet (personne ne le dépasse), quel que soit le
+  // critère choisi ; le critère ne sert qu'à classer les villes qui passent ce filtre.
   return villes
     .map((ville) => evaluer(ville, amis, mesure))
-    .filter((c): c is VilleClassee => c !== null && (max === null || c[critere] <= max))
+    .filter((c): c is VilleClassee => c !== null && (max === null || c.pire <= max))
     .sort((x, y) => x[critere] - y[critere] || x.moyenne - y.moyenne)
     .slice(0, limite)
 }

@@ -36,11 +36,13 @@ export interface Etat {
   mode: Mode
   critere: Critere
   grandeur: Grandeur
-  /** Valeur maximale (km en vol d'oiseau), null = sans limite. */
+  /** Valeur maximale (km en vol d'oiseau), null = sans limite ; s'applique toujours au pire trajet. */
   max: number | null
   /** Identifiants cochés, null = tout le monde. */
   selection: string[] | null
   lieu: Lieu | null
+  /** Réglage « Personnes par voiture » (1 à 4), pour diviser le prix en mode voiture ou mixte. */
+  personnesParVoiture: number
 }
 
 export interface Ville {

@@ -259,7 +259,7 @@ test('filtres : Mesure (Temps / Prix) seulement en transports', () => {
 test('filtres : critère et distance maximum', () => {
   const el = document.createElement('div')
   const changer = vi.fn()
-  rendreFiltres(el, ETAT_DEFAUT, 2, changer)
+  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'oiseau', max: null }, 2, changer)
   cliquer(el, '[data-critere="moyenne"]')
   expect(changer).toHaveBeenCalledWith({ critere: 'moyenne' })
   const select = el.querySelector('select')!
@@ -272,17 +272,19 @@ test('filtres : critère et distance maximum', () => {
 
 test('filtres : maximum en durée ou en prix selon la grandeur', () => {
   const el = document.createElement('div')
-  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'tc', max: 180 }, 3, vi.fn())
+  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'tc', critere: 'pire', max: 180 }, 3, vi.fn())
   const select = el.querySelector('select')!
   expect(select.getAttribute('aria-label')).toBe('Durée maximum')
   expect(select.options[0]!.textContent).toBe('Durée maximum')
   expect([...select.options].map((o) => o.textContent)).toContain('3 h max')
   expect(select.value).toBe('180')
   expect(el.querySelector('h1')!.textContent).toBe('Où se retrouver entre 3 Crocos')
-  expect(el.querySelector('.sous-titre')!.textContent).toBe('En transports, au pire trajet le plus court, sans dépasser 3 h')
+  expect(el.querySelector('.sous-titre')!.textContent).toBe(
+    'En transports, au pire trajet le plus court, sans que personne ne dépasse 3 h',
+  )
 
   const prix = document.createElement('div')
-  rendreFiltres(prix, { ...ETAT_DEFAUT, mode: 'tc', grandeur: 'prix' }, 3, vi.fn())
+  rendreFiltres(prix, { ...ETAT_DEFAUT, mode: 'tc', grandeur: 'prix', max: null }, 3, vi.fn())
   const menu = prix.querySelector('select')!
   expect(menu.getAttribute('aria-label')).toBe('Prix maximum')
   expect([...menu.options].map((o) => o.textContent)).toContain('40 € max')

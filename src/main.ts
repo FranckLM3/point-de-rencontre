@@ -4,7 +4,7 @@ import '@fontsource/jost/800.css'
 import '@fontsource/fredoka/500.css'
 import '@fontsource/fredoka/700.css'
 import './styles/app.css'
-import { agreger, meilleurIndice } from './calcul/agregat'
+import { agreger, limiterAuMaximum, meilleurIndice } from './calcul/agregat'
 import { choisirMesure, creerChargeurTc, creerCouches, type ChargeurTc, type Couches } from './calcul/couches'
 import { coordonnees, type Grille } from './calcul/grille'
 import { personnesTrajetCarte } from './calcul/trace'
@@ -218,7 +218,12 @@ function rendreZones(s: Session, choisis: Ami[], villesClassees: VilleClassee[],
     s.repaire = null
     return
   }
-  const valeurs = agreger(choisis.map((a) => s.couches.obtenir(a, s.etat, s.tc.pret())), s.etat.critere, s.grille.nx * s.grille.ny)
+  const couchesChoisis = choisis.map((a) => s.couches.obtenir(a, s.etat, s.tc.pret()))
+  const taille = s.grille.nx * s.grille.ny
+  const critereValeurs = agreger(couchesChoisis, s.etat.critere, taille)
+  // Le maximum s'applique toujours au pire trajet, quel que soit le critère affiché (décision 4).
+  const pireValeurs = s.etat.critere === 'pire' ? critereValeurs : agreger(couchesChoisis, 'pire', taille)
+  const valeurs = limiterAuMaximum(critereValeurs, pireValeurs, s.etat.max)
   let plusGrande = 0
   for (const v of valeurs) if (v > plusGrande) plusGrande = v
   const unite = uniteDe(s.etat.mode, s.etat.grandeur)

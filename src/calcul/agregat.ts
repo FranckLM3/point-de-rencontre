@@ -32,6 +32,18 @@ export function agreger(couches: Float32Array[], critere: Critere, taille = couc
   return sortie
 }
 
+/**
+ * Exclut (NaN) les points où le pire trajet dépasse le maximum, quel que soit le critère affiché
+ * (`valeurs`) : le maximum s'applique toujours au pire trajet, jamais seulement à la moyenne.
+ * `pire` doit être aligné point à point avec `valeurs` (même grille).
+ */
+export function limiterAuMaximum(valeurs: Float32Array, pire: Float32Array, max: number | null): Float32Array {
+  if (max === null) return valeurs
+  const sortie = new Float32Array(valeurs.length)
+  for (let i = 0; i < valeurs.length; i++) sortie[i] = pire[i]! <= max ? valeurs[i]! : Number.NaN
+  return sortie
+}
+
 export function meilleurIndice(valeurs: Float32Array): number {
   let meilleur = -1
   let min = Infinity
