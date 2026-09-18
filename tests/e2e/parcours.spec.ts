@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
 import type { Ami, Groupe } from '../../src/types'
-import { simulerHoraires } from './horaires-simules'
+import { simulerHoraires, type HorairesSimules } from './horaires-simules'
+import { simulerVoiture } from './voiture-simulee'
 
 const MOT_DE_PASSE = 'secret'
 const MARSEILLE = { geometry: { coordinates: [5.3698, 43.2965] }, properties: { label: '1 La Canebière 13001 Marseille' } }
@@ -15,6 +16,8 @@ interface Simulation {
   groupes: Groupe[]
   /** Bascule la réponse de GET amis en erreur 500, modifiable en cours de test. */
   echouerAmis: boolean
+  /** Mode par défaut (chacun son moyen) : Léa a besoin des horaires même sans passer par « Transports ». */
+  horaires: HorairesSimules
 }
 
 function estUnique(route: Route): boolean {
@@ -68,8 +71,13 @@ async function routerGroupes(route: Route, s: Simulation): Promise<void> {
   return route.fulfill({ status: 405, json: { message: `méthode ${methode} non simulée` } })
 }
 
+/**
+ * Le mode par défaut (chacun son moyen, décision 2) a besoin des horaires dès le premier chargement
+ * (Léa est en transports) : les horaires sont donc simulées ici pour tous les tests, pas seulement
+ * ceux qui testent le mode Transports explicitement.
+ */
 async function simuler(page: Page, echouerAmis = false): Promise<Simulation> {
-  const s: Simulation = { amis: depart(), groupes: [], echouerAmis }
+  const s: Simulation = { amis: depart(), groupes: [], echouerAmis, horaires: { disponibles: true } }
   await page.route(/tile\.openstreetmap\.org/, (r) => r.abort())
   await page.route('http://supabase.test/auth/v1/token**', async (route) => {
     const corps = route.request().postDataJSON() as { password: string }
@@ -87,6 +95,11 @@ async function simuler(page: Page, echouerAmis = false): Promise<Simulation> {
   await page.route('http://supabase.test/rest/v1/amis**', (route) => routerAmis(route, s))
   await page.route('http://supabase.test/rest/v1/groupes**', (route) => routerGroupes(route, s))
   await page.route('https://data.geopf.fr/**', (r) => r.fulfill({ json: { type: 'FeatureCollection', features: [MARSEILLE] } }))
+  // Grille voiture publiée pas encore en ligne (Task 7) : la table temps et la fonction sont
+  // simulées ici, avec des couches vides par défaut (`simulerVoiture` peut ensuite les enrichir).
+  await page.route('http://supabase.test/rest/v1/temps**', (r) => r.fulfill({ json: [] }))
+  await page.route('http://supabase.test/functions/v1/voiture', (r) => r.fulfill({ json: { etat: 'calcule' } }))
+  s.horaires = await simulerHoraires(page)
   return s
 }
 
@@ -96,9 +109,11 @@ async function connecter(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Ouvrir la carte' }).click()
 }
 
+/** Attend la fin du premier calcul (horaires et/ou grille voiture, asynchrones en mode par défaut). */
 async function entrer(page: Page): Promise<void> {
   await connecter(page)
   await expect(page.getByRole('heading', { level: 1 })).toContainText('entre 2')
+  await expect(page.locator('#chargement')).toBeEmpty()
 }
 
 /** D5 : sous 1024 px le panneau est un volet fermé (38dvh) sous la poignée ; il faut l'ouvrir
@@ -127,6 +142,11 @@ test('connexion, sélection, ajout d’une personne, test d’un lieu', async ({
   await expect(page.getByRole('alert')).toHaveText('Mot de passe incorrect.')
   await entrer(page)
   await ouvrirVoletSiVisible(page)
+
+  // Mode par défaut (chacun son moyen, décision 2) : Tom est en voiture, sa couche n'est pas encore
+  // calculée (aucune simulation de la table temps ici) → indicateur dans la liste et bandeau discret.
+  await expect(page.locator('.ligne-ami', { hasText: 'Tom' }).locator('.calcul-en-cours')).toContainText('calcul en cours')
+  await expect(page.locator('#avis-voiture')).toContainText('Tom')
 
   await expect(page.locator('.cible')).toBeVisible()
   await expect(page.locator('.marqueur-personne')).toHaveCount(2)
@@ -251,14 +271,12 @@ test('sur mobile, la carte est visible en arrivant et le volet s’ouvre sans d�
 /** Le mode transports calcule de façon asynchrone : on attend la fin du chargement, pas un délai. */
 async function passerEnTransports(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Transports' }).click()
-  await expect(page.locator('#chargement')).toHaveText('Chargement des horaires…')
   await expect(page.locator('#chargement')).toBeEmpty()
   await expect(page.locator('.sous-titre')).toContainText('En transports')
 }
 
 test('mode transports : zones en heures, gares et liens de réservation', async ({ page }) => {
   await simuler(page)
-  await simulerHoraires(page)
   await page.goto('./')
   await entrer(page)
   await ouvrirVoletSiVisible(page)
@@ -282,7 +300,6 @@ test('mode transports : zones en heures, gares et liens de réservation', async 
 
 test('mode transports en prix : légende et menu en euros', async ({ page }) => {
   await simuler(page)
-  await simulerHoraires(page)
   await page.goto('./')
   await entrer(page)
   await ouvrirVoletSiVisible(page)
@@ -306,7 +323,6 @@ async function testerUnLieu(page: Page, recherche: string, libelle: string): Pro
 
 test('mode transports : le trajet en train suit les gares réelles, pas une ligne directe', async ({ page }) => {
   await simuler(page)
-  await simulerHoraires(page)
   const lyon = { geometry: { coordinates: [4.86, 45.76] }, properties: { label: 'Près de Lyon' } }
   await page.route('https://data.geopf.fr/**', (route) => route.fulfill({ json: { type: 'FeatureCollection', features: [lyon] } }))
   await page.goto('./')
@@ -324,7 +340,6 @@ test('mode transports : le trajet en train suit les gares réelles, pas une lign
 
 test('mode transports : sélectionner une cible plusieurs fois ne double jamais les tracés (D8)', async ({ page }) => {
   await simuler(page)
-  await simulerHoraires(page)
   // Près de Dijon : à plus de 30 km de Paris et de Lyon pour les deux Crocos (le trajet direct,
   // pointillé, ne l'emporte jamais), mais à moins de 50 km d'une gare (Dijon-Ville elle-même).
   const dijon = { geometry: { coordinates: [5.0415, 47.322] }, properties: { label: 'Vers Dijon' } }
@@ -353,21 +368,50 @@ test('mode transports : sélectionner une cible plusieurs fois ne double jamais 
   await expect(traces).toHaveCount(2)
 })
 
-test('horaires indisponibles : bandeau, repli en vol d’oiseau, puis réessai', async ({ page }) => {
-  await simuler(page)
-  const horaires = await simulerHoraires(page)
-  horaires.disponibles = false
+test('horaires indisponibles dès le chargement (mode par défaut chacun son moyen) : repli à vol d’oiseau, bandeau, puis réessai', async ({ page }) => {
+  const s = await simuler(page)
+  s.horaires.disponibles = false
   await page.goto('./')
   await entrer(page)
   await ouvrirVoletSiVisible(page)
 
-  await page.getByRole('button', { name: 'Transports' }).click()
+  await expect(page.locator('#message')).toContainText('Estimation à vol d’oiseau')
   await expect(page.locator('#message')).toContainText('Horaires des trains indisponibles pour le moment.')
-  await expect(page.getByRole('button', { name: 'Vol d’oiseau' })).toHaveAttribute('aria-pressed', 'true')
+  // Le vol d'oiseau n'a plus de bouton (décision 1) : aucun mode n'apparaît enfoncé.
+  await expect(page.locator('[data-mode][aria-pressed="true"]')).toHaveCount(0)
 
-  horaires.disponibles = true
+  s.horaires.disponibles = true
   await page.getByRole('button', { name: 'Réessayer' }).click()
-  await expect(page.locator('.sous-titre')).toContainText('En transports')
-  await expect(page.locator('#legende .case').first()).toContainText('h')
+  await expect(page.locator('.sous-titre')).toContainText('Chacun avec son moyen')
   await expect(page.locator('#message')).toBeEmpty()
+})
+
+test('mode voiture : détail du trajet en voiture, prix divisé par personnes par voiture', async ({ page }) => {
+  const s = await simuler(page)
+  await simulerVoiture(page, s.amis, ['b'])
+  await page.goto('./')
+  await entrer(page)
+  await ouvrirVoletSiVisible(page)
+
+  await page.getByRole('button', { name: 'Voiture', exact: true }).click()
+  await expect(page.locator('#chargement')).toBeEmpty()
+  await expect(page.locator('.sous-titre')).toContainText('En voiture')
+  // Tom (seul Croco en voiture) a sa couche prête : plus d'indicateur « calcul en cours ».
+  await expect(page.locator('.calcul-en-cours')).toHaveCount(0)
+
+  const premiere = page.locator('#villes .ville-carte').first()
+  await expect(premiere).toBeVisible()
+  await premiere.locator('.ville-entete').click()
+  await expect(premiere.locator('.zone-detail')).toContainText('de route')
+  await expect(premiere.locator('.zone-detail')).toContainText('km')
+
+  await page.getByRole('button', { name: 'Prix', exact: true }).click()
+  await expect(page).toHaveURL(/grandeur=prix/)
+  const reglage = page.getByRole('group', { name: 'Personnes par voiture' })
+  await expect(reglage).toBeVisible()
+  const detailAvant = await premiere.locator('.zone-detail').textContent()
+
+  await reglage.getByRole('button', { name: '4', exact: true }).click()
+  await expect(page).toHaveURL(/parvoiture=4/)
+  await expect.poll(() => premiere.locator('.zone-detail').textContent()).not.toBe(detailAvant)
 })

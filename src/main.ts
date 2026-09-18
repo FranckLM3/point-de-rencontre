@@ -127,16 +127,23 @@ async function actualiserCouchesVoiture(s: Session, amis: Ami[]): Promise<void> 
   }
 }
 
-/** Personnes en voiture dont la couche n'est pas encore calculée, parmi celles données. */
+/** Personnes qui ont choisi la voiture dont la couche n'est pas encore calculée, parmi celles
+ * données (indicateur de la liste et note en mode mixte, décision 6 : ne concerne que leur choix). */
 function personnesEnCalcul(s: Session, amis: Ami[]): Ami[] {
   return amis.filter((a) => a.transport === 'voiture' && !s.voitureCouches.has(a.id))
+}
+
+/** En mode voiture pur, tout le monde est mesuré en voiture, pas seulement les Crocos qui l'ont
+ * choisie comme transport : quiconque n'a pas encore de couche compte, le temps du calcul. */
+function personnesSansCoucheVoiture(s: Session, amis: Ami[]): Ami[] {
+  return amis.filter((a) => !s.voitureCouches.has(a.id))
 }
 
 /** En mode voiture, une personne dont la couche n'est pas prête est exclue du calcul (zones, repaire,
  * villes) le temps du calcul ; en mixte elle retombe sur les transports (couches.ts) et reste incluse. */
 function calculables(s: Session, choisis: Ami[]): Ami[] {
   if (s.etat.mode !== 'voiture') return choisis
-  const enAttente = new Set(personnesEnCalcul(s, choisis).map((a) => a.id))
+  const enAttente = new Set(personnesSansCoucheVoiture(s, choisis).map((a) => a.id))
   return choisis.filter((a) => !enAttente.has(a.id))
 }
 
@@ -145,7 +152,8 @@ const PLURIEL = (n: number, singulier: string, pluriel: string): string => (n > 
 /** Bandeau/note « calcul en cours » (décision 6) : exclusion en voiture, repli transports en mixte. */
 function avisVoiture(s: Session, choisis: Ami[]): string {
   if (s.etat.mode !== 'voiture' && s.etat.mode !== 'mixte') return ''
-  const noms = personnesEnCalcul(s, choisis).map((a) => a.nom)
+  const enAttente = s.etat.mode === 'voiture' ? personnesSansCoucheVoiture(s, choisis) : personnesEnCalcul(s, choisis)
+  const noms = enAttente.map((a) => a.nom)
   if (noms.length === 0) return ''
   const liste = noms.join(', ')
   if (s.etat.mode === 'voiture') {
