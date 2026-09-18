@@ -1,10 +1,20 @@
 import { writeFile, mkdir } from 'node:fs/promises'
+import { parseArgs } from 'node:util'
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon'
 
 const SOURCE = 'https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/metropole-version-simplifiee.geojson'
-const PAS_KM = 4
 const LAT_MOY = 46.5
 const BBOX = { lonMin: -5.3, lonMax: 9.7, latMin: 41.2, latMax: 51.2 }
+
+const { values } = parseArgs({
+  options: {
+    pas: { type: 'string', default: '4' },
+    sortie: { type: 'string', default: 'public/data/grille-4km.json' },
+  },
+})
+const PAS_KM = Number(values.pas)
+if (!Number.isFinite(PAS_KM) || PAS_KM <= 0) throw new Error(`--pas invalide : ${values.pas}`)
+const SORTIE = values.sortie
 
 const reponse = await fetch(SOURCE)
 if (!reponse.ok) throw new Error(`contour France : HTTP ${reponse.status}`)
@@ -49,6 +59,6 @@ const sortie = {
   lon0: BBOX.lonMin, lat0: BBOX.latMin, pasLon, pasLat, nx, ny,
   dedans: Buffer.from(elargi).toString('base64'),
 }
-await writeFile('public/data/grille-4km.json', JSON.stringify(sortie))
+await writeFile(SORTIE, JSON.stringify(sortie))
 const compter = (m) => m.reduce((a, b) => a + b, 0)
-console.log(`grille ${nx}x${ny}, ${compter(dedans)} points dans le contour, ${compter(elargi)} après élargissement d'une maille`)
+console.log(`grille ${nx}x${ny} (pas ${PAS_KM} km) dans ${SORTIE} : ${compter(dedans)} points dans le contour, ${compter(elargi)} après élargissement d'une maille`)
