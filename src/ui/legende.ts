@@ -1,7 +1,7 @@
 import type { Unite } from '../calcul/unites'
 import type { Tranche } from '../calcul/zones'
 import { valeur } from './format'
-import { TEINTE_ZONES, opaciteCumulee } from './rendu-zones'
+import { OPACITE_ZONE } from './rendu-zones'
 
 /**
  * Réglette horizontale : une case par tranche. En km, les cases portent le nombre nu et
@@ -14,11 +14,11 @@ export function rendreLegende(el: HTMLElement, tranches: Tranche[], unite: Unite
   el.hidden = croissantes.length === 0
   el.setAttribute('role', 'img')
   el.setAttribute('aria-label', `Légende : ${croissantes.map((t) => `jusqu’à ${valeur(t.seuil, unite)}`).join(', ')}`)
-  // Chaque case montre l'opacité réellement visible sur la carte (couches cumulées).
+  // Chaque carré reprend exactement la couleur et l'opacité peintes sur la carte pour cette tranche.
   el.innerHTML = croissantes
     .map(
-      (t, rang) =>
-        `<span class="case"><span class="nuance" style="background:${TEINTE_ZONES};opacity:${opaciteCumulee(rang, croissantes.length).toFixed(2)}"></span>${unite === 'km' ? Math.round(t.seuil) : valeur(t.seuil, unite)}</span>`,
+      (t) =>
+        `<span class="case"><span class="nuance" style="background:${t.couleur};opacity:${OPACITE_ZONE}"></span>${unite === 'km' ? Math.round(t.seuil) : valeur(t.seuil, unite)}</span>`,
     )
     .join('')
     .concat(unite === 'km' && croissantes.length > 0 ? '<span class="unite">km</span>' : '')

@@ -1,8 +1,12 @@
 import { contours } from 'd3-contour'
 import type { Grille } from './grille'
 
-/** Du plus proche (vert profond) au plus loin (presque transparent). */
-export const COULEURS_TRANCHES = ['#0b5d2a', '#1a7f3c', '#2f9e52', '#55b86f', '#86cf95', '#b5e2bd', '#d6efd9', '#ecf8ee'] as const
+/**
+ * Du plus proche (vert vif) au plus loin (vert pâle) : une couleur propre par tranche (pas une
+ * simple opacité cumulée), pour que deux tranches voisines restent nettement différentes à l'œil
+ * même vers le centre (où l'ancien dégradé par opacité empilée se tassait visuellement).
+ */
+export const COULEURS_TRANCHES = ['#0e9150', '#22a65e', '#3fbb6f', '#5ecf82', '#82e096', '#a9edad', '#cdf5c9', '#eafbe6'] as const
 
 const HORS_ZONE = 1e9
 

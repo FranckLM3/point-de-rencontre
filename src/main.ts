@@ -8,7 +8,7 @@ import { agreger, meilleurIndice } from './calcul/agregat'
 import { choisirMesure, creerChargeurTc, creerCouches, type ChargeurTc, type Couches } from './calcul/couches'
 import { coordonnees, type Grille } from './calcul/grille'
 import { pasTranches, uniteDe } from './calcul/unites'
-import { classerVilles, type Mesure, villeLaPlusProche } from './calcul/villes'
+import { classerVilles, evaluer, type Mesure, type VilleClassee, villeLaPlusProche } from './calcul/villes'
 import { seuils, zones } from './calcul/zones'
 import { ajouterAmi, listerAmis, modifierAmi, supprimerAmi } from './donnees/amis'
 import { connecter, deconnecter, estConnecte } from './donnees/auth'
@@ -21,6 +21,7 @@ import { rendreAmis } from './ui/amis'
 import { amisChoisis, cleFocus, cleZones, libelleClic } from './ui/assemblage'
 import { creerCarte, type Carte } from './ui/carte'
 import { afficherConnexion } from './ui/connexion'
+import { prixEtiquette, selectionEtiquettes, valeurEtiquette } from './ui/etiquettes'
 import { ouvrirFicheAmi } from './ui/fiche-ami'
 import { rendreFiltres } from './ui/filtres'
 import { rendreLegende } from './ui/legende'
@@ -31,6 +32,9 @@ import { mascotteCroco } from './ui/mascotte'
 import { rendreRepaire, type Repaire } from './ui/repaire'
 
 const NB_VILLES = 20
+/** Nombre de grandes villes (population décroissante) offertes en renfort aux étiquettes de la carte (D3). */
+const NB_GRANDES_VILLES = 40
+const MAX_ETIQUETTES = 32
 const TEXTE_CHARGEMENT = 'Chargement de la carte…'
 const TEXTE_HORAIRES = 'Chargement des horaires…'
 const racine = document.querySelector<HTMLElement>('#app')!
@@ -59,6 +63,10 @@ interface Session {
   cleZones: string | null
   /** Résumé du meilleur point, recalculé en même temps que les zones (même clé). */
   repaire: (Repaire & { lat: number; lon: number }) | null
+  /** Grandes villes (population décroissante), calculé une fois : renfort des étiquettes de la carte (D3). */
+  grandesVilles: Ville[]
+  /** Ville choisie (carte de ville ou étiquette cliquée) : lignes vertes et bordure d'accent (D3). */
+  villeChoisie: VilleClassee | null
 }
 
 const $ = <T extends HTMLElement>(sel: string): T => document.querySelector<T>(sel)!
@@ -120,7 +128,13 @@ function retirerLieu(s: Session): void {
   $('#champ-lieu').focus()
 }
 
-function rendrePanneau(s: Session, choisis: Ami[], mesure: Mesure): void {
+/** Ville choisie (carte de ville ou étiquette cliquée sur la carte) : mêmes lignes vertes dans les deux cas. */
+function choisirVille(s: Session, v: VilleClassee): void {
+  s.villeChoisie = v
+  rafraichir(s)
+}
+
+function rendrePanneau(s: Session, choisis: Ami[], mesure: Mesure, villes: VilleClassee[]): void {
   rendreAmis($('#amis'), { amis: s.amis, groupes: s.groupes, selection: new Set(choisis.map((a) => a.id)) }, {
     changerSelection: (ids) => changer(s, { selection: ids }),
     editer: (ami) => editer(s, ami),
@@ -140,9 +154,8 @@ function rendrePanneau(s: Session, choisis: Ami[], mesure: Mesure): void {
   })
   const details = lieu ? choisis.map((a) => mesure(a, lieu.lat, lieu.lon)) : []
   rendreResultatLieu($('#resultat-lieu'), lieu, choisis, details, unite, () => retirerLieu(s))
-  const villes = classerVilles(s.villes, choisis, mesure, critere, max, NB_VILLES)
   rendreVilles($('#villes'), { villes, amis: choisis, nbPersonnes: s.amis.length, max, unite, mode, critere }, {
-    choisir: (c) => s.carte.lignes(choisis, { lat: c.ville.lat, lon: c.ville.lon, label: c.ville.nom }),
+    choisir: (c) => choisirVille(s, c),
     ajouter: () => ajouter(s),
   })
 }
@@ -162,10 +175,29 @@ function calculerRepaire(s: Session, choisis: Ami[], meilleur: number): Session[
   return { ville: proche?.nom ?? '', pire, total, lat, lon }
 }
 
-function rendreZones(s: Session, choisis: Ami[]): void {
+/** Étiquettes de villes façon Chronotrains (D3) : villes classées d'abord, grandes villes en renfort. */
+function rendreEtiquettes(s: Session, choisis: Ami[], villesClassees: VilleClassee[], mesure: Mesure): void {
+  const { critere, mode, grandeur } = s.etat
+  const unite = uniteDe(mode, grandeur)
+  const grandesClassees = classerVilles(s.grandesVilles, choisis, mesure, critere, null, NB_GRANDES_VILLES).sort(
+    (a, b) => b.ville.population - a.ville.population,
+  )
+  const candidats = selectionEtiquettes(villesClassees, grandesClassees, MAX_ETIQUETTES)
+  // Ligne de prix (mode transports) même quand le critère actif est le temps : mesure séparée, mais
+  // seulement point à point sur les quelques villes déjà retenues (pas de nouveau calcul de grille).
+  const mesurePrix = mode === 'tc' && grandeur !== 'prix' ? choisirMesure({ mode, grandeur: 'prix' }, s.tc.pret()) : null
+  const enrichis = candidats.map((c) => {
+    const prixCalc = mesurePrix ? evaluer(c.ville.ville, choisis, mesurePrix) : null
+    return { ...c, valeurAffichee: valeurEtiquette(c.ville, critere, unite), prix: prixCalc ? prixEtiquette(prixCalc, critere) : undefined }
+  })
+  s.carte.etiquettes(enrichis, (v) => choisirVille(s, v))
+}
+
+function rendreZones(s: Session, choisis: Ami[], villesClassees: VilleClassee[], mesure: Mesure): void {
   if (choisis.length === 0) {
     s.carte.zones([])
     s.carte.sansCentre()
+    s.carte.etiquettes([], () => {})
     rendreLegende($('#legende'), [])
     s.repaire = null
     return
@@ -181,28 +213,31 @@ function rendreZones(s: Session, choisis: Ami[]): void {
   if (meilleur < 0) {
     s.carte.sansCentre()
     s.repaire = null
-    return
+  } else {
+    const [lon, lat] = coordonnees(s.grille, meilleur)
+    s.carte.centre(lat, lon, infobulleCentre(valeurs[meilleur]!, s.etat.critere, unite))
+    s.repaire = calculerRepaire(s, choisis, meilleur)
   }
-  const [lon, lat] = coordonnees(s.grille, meilleur)
-  s.carte.centre(lat, lon, infobulleCentre(valeurs[meilleur]!, s.etat.critere, unite))
-  s.repaire = calculerRepaire(s, choisis, meilleur)
+  rendreEtiquettes(s, choisis, villesClassees, mesure)
 }
 
-function rendreCarte(s: Session, choisis: Ami[]): void {
+function rendreCarte(s: Session, choisis: Ami[], villesClassees: VilleClassee[], mesure: Mesure): void {
   const ids = choisis.map((a) => a.id)
   s.carte.amis(s.amis, new Set(ids), s.recemment)
   s.recemment = null
   s.carte.lignes(choisis, s.etat.lieu)
+  s.carte.lignesVille(choisis, s.villeChoisie ? { lat: s.villeChoisie.ville.lat, lon: s.villeChoisie.ville.lon, label: s.villeChoisie.ville.nom } : null)
   const cle = cleZones(s.etat, ids, s.version)
   if (cle === s.cleZones) return
   s.cleZones = cle
-  rendreZones(s, choisis)
+  rendreZones(s, choisis, villesClassees, mesure)
 }
 
 function afficher(s: Session, choisis: Ami[], mesure: Mesure, focus: string | null): void {
+  const villesClassees = classerVilles(s.villes, choisis, mesure, s.etat.critere, s.etat.max, NB_VILLES)
   // La carte d'abord : elle recalcule s.repaire (même clé que les zones), lu ensuite par le panneau.
-  rendreCarte(s, choisis)
-  rendrePanneau(s, choisis, mesure)
+  rendreCarte(s, choisis, villesClassees, mesure)
+  rendrePanneau(s, choisis, mesure, villesClassees)
   const actif = document.activeElement
   const perdu = !actif || actif === document.body || !actif.isConnected
   if (focus && perdu) $('#panneau').querySelector<HTMLElement>(focus)?.focus()
@@ -216,6 +251,7 @@ function attendreHoraires(s: Session, choisis: Ami[]): void {
   $('#resultat-lieu').textContent = ''
   s.carte.zones([])
   s.carte.sansCentre()
+  s.carte.etiquettes([], () => {})
   rendreLegende($('#legende'), [])
   s.repaire = null
   rendreRepaire($('#repaire'), null, uniteDe(s.etat.mode, s.etat.grandeur), () => {})
@@ -329,6 +365,8 @@ async function charger(carte: Carte, installer: (s: Session) => void): Promise<v
       recemment: null,
       cleZones: null,
       repaire: null,
+      grandesVilles: [...villes].sort((a, b) => b.population - a.population).slice(0, NB_GRANDES_VILLES),
+      villeChoisie: null,
     }
     installer(s)
     statut.textContent = ''

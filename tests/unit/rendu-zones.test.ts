@@ -1,16 +1,14 @@
 import { expect, test } from 'vitest'
-import { OPACITE_TRANCHE, opaciteCumulee } from '../../src/ui/rendu-zones'
+import { COULEUR_CONTOUR_ZONE, EPAISSEUR_CONTOUR_ZONE, OPACITE_CONTOUR_ZONE, OPACITE_ZONE } from '../../src/ui/rendu-zones'
 
-test('la tranche la plus large ne porte qu’une couche', () => {
-  expect(opaciteCumulee(7, 8)).toBeCloseTo(OPACITE_TRANCHE)
+test('opacité des zones : translucide, le fond de carte reste visible sous la bande la plus proche', () => {
+  expect(OPACITE_ZONE).toBeGreaterThan(0.4)
+  expect(OPACITE_ZONE).toBeLessThan(0.8)
 })
 
-test('la tranche la plus étroite cumule toutes les couches sans devenir opaque', () => {
-  const centre = opaciteCumulee(0, 8)
-  expect(centre).toBeGreaterThan(opaciteCumulee(1, 8))
-  expect(centre).toBeLessThan(0.6)
-})
-
-test('rang hors limites : aucune couche', () => {
-  expect(opaciteCumulee(9, 8)).toBe(0)
+test('contour de tranche : fin et discret', () => {
+  expect(EPAISSEUR_CONTOUR_ZONE).toBe(1)
+  expect(OPACITE_CONTOUR_ZONE).toBeGreaterThan(0)
+  expect(OPACITE_CONTOUR_ZONE).toBeLessThan(0.5)
+  expect(COULEUR_CONTOUR_ZONE).toMatch(/^#[0-9a-f]{6}$/)
 })

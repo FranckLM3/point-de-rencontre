@@ -1,17 +1,12 @@
 /**
- * Rendu des zones : une seule teinte, très transparente, répétée à chaque tranche.
- * Les tranches sont empilées de la plus large à la plus étroite, donc les opacités
- * se cumulent vers le centre : le dégradé naît de la superposition et le fond de
- * carte reste lisible partout.
+ * Rendu des zones : chaque tranche garde sa propre couleur (calcul/zones.ts, COULEURS_TRANCHES),
+ * peinte de la plus large à la plus étroite ; la plus étroite recouvre donc les autres en son
+ * centre, si bien que chaque anneau affiché montre exactement la couleur de sa propre tranche.
+ * La légende utilise les mêmes constantes : un carré de légende correspond pixel pour pixel à ce
+ * qui est peint sur la carte.
  */
-export const TEINTE_ZONES = '#1a7f3c'
-export const OPACITE_TRANCHE = 0.09
-
-/**
- * Opacité visible sur la carte pour la tranche de rang `rang` (0 = la plus étroite),
- * quand `total` tranches sont empilées : 1 - (1 - a) ^ (total - rang).
- */
-export function opaciteCumulee(rang: number, total: number): number {
-  const couches = Math.max(0, total - rang)
-  return 1 - (1 - OPACITE_TRANCHE) ** couches
-}
+export const OPACITE_ZONE = 0.62
+/** Contour fin à chaque frontière de tranche (D3) : lisible même quand deux verts sont proches. */
+export const COULEUR_CONTOUR_ZONE = '#0b5d2a'
+export const OPACITE_CONTOUR_ZONE = 0.35
+export const EPAISSEUR_CONTOUR_ZONE = 1

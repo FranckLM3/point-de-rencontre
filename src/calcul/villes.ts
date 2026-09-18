@@ -20,7 +20,7 @@ export interface VilleClassee {
   pire: number
 }
 
-function evaluer(ville: Ville, amis: Ami[], mesure: Mesure): VilleClassee | null {
+export function evaluer(ville: Ville, amis: Ami[], mesure: Mesure): VilleClassee | null {
   const parAmi: Detail[] = []
   for (const a of amis) {
     const d = mesure(a, ville.lat, ville.lon)

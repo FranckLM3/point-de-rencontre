@@ -42,5 +42,5 @@ test('la couleur suit le rang du seuil dans une liste croissante, indépendammen
 })
 
 test('palette des zones : dégradé de vert, du plus proche au plus loin', () => {
-  expect(COULEURS_TRANCHES).toEqual(['#0b5d2a', '#1a7f3c', '#2f9e52', '#55b86f', '#86cf95', '#b5e2bd', '#d6efd9', '#ecf8ee'])
+  expect(COULEURS_TRANCHES).toEqual(['#0e9150', '#22a65e', '#3fbb6f', '#5ecf82', '#82e096', '#a9edad', '#cdf5c9', '#eafbe6'])
 })

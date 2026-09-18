@@ -196,13 +196,45 @@ form.groupe .champ { flex: 1 1 100%; }
   position: absolute; left: 12px; bottom: 24px; z-index: 500;
   display: flex; align-items: end; gap: 2px; padding: 8px 10px; background: var(--surface);
   border-radius: var(--rayon-pastille); box-shadow: var(--ombre);
-  font: 500 .75rem/1 var(--police); color: var(--texte-doux); white-space: nowrap;
+  font: 600 .875rem/1 var(--police); color: var(--texte); white-space: nowrap;
 }
 .legende[hidden] { display: none; }
 .legende .case { display: grid; gap: 4px; justify-items: end; flex: 1 1 0; min-width: 40px; }
-/* L'opacité de chaque nuance est posée en ligne par legende.ts (couches cumulées). */
+/* Couleur et opacité identiques à celles peintes sur la carte pour cette tranche (rendu-zones.ts). */
 .legende .nuance { display: block; width: 100%; height: 10px; border-radius: 2px; border: 1px solid rgb(0 0 0 / 15%); }
 .legende .unite { padding-left: 4px; }
+
+/* Étiquettes de villes façon Chronotrains : petite carte blanche avec pointeur, posée sous les marqueurs. */
+.etiquette-ville {
+  position: absolute; transform: translate(-50%, -100%); display: grid; justify-items: center; gap: 1px;
+  padding: 5px 9px 6px; background: var(--surface); border: 1px solid var(--bord); border-radius: 8px;
+  box-shadow: var(--ombre); font: 500 .75rem/1.2 var(--police); color: var(--texte); white-space: nowrap;
+  pointer-events: auto; cursor: pointer;
+}
+.etiquette-ville::after {
+  content: ''; position: absolute; left: 50%; bottom: -5px; transform: translateX(-50%);
+  border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 5px solid var(--surface);
+  filter: drop-shadow(0 1px 0 var(--bord));
+}
+.etiquette-ville .nom { font-weight: 700; }
+.etiquette-ville .valeur { color: var(--accent); font-weight: 600; }
+.etiquette-ville .prix { color: var(--texte-doux); font-size: .6875rem; }
+.etiquette-ville.meilleure { border-color: var(--accent); border-width: 2px; box-shadow: var(--ombre), 0 0 0 2px var(--accent-fond); }
+.etiquette-ville:hover, .etiquette-ville:focus-visible { z-index: 1; outline: 2px solid var(--accent); outline-offset: 1px; }
+@media (max-width: 599px) {
+  .etiquette-ville { font-size: .6875rem; padding: 4px 7px 5px; }
+  .etiquette-ville .prix { display: none; }
+}
+
+/* Bulle de plusieurs personnes regroupées à l'écran (D3), légèrement plus grande qu'un marqueur seul. */
+.marqueur-personne.grappe { width: 34px; height: 34px; font-size: 14px; border-width: 3px; }
+
+.controle-plein-ecran button {
+  width: 30px; height: 30px; display: grid; place-items: center; border: 0; background: var(--surface);
+  color: var(--texte); cursor: pointer;
+}
+.controle-plein-ecran button:hover { background: var(--fond); }
+.controle-plein-ecran button:focus-visible { outline: 3px solid var(--accent); outline-offset: -2px; }
 
 /* Meilleur point : anneau vert et point central sombre. */
 .cible {
@@ -359,4 +391,4 @@ form.groupe .champ { flex: 1 1 100%; }
 }
 
 /* Fond de carte OpenStreetMap adouci pour laisser les zones au premier plan. */
-.leaflet-tile-pane { filter: grayscale(1) contrast(0.85) brightness(1.08); }
+.leaflet-tile-pane { filter: grayscale(1) brightness(1.18) contrast(0.72); }
