@@ -1,6 +1,13 @@
 import type { Grille } from '../calcul/grille'
 import type { Ville } from '../types'
 
+export interface PrixCarburant {
+  gazole: number
+  sp95: number
+  e10: number
+  date: string
+}
+
 interface GrilleBrute extends Omit<Grille, 'dedans'> {
   dedans: string
 }
@@ -25,4 +32,14 @@ export async function chargerGrille(): Promise<Grille> {
 
 export function chargerVilles(): Promise<Ville[]> {
   return lireJson<Ville[]>('data/villes.json')
+}
+
+/** Grille de 8 km utilisée par la couche voiture (même format que la grille de 4 km). */
+export async function chargerGrille8km(): Promise<Grille> {
+  return decoderGrille(await lireJson<GrilleBrute>('data/grille-8km.json'))
+}
+
+/** Prix moyen national des carburants, mis à jour à chaque publication (repli sur le fichier commité). */
+export function chargerCarburant(): Promise<PrixCarburant> {
+  return lireJson<PrixCarburant>('data/carburant.json')
 }

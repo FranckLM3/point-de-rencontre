@@ -81,6 +81,8 @@ jobs:
         with:
           path: public/data/tc
           key: ${{ steps.version.outputs.cle }}
+      - name: Prix du carburant
+        run: node scripts/carburant.mjs || echo "::warning::Téléchargement du prix des carburants en échec : conservation du fichier commité (public/data/carburant.json)."
       - run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}

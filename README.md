@@ -22,6 +22,9 @@ npm run dev
 - `npm run horaires` : télécharge les horaires SNCF et calcule les trajets
   entre gares dans `public/data/tc/` (quelques minutes, non commité).
 - `npm run test:horaires` : tests du calcul (Python, bibliothèque standard).
+- `node scripts/carburant.mjs` : rafraîchit `public/data/carburant.json` (prix moyen des
+  carburants, déjà commité) ; lancé par `pages.yml` avant la construction, avec repli sur
+  le fichier commité si l'API des prix ne répond pas.
 
 Les adresses ne sont jamais dans ce dépôt : elles vivent dans Supabase, derrière le mot de passe du groupe.
 
