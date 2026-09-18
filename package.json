@@ -12,6 +12,7 @@
     "horaires": "python3 -m horaires --sortie public/data/tc"
   },
   "dependencies": {
+    "@fontsource/fredoka": "^5.3.0",
     "@fontsource/jost": "^5.3.0",
     "@supabase/supabase-js": "^2.116.0",
     "d3-contour": "^4.0.2",

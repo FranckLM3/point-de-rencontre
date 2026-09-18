@@ -1,6 +1,9 @@
+import { mascotteCroco } from './mascotte'
+
 const LIBELLE_BOUTON = 'Ouvrir la carte'
 const NB_DENTS = 15
 const MESSAGE_ECHEC = 'Connexion impossible.'
+const TAILLE_MASCOTTE = 96
 
 export function afficherConnexion(
   racine: HTMLElement,
@@ -11,7 +14,9 @@ export function afficherConnexion(
     <main class="connexion">
       <form>
         <div class="dents" aria-hidden="true">${'<span></span>'.repeat(NB_DENTS)}</div>
+        ${mascotteCroco('mascotte', TAILLE_MASCOTTE)}
         <h1>Les Crocos</h1>
+        <p class="accroche">La carte pour savoir où se retrouver entre Crocos.</p>
         <label for="mdp">Mot de passe des Crocos</label>
         <input id="mdp" class="champ" type="password" autocomplete="current-password" required />
         <p class="erreur" role="alert"></p>

@@ -16,6 +16,8 @@
   --ombre: 0 1px 2px rgb(16 24 40 / 6%), 0 4px 12px rgb(16 24 40 / 6%);
   --ombre-volet: 0 -6px 24px rgb(16 24 40 / 14%);
   --police: 'Jost', system-ui, sans-serif;
+  /* Nom de la marque, h1 et titre du repaire seulement (500/700 chargés) ; le corps de texte reste en Jost. */
+  --police-marque: 'Fredoka', var(--police);
   --titre: clamp(1.6rem, 1.1rem + 2vw, 2.4rem);
   --texte-pastille: .875rem;
   --panneau: 460px;

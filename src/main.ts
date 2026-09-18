@@ -1,6 +1,8 @@
 import '@fontsource/jost/400.css'
 import '@fontsource/jost/500.css'
 import '@fontsource/jost/800.css'
+import '@fontsource/fredoka/500.css'
+import '@fontsource/fredoka/700.css'
 import './styles/app.css'
 import { agreger, meilleurIndice } from './calcul/agregat'
 import { choisirMesure, creerChargeurTc, creerCouches, type ChargeurTc, type Couches } from './calcul/couches'
@@ -25,6 +27,7 @@ import { rendreLegende } from './ui/legende'
 import { rendreRechercheLieu, rendreResultatLieu, type RechercheLieu } from './ui/lieu'
 import { rendreVilles } from './ui/liste-villes'
 import { infobulleCentre } from './ui/marqueurs'
+import { mascotteCroco } from './ui/mascotte'
 import { rendreRepaire, type Repaire } from './ui/repaire'
 
 const NB_VILLES = 20
@@ -33,14 +36,7 @@ const TEXTE_HORAIRES = 'Chargement des horaires…'
 const racine = document.querySelector<HTMLElement>('#app')!
 
 /** Tête de crocodile de la marque, décorative : le nom qui suit la nomme déjà. */
-const CROCO = `<svg class="croco" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-    <circle cx="10.5" cy="9" r="4.5" fill="var(--accent)" />
-    <circle cx="21.5" cy="9" r="4.5" fill="var(--accent)" />
-    <circle cx="10.5" cy="8.5" r="1.7" fill="var(--accent-fond)" />
-    <circle cx="21.5" cy="8.5" r="1.7" fill="var(--accent-fond)" />
-    <path d="M7 12h18a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-8a3 3 0 0 1 3-3Z" fill="var(--accent)" />
-    <path d="M6 18h20l-2 3-2-3-2 3-2-3-2 3-2-3-2 3-2-3-2 3-2-3z" fill="var(--accent-fond)" />
-  </svg>`
+const CROCO = mascotteCroco('croco', 28)
 
 interface Session {
   grille: Grille
