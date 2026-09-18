@@ -32,6 +32,20 @@ function evaluer(ville: Ville, amis: Ami[], mesure: Mesure): VilleClassee | null
   return { ville, parAmi, total, moyenne: total / valeurs.length, pire: Math.max(...valeurs) }
 }
 
+/** La ville la plus proche du point (à vol d'oiseau), pour nommer le repaire. */
+export function villeLaPlusProche(villes: Ville[], lat: number, lon: number): Ville | null {
+  let proche: Ville | null = null
+  let min = Number.POSITIVE_INFINITY
+  for (const v of villes) {
+    const d = haversineKm(lat, lon, v.lat, v.lon)
+    if (d < min) {
+      min = d
+      proche = v
+    }
+  }
+  return proche
+}
+
 /** Calcul exact au centre de chaque ville ; une ville injoignable pour une personne est écartée. */
 export function classerVilles(
   villes: Ville[],

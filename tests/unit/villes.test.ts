@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { haversineKm } from '../../src/calcul/geo'
-import { classerVilles, type Mesure, mesureOiseau } from '../../src/calcul/villes'
+import { classerVilles, type Mesure, mesureOiseau, villeLaPlusProche } from '../../src/calcul/villes'
 import type { Ami, Ville } from '../../src/types'
 
 const v = (nom: string, lat: number, lon: number): Ville => ({ nom, dep: '00', lat, lon, population: 1 })
@@ -30,4 +30,13 @@ test('une ville injoignable pour une personne est écartée, la précision est g
 
 test('sans ami, aucune ville', () => {
   expect(classerVilles([v('A', 48, 2)], [], mesureOiseau, 'moyenne', null, 10)).toEqual([])
+})
+
+test('villeLaPlusProche : la ville la plus proche du point, même lointaine', () => {
+  const villes = [v('Loin', 48, 10), v('Proche', 45.77, 4.84), v('Milieu', 46, 5)]
+  expect(villeLaPlusProche(villes, 45.76, 4.83)!.nom).toBe('Proche')
+})
+
+test('villeLaPlusProche : null sans ville', () => {
+  expect(villeLaPlusProche([], 45.76, 4.83)).toBeNull()
 })

@@ -1,6 +1,6 @@
 import { maximaProposes, uniteDe, type Unite } from '../calcul/unites'
 import type { Etat, Grandeur, Mode } from '../types'
-import { titre, valeur } from './format'
+import { sousTitre, titreCourt, valeur } from './format'
 
 interface BoutonMode {
   mode: Mode
@@ -63,7 +63,8 @@ export function rendreFiltres(el: HTMLElement, e: Etat, nombre: number, changer:
       <button type="button" class="pastille" data-critere="moyenne" ${presse(e.critere === 'moyenne')}>Moyenne</button>
       ${menuMaximum(e, unite)}
     </div>
-    <h1>${titre({ nombre, mode: e.mode, unite, critere: e.critere, max: e.max })}</h1>`
+    <h1>${titreCourt(nombre)}</h1>
+    <p class="sous-titre">${sousTitre({ mode: e.mode, unite, critere: e.critere, max: e.max })}</p>`
   // Les unités diffèrent d'un mode ou d'une grandeur à l'autre : le maximum repart de zéro.
   el.querySelectorAll<HTMLButtonElement>('[data-mode]:not([disabled])').forEach((b) =>
     b.addEventListener('click', () => changer({ mode: b.dataset.mode as Mode, max: null })),

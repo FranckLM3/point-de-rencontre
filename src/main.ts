@@ -6,7 +6,7 @@ import { agreger, meilleurIndice } from './calcul/agregat'
 import { choisirMesure, creerChargeurTc, creerCouches, type ChargeurTc, type Couches } from './calcul/couches'
 import { coordonnees, type Grille } from './calcul/grille'
 import { pasTranches, uniteDe } from './calcul/unites'
-import { classerVilles, type Mesure } from './calcul/villes'
+import { classerVilles, type Mesure, villeLaPlusProche } from './calcul/villes'
 import { seuils, zones } from './calcul/zones'
 import { ajouterAmi, listerAmis, modifierAmi, supprimerAmi } from './donnees/amis'
 import { connecter, deconnecter, estConnecte } from './donnees/auth'
@@ -25,6 +25,7 @@ import { rendreLegende } from './ui/legende'
 import { rendreRechercheLieu, rendreResultatLieu, type RechercheLieu } from './ui/lieu'
 import { rendreVilles } from './ui/liste-villes'
 import { infobulleCentre } from './ui/marqueurs'
+import { rendreRepaire, type Repaire } from './ui/repaire'
 
 const NB_VILLES = 20
 const TEXTE_CHARGEMENT = 'Chargement de la carte…'
@@ -58,6 +59,8 @@ interface Session {
   /** Augmente à chaque rechargement des personnes (E4). */
   version: number
   cleZones: string | null
+  /** Résumé du meilleur point, recalculé en même temps que les zones (même clé). */
+  repaire: (Repaire & { lat: number; lon: number }) | null
 }
 
 const $ = <T extends HTMLElement>(sel: string): T => document.querySelector<T>(sel)!
@@ -122,6 +125,11 @@ function rendrePanneau(s: Session, choisis: Ami[], mesure: Mesure): void {
   rendreFiltres($('#filtres'), s.etat, choisis.length, (p) => changer(s, p))
   const { lieu, mode, critere, max } = s.etat
   const unite = uniteDe(mode, s.etat.grandeur)
+  rendreRepaire($('#repaire'), s.repaire, unite, () => {
+    if (!s.repaire) return
+    s.carte.centrerSur(s.repaire.lat, s.repaire.lon)
+    fermerVolet()
+  })
   const details = lieu ? choisis.map((a) => mesure(a, lieu.lat, lieu.lon)) : []
   rendreResultatLieu($('#resultat-lieu'), lieu, choisis, details, unite, () => retirerLieu(s))
   const villes = classerVilles(s.villes, choisis, mesure, critere, max, NB_VILLES)
@@ -131,11 +139,27 @@ function rendrePanneau(s: Session, choisis: Ami[], mesure: Mesure): void {
   })
 }
 
+/** Pire trajet et total exacts au meilleur point, pour la carte « Le repaire » (mêmes règles que classerVilles). */
+function calculerRepaire(s: Session, choisis: Ami[], meilleur: number): Session['repaire'] {
+  let pire = 0
+  let total = 0
+  const moteur = s.tc.pret()
+  for (const a of choisis) {
+    const v = s.couches.obtenir(a, s.etat, moteur)[meilleur]!
+    total += v
+    if (v > pire) pire = v
+  }
+  const [lon, lat] = coordonnees(s.grille, meilleur)
+  const proche = villeLaPlusProche(s.villes, lat, lon)
+  return { ville: proche?.nom ?? '', pire, total, lat, lon }
+}
+
 function rendreZones(s: Session, choisis: Ami[]): void {
   if (choisis.length === 0) {
     s.carte.zones([])
     s.carte.sansCentre()
     rendreLegende($('#legende'), [])
+    s.repaire = null
     return
   }
   const valeurs = agreger(choisis.map((a) => s.couches.obtenir(a, s.etat, s.tc.pret())), s.etat.critere, s.grille.nx * s.grille.ny)
@@ -148,10 +172,12 @@ function rendreZones(s: Session, choisis: Ami[]): void {
   const meilleur = meilleurIndice(valeurs)
   if (meilleur < 0) {
     s.carte.sansCentre()
+    s.repaire = null
     return
   }
   const [lon, lat] = coordonnees(s.grille, meilleur)
   s.carte.centre(lat, lon, infobulleCentre(valeurs[meilleur]!, s.etat.critere, unite))
+  s.repaire = calculerRepaire(s, choisis, meilleur)
 }
 
 function rendreCarte(s: Session, choisis: Ami[]): void {
@@ -165,8 +191,9 @@ function rendreCarte(s: Session, choisis: Ami[]): void {
 }
 
 function afficher(s: Session, choisis: Ami[], mesure: Mesure, focus: string | null): void {
-  rendrePanneau(s, choisis, mesure)
+  // La carte d'abord : elle recalcule s.repaire (même clé que les zones), lu ensuite par le panneau.
   rendreCarte(s, choisis)
+  rendrePanneau(s, choisis, mesure)
   const actif = document.activeElement
   const perdu = !actif || actif === document.body || !actif.isConnected
   if (focus && perdu) $('#panneau').querySelector<HTMLElement>(focus)?.focus()
@@ -181,6 +208,8 @@ function attendreHoraires(s: Session, choisis: Ami[]): void {
   s.carte.zones([])
   s.carte.sansCentre()
   rendreLegende($('#legende'), [])
+  s.repaire = null
+  rendreRepaire($('#repaire'), null, uniteDe(s.etat.mode, s.etat.grandeur), () => {})
   s.cleZones = null
 }
 
@@ -235,6 +264,7 @@ const SQUELETTE = `
       <div id="lieu"></div>
       <div id="resultat-lieu"></div>
       <div id="filtres"></div>
+      <div id="repaire"></div>
       <p id="chargement" class="chargement" role="status">${TEXTE_CHARGEMENT}</p>
       <div id="message" class="bandeau erreur" role="alert"></div>
       <div id="villes" class="villes"></div>
@@ -244,14 +274,22 @@ const SQUELETTE = `
     </div>
   </div>`
 
+function ouvrirOuFermerVolet(ouvert: boolean): void {
+  $('.app').classList.toggle('volet-ouvert', ouvert)
+  const poignee = $('#poignee')
+  poignee.setAttribute('aria-expanded', String(ouvert))
+  poignee.textContent = ouvert ? 'Réduire' : 'Voir la liste'
+}
+
+/** Sans effet sur ordinateur (la poignée y est masquée, la classe n'y change rien). */
+function fermerVolet(): void {
+  ouvrirOuFermerVolet(false)
+}
+
 function brancherVolet(): void {
   const app = $('.app')
   const poignee = $('#poignee')
-  poignee.addEventListener('click', () => {
-    const ouvert = app.classList.toggle('volet-ouvert')
-    poignee.setAttribute('aria-expanded', String(ouvert))
-    poignee.textContent = ouvert ? 'Réduire' : 'Voir la liste'
-  })
+  poignee.addEventListener('click', () => ouvrirOuFermerVolet(!app.classList.contains('volet-ouvert')))
 }
 
 function brancherSortie(): void {
@@ -280,6 +318,7 @@ async function charger(carte: Carte, installer: (s: Session) => void): Promise<v
       rendu: 0,
       version: 0,
       cleZones: null,
+      repaire: null,
     }
     installer(s)
     statut.textContent = ''

@@ -61,20 +61,28 @@ const LIBELLE_MODE: Record<Mode, string> = {
 }
 
 export interface OptionsTitre {
-  nombre: number
   mode: Mode
   unite: Unite
   critere: Critere
   max: number | null
 }
 
-export function titre(o: OptionsTitre): string {
-  const debut = `Où se retrouver à ${o.nombre} Croco${o.nombre > 1 ? 's' : ''}, ${LIBELLE_MODE[o.mode]}`
-  if (o.max !== null) return `${debut}, sans dépasser ${valeur(o.max, o.unite)}`
-  if (o.unite === 'eur') {
-    return o.critere === 'pire' ? `${debut}, sans billet trop cher pour personne` : `${debut}, au moins cher en moyenne`
-  }
-  return o.critere === 'pire' ? `${debut}, au pire trajet le plus court` : `${debut}, au plus court en moyenne`
+/** Titre principal, court : juste le nombre de Crocos. Le reste va dans `sousTitre`. */
+export function titreCourt(nombre: number): string {
+  return `Où se retrouver entre ${nombre} Croco${nombre > 1 ? 's' : ''}`
+}
+
+const majuscule = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
+
+function phraseCritere(o: OptionsTitre): string {
+  if (o.unite === 'eur') return o.critere === 'pire' ? 'sans billet trop cher pour personne' : 'au moins cher en moyenne'
+  return o.critere === 'pire' ? 'au pire trajet le plus court' : 'au plus court en moyenne'
+}
+
+/** Sous-titre sous le h1 : mode, critère, et maximum s'il y en a un. */
+export function sousTitre(o: OptionsTitre): string {
+  const debut = `${majuscule(LIBELLE_MODE[o.mode])}, ${phraseCritere(o)}`
+  return o.max !== null ? `${debut}, sans dépasser ${valeur(o.max, o.unite)}` : debut
 }
 
 /** Échappe le texte avant insertion dans le HTML. */

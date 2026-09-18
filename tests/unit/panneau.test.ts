@@ -126,7 +126,7 @@ test('filtres : seuls « Chacun son moyen » et « Tous en voiture » restent d�
     expect(el.querySelector<HTMLButtonElement>(`[data-mode="${m}"]`)!.disabled).toBe(true)
   }
   expect(el.querySelector<HTMLButtonElement>('[data-mode="tc"]')!.disabled).toBe(false)
-  expect(el.querySelector('h1')!.textContent).toContain('à 2')
+  expect(el.querySelector('h1')!.textContent).toContain('entre 2')
   expect(el.querySelector('select')!.hasAttribute('aria-pressed')).toBe(false)
 })
 
@@ -192,14 +192,15 @@ test('filtres : maximum en durée ou en prix selon la grandeur', () => {
   expect(select.options[0]!.textContent).toBe('Durée maximum')
   expect([...select.options].map((o) => o.textContent)).toContain('3 h max')
   expect(select.value).toBe('180')
-  expect(el.querySelector('h1')!.textContent).toBe('Où se retrouver à 3 Crocos, en transports, sans dépasser 3 h')
+  expect(el.querySelector('h1')!.textContent).toBe('Où se retrouver entre 3 Crocos')
+  expect(el.querySelector('.sous-titre')!.textContent).toBe('En transports, au pire trajet le plus court, sans dépasser 3 h')
 
   const prix = document.createElement('div')
   rendreFiltres(prix, { ...ETAT_DEFAUT, mode: 'tc', grandeur: 'prix' }, 3, vi.fn())
   const menu = prix.querySelector('select')!
   expect(menu.getAttribute('aria-label')).toBe('Prix maximum')
   expect([...menu.options].map((o) => o.textContent)).toContain('40 € max')
-  expect(prix.querySelector('h1')!.textContent).toContain('en transports')
+  expect(prix.querySelector('.sous-titre')!.textContent).toContain('En transports')
 })
 
 const ville = { nom: 'Dijon', dep: '21', lat: 47.3, lon: 5.04, population: 1 }

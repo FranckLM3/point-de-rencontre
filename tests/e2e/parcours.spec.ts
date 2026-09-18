@@ -98,7 +98,7 @@ async function connecter(page: Page): Promise<void> {
 
 async function entrer(page: Page): Promise<void> {
   await connecter(page)
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('à 2')
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('entre 2')
 }
 
 /** D5 : sous 1024 px le panneau est un volet fermé (38dvh) sous la poignée ; il faut l'ouvrir
@@ -128,13 +128,17 @@ test('connexion, sélection, ajout d’une personne, test d’un lieu', async ({
   expect(nbCases).toBeGreaterThanOrEqual(1)
   expect(nbCases).toBeLessThanOrEqual(8)
 
+  await expect(page.locator('#repaire')).toContainText('Le repaire')
+  await page.getByRole('button', { name: 'Voir sur la carte' }).click()
+  await expect(page.locator('.cible')).toBeVisible()
+
   await page.getByLabel('Inclure Tom').uncheck()
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('à 1')
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('entre 1')
   await expect(page).toHaveURL(/sel=a/)
   await expect(page.locator('.marqueur-personne.inactif')).toHaveCount(1)
 
   await page.getByRole('button', { name: 'Tout le monde' }).click()
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('à 2')
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('entre 2')
 
   await page.locator('#amis').getByRole('button', { name: 'Ajouter un Croco' }).click()
   await page.getByLabel('Nom', { exact: true }).fill('Zoé')
@@ -208,12 +212,13 @@ test('états vide et erreur', async ({ page }) => {
 
   s.echouerAmis = false
   await relancer.click()
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('à 2')
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('entre 2')
   await ouvrirVoletSiVisible(page)
 
   await page.getByRole('button', { name: 'Aucune' }).click()
   await expect(page.locator('#villes')).toContainText('Coche au moins un Croco pour voir la carte.')
   await expect(page.locator('#legende')).toBeHidden()
+  await expect(page.locator('#repaire')).toBeEmpty()
 })
 
 test('sur mobile, la carte est visible en arrivant et le volet s’ouvre sans déborder', async ({ page }, testInfo) => {
@@ -240,7 +245,7 @@ async function passerEnTransports(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Tous en transports' }).click()
   await expect(page.locator('#chargement')).toHaveText('Chargement des horaires…')
   await expect(page.locator('#chargement')).toBeEmpty()
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('en transports')
+  await expect(page.locator('.sous-titre')).toContainText('En transports')
 }
 
 test('mode transports : zones en heures, gares et liens de réservation', async ({ page }) => {
@@ -295,7 +300,7 @@ test('horaires indisponibles : bandeau, repli en vol d’oiseau, puis réessai',
 
   horaires.disponibles = true
   await page.getByRole('button', { name: 'Réessayer' }).click()
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('en transports')
+  await expect(page.locator('.sous-titre')).toContainText('En transports')
   await expect(page.locator('#legende .case').first()).toContainText('h')
   await expect(page.locator('#message')).toBeEmpty()
 })

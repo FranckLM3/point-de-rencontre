@@ -12,6 +12,9 @@ button, input, select { font: inherit; }
 .carte { position: relative; margin: 8px; border-radius: var(--rayon-carte); overflow: hidden; border: 1px solid var(--bord); }
 
 h1 { font-size: var(--titre); font-weight: 800; line-height: 1.1; margin: 4px 0; }
+/* h1 du panneau : court (le nombre de Crocos), le détail va dans .sous-titre. */
+#filtres h1 { font-size: clamp(1.35rem, 1rem + 1.2vw, 1.9rem); margin-top: 10px; }
+.sous-titre { color: var(--texte-doux); margin: 2px 0 0; font-size: 1rem; }
 
 .rang { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 /* Marque : la tête de croco précède le nom, à sa hauteur de texte. */
@@ -72,6 +75,9 @@ h1 { font-size: var(--titre); font-weight: 800; line-height: 1.1; margin: 4px 0;
 .ville-carte .ligne { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-weight: 500; }
 .ville-carte.lieu { display: grid; gap: 8px; justify-items: start; border-color: var(--accent); }
 .ville-carte.lieu .detail { width: 100%; }
+.ville-carte.repaire { display: grid; gap: 8px; justify-items: start; border-color: var(--accent); background: var(--accent-fond); }
+.ville-carte.repaire .ligne { font-weight: 500; }
+#repaire:empty { display: none; }
 .sur-titre { color: var(--accent); font-size: .875rem; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
 
 .etiquette { display: block; font-weight: 500; margin: 0 0 6px 4px; }
@@ -182,10 +188,11 @@ form.groupe .champ { flex: 1 1 100%; }
   #poignee::before { content: ''; width: 36px; height: 4px; border-radius: 2px; background: var(--bord); }
   #poignee:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
 
-  /* Ordre dans le volet : poignée, filtres, première ville, amis, lieu, autres villes. */
+  /* Ordre dans le volet : poignée, filtres + repaire, première ville, amis, lieu, autres villes.
+     Repaire partage l'ordre de filtres (1) : il suit dans le flux grâce à l'ordre du DOM. */
   .panneau > * { order: 7; }
   #poignee { order: 0; }
-  #filtres { order: 1; }
+  #filtres, #repaire { order: 1; }
   #message, .panneau > .chargement { order: 2; }
   .panneau > .villes { display: contents; }
   .panneau > .villes > * { order: 6; }

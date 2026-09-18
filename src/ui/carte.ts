@@ -13,6 +13,8 @@ const CENTRE_FRANCE: L.LatLngTuple = [46.6, 2.4]
 const ZOOM_FRANCE = 6
 const ZOOM_MAX_CADRAGE = 9
 const MARGE_CADRAGE: L.PointTuple = [40, 40]
+/** Zoom appliqué par « Voir sur la carte » : assez proche pour situer le repaire sans perdre le contexte. */
+const ZOOM_REPAIRE = 8
 /** D1 : même valeur que l'opacité des nuances de la légende (app.css). */
 /** Valeurs de tokens.css (--pastille, --accent) : Leaflet dessine en SVG, sans accès aux variables. */
 const COULEUR_LIGNE = '#1f2733'
@@ -26,6 +28,8 @@ export interface Carte {
   zones(tranches: Tranche[]): void
   centre(lat: number, lon: number, libelle: string): void
   sansCentre(): void
+  /** Cadre la carte sur un point (bouton « Voir sur la carte »). */
+  centrerSur(lat: number, lon: number): void
   lignes(depuis: Ami[], vers: Lieu | null): void
   recalculer(): void
   surClic(action: (lat: number, lon: number) => void): void
@@ -82,6 +86,9 @@ export function creerCarte(element: HTMLElement): Carte {
     sansCentre() {
       marqueurCentre?.remove()
       marqueurCentre = null
+    },
+    centrerSur(lat, lon) {
+      carte.setView([lat, lon], Math.max(carte.getZoom(), ZOOM_REPAIRE))
     },
     lignes(depuis, vers) {
       coucheLignes.clearLayers()
