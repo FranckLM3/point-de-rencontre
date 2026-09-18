@@ -271,6 +271,7 @@ form.groupe .champ { flex: 1 1 100%; }
 }
 .feuille label { display: grid; gap: 4px; font-weight: 500; }
 .feuille label.option { display: flex; align-items: center; gap: 8px; }
+.feuille label[hidden] { display: none; }
 .feuille fieldset { border: 1px solid var(--bord); border-radius: 12px; display: flex; gap: 16px; }
 .feuille .aide { margin: 0; }
 
