@@ -32,6 +32,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Parcours dans le navigateur (Supabase simulé)
+        run: |
+          npx playwright install --with-deps chromium
+          npm run e2e
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -77,10 +81,6 @@ jobs:
         with:
           path: public/data/tc
           key: ${{ steps.version.outputs.cle }}
-      - name: Parcours dans le navigateur (Supabase simulé)
-        run: |
-          npx playwright install --with-deps chromium
-          npm run e2e
       - run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
