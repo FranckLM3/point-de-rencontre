@@ -131,6 +131,8 @@ test('connexion, sélection, ajout d’une personne, test d’un lieu', async ({
   await expect(page.locator('#repaire')).toContainText('Le repaire')
   await page.getByRole('button', { name: 'Voir sur la carte' }).click()
   await expect(page.locator('.cible')).toBeVisible()
+  // Voir sur la carte referme le volet sur mobile (D1) : on le rouvre pour continuer.
+  await ouvrirVoletSiVisible(page)
 
   await page.getByLabel('Inclure Tom').uncheck()
   await expect(page.getByRole('heading', { level: 1 })).toContainText('entre 1')

@@ -15,6 +15,16 @@ const ZOOM_MAX_CADRAGE = 9
 const MARGE_CADRAGE: L.PointTuple = [40, 40]
 /** Zoom appliqué par « Voir sur la carte » : assez proche pour situer le repaire sans perdre le contexte. */
 const ZOOM_REPAIRE = 8
+/** Sous ce seuil, le panneau devient un volet fixé en bas (même seuil que app.css). */
+const SEUIL_MOBILE_PX = 1024
+/** Même ratio que --volet-ferme (tokens.css) : hauteur du volet fermé, qui masque le bas de la carte. */
+const RATIO_VOLET_FERME = 0.38
+
+/** En dessous de 1024 px, le volet fermé couvre le bas de l'écran : le cadrage lui réserve de la place. */
+function margeBasse(): L.PointTuple {
+  const bas = window.innerWidth < SEUIL_MOBILE_PX ? MARGE_CADRAGE[1] + window.innerHeight * RATIO_VOLET_FERME : MARGE_CADRAGE[1]
+  return [MARGE_CADRAGE[0], bas]
+}
 /** D1 : même valeur que l'opacité des nuances de la légende (app.css). */
 /** Valeurs de tokens.css (--pastille, --accent) : Leaflet dessine en SVG, sans accès aux variables. */
 const COULEUR_LIGNE = '#1f2733'
@@ -65,7 +75,11 @@ export function creerCarte(element: HTMLElement): Carte {
           .addTo(coucheAmis)
       }
       if (!dejaCadre && liste.length > 0) {
-        carte.fitBounds(L.latLngBounds(liste.map((a) => [a.lat, a.lon])), { padding: MARGE_CADRAGE, maxZoom: ZOOM_MAX_CADRAGE })
+        carte.fitBounds(L.latLngBounds(liste.map((a) => [a.lat, a.lon])), {
+          paddingTopLeft: MARGE_CADRAGE,
+          paddingBottomRight: margeBasse(),
+          maxZoom: ZOOM_MAX_CADRAGE,
+        })
         dejaCadre = true
       }
     },
@@ -88,7 +102,13 @@ export function creerCarte(element: HTMLElement): Carte {
       marqueurCentre = null
     },
     centrerSur(lat, lon) {
-      carte.setView([lat, lon], Math.max(carte.getZoom(), ZOOM_REPAIRE))
+      // Un point unique en guise de bornes : fitBounds cadre alors sur ce point, en réservant la
+      // place du volet fermé, sans code séparé pour le cas plein écran (marge basse nulle).
+      carte.fitBounds(L.latLngBounds([[lat, lon], [lat, lon]]), {
+        paddingTopLeft: MARGE_CADRAGE,
+        paddingBottomRight: margeBasse(),
+        maxZoom: ZOOM_REPAIRE,
+      })
     },
     lignes(depuis, vers) {
       coucheLignes.clearLayers()

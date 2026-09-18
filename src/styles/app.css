@@ -186,8 +186,9 @@ form.groupe .champ { flex: 1 1 100%; }
     transition: transform var(--duree-volet) ease-out;
   }
   .app.volet-ouvert .panneau { transform: translateY(0); }
-  /* En haut, à droite du zoom, sur toute la largeur restante. */
-  .legende { top: 12px; bottom: auto; left: 56px; right: 12px; }
+  /* Au-dessus du volet fermé plutôt qu'en haut : ça libère tout le haut de la carte (et le
+     contrôle de zoom) au lieu de partager une bannière avec eux et de risquer d'y cacher un marqueur. */
+  .legende { top: auto; bottom: calc(var(--volet-ferme) + 12px); left: 12px; right: 12px; }
   .legende .case { min-width: 0; }
 
   #poignee {
