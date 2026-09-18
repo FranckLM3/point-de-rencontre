@@ -1,13 +1,14 @@
 import { expect, test } from 'vitest'
 import { haversineKm } from '../../src/calcul/geo'
 import type { Grille } from '../../src/calcul/grille'
-import { acces, coucheTc, depuisGares, garesProches, prixTrain, versPointTc } from '../../src/calcul/tc'
-import type { Horaires, Ligne, Station } from '../../src/donnees/horaires'
+import { acces, cheminGares, coucheTc, depuisGares, garesProches, prixTrain, versPointTc } from '../../src/calcul/tc'
+import { INJOIGNABLE, type Horaires, type Ligne, type Station } from '../../src/donnees/horaires'
 import type { Ami } from '../../src/types'
 
-const ligne = (m: number[], k: number[], g: number[], c: number[] = m.map(() => 0)): Ligne => ({
+const ligne = (m: number[], k: number[], g: number[], c: number[] = m.map(() => 0), p: number[] = m.map(() => INJOIGNABLE)): Ligne => ({
   minutes: Uint16Array.from(m), km: Uint16Array.from(k),
   grandeLigne: Uint8Array.from(g), correspondances: Uint8Array.from(c),
+  precedente: Uint16Array.from(p),
 })
 
 // Gare 0 à Marseille, gare 1 à Paris ; 194 min, 750 km, grande ligne, 1 correspondance.
@@ -90,8 +91,12 @@ test('versPointTc : trajet complet avec gares et direct si proche', () => {
   expect(loin.minutes).toBeGreaterThan(194)
   expect(loin.depart).toBe('Marseille Saint-Charles')
   expect(loin.arrivee).toBe('Paris Gare de Lyon')
+  expect(loin.departIndice).toBe(0)
+  expect(loin.arriveeIndice).toBe(1)
   const pres = versPointTc(horaires, d, franck, 43.2965, 5.37)!
   expect(pres.depart).toBeNull()
+  expect(pres.departIndice).toBeNull()
+  expect(pres.arriveeIndice).toBeNull()
 })
 
 test('versPointTc : lieu lointain sans ligne chargée, injoignable', () => {
@@ -262,4 +267,40 @@ test('coucheTc (grille) et versPointTc (point) restent cohérents pour la même 
   const valeurGrille = coucheTc(grille, h, d, ami, 'temps')[0]!
   const valeurPoint = versPointTc(h, d, ami, cible.lat, cible.lon)!.minutes
   expect(Math.abs(valeurGrille - valeurPoint)).toBeLessThanOrEqual(1)
+})
+
+test('cheminGares : train direct', () => {
+  const l = ligne([0, 60], [0, 10], [0, 0], [0, 0], [INJOIGNABLE, 0])
+  expect(cheminGares(l, 0, 1)).toEqual([0, 1])
+})
+
+test('cheminGares : une correspondance', () => {
+  // Gare 2 atteinte depuis 1, elle-même atteinte depuis 0 (source).
+  const l = ligne([0, 30, 60], [0, 5, 10], [0, 0, 0], [0, 0, 1], [INJOIGNABLE, 0, 1])
+  expect(cheminGares(l, 0, 2)).toEqual([0, 1, 2])
+})
+
+test('cheminGares : même gare de départ et d’arrivée', () => {
+  const l = ligne([0], [0], [0], [0], [INJOIGNABLE])
+  expect(cheminGares(l, 0, 0)).toEqual([0])
+})
+
+test('cheminGares : s’arrête à une gare injoignable dans la chaîne (donnée incohérente)', () => {
+  const l = ligne([0, 60, 90], [0, 10, 15], [0, 0, 0], [0, 0, 0], [INJOIGNABLE, 0, INJOIGNABLE])
+  // La gare 2 pointe vers une précédente injoignable sans atteindre 0 : on s'arrête là.
+  expect(cheminGares(l, 0, 2)).toEqual([2])
+})
+
+test('cheminGares : boucle sans fin bornée à 400 pas', () => {
+  const n = 500
+  const precedente = Array.from({ length: n }, (_, i) => (i === 0 ? INJOIGNABLE : i - 1))
+  const l = ligne(
+    Array(n).fill(0),
+    Array(n).fill(0),
+    Array(n).fill(0),
+    Array(n).fill(0),
+    precedente,
+  )
+  const chemin = cheminGares(l, 0, n - 1)
+  expect(chemin.length).toBeLessThanOrEqual(401)
 })

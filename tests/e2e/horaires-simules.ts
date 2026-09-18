@@ -4,17 +4,22 @@ import type { Page, Route } from '@playwright/test'
 import { haversineKm } from '../../src/calcul/geo'
 import type { Station } from '../../src/donnees/horaires'
 
-/** Deux gares seulement : celles des deux personnes du parcours (Paris et Lyon). */
+/**
+ * Trois gares : celles des deux personnes du parcours (Paris et Lyon), plus Dijon, gare
+ * intermédiaire sur le trajet Paris-Lyon (pour tester un chemin de plus de deux points).
+ */
 export const GARES: Station[] = [
   { nom: 'Paris Gare de Lyon Hall 1 - 2', lat: 48.8449, lon: 2.3735, desservie: true },
   { nom: 'Lyon-Part-Dieu', lat: 45.7602, lon: 4.8596, desservie: true },
+  { nom: 'Dijon-Ville', lat: 47.322, lon: 5.0415, desservie: true },
 ]
+const DIJON = 2
 
 const MINUTES = 120
 const KM = 465
 /** Bit 0 : une grande ligne est empruntée ; bits 1 à 4 : aucune correspondance. */
 const DRAPEAUX = 0b0000_0001
-const OCTETS_PAR_GARE = 5
+const OCTETS_PAR_GARE = 7
 const NB_VOISINS = 3
 const INJOIGNABLE = 65535
 const HECTOMETRES_MAX = 65535
@@ -35,7 +40,14 @@ function grille(): GrilleBrute {
   return JSON.parse(readFileSync('public/data/grille-4km.json', 'utf8')) as GrilleBrute
 }
 
-/** `lignes/<i>.bin` : 5 octets par gare, la gare elle-même à zéro. */
+/** Entre Paris et Lyon, le trajet passe par Dijon (intermédiaire) ; sinon direct depuis la source. */
+function precedenteDepuis(source: number, j: number): number {
+  if (j === source) return INJOIGNABLE
+  if (source !== DIJON && j !== DIJON) return DIJON
+  return source
+}
+
+/** `lignes/<i>.bin` : 7 octets par gare, la gare elle-même à zéro. */
 function ligne(source: number): Buffer {
   const octets = Buffer.alloc(GARES.length * OCTETS_PAR_GARE)
   for (let j = 0; j < GARES.length; j++) {
@@ -43,6 +55,7 @@ function ligne(source: number): Buffer {
     octets.writeUInt16LE(j === source ? 0 : MINUTES, decalage)
     octets.writeUInt16LE(j === source ? 0 : KM, decalage + 2)
     octets.writeUInt8(j === source ? 0 : DRAPEAUX, decalage + 4)
+    octets.writeUInt16LE(precedenteDepuis(source, j), decalage + 5)
   }
   return octets
 }

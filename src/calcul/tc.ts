@@ -1,4 +1,4 @@
-import type { Horaires, Station } from '../donnees/horaires'
+import type { Horaires, Ligne, Station } from '../donnees/horaires'
 import { INJOIGNABLE, NB_VOISINS } from '../donnees/horaires'
 import type { Ami, Grandeur, Transport } from '../types'
 import { haversineKm } from './geo'
@@ -138,6 +138,9 @@ export interface TrajetTc {
   /** Noms des gares, null pour un trajet direct sans train. */
   depart: string | null
   arrivee: string | null
+  /** Indices des gares (pour retracer le chemin réel sur la carte), null pour un trajet direct sans train. */
+  departIndice: number | null
+  arriveeIndice: number | null
   /** Rejoindre la gare de départ ; le trajet entier s'il n'y a pas de train. */
   acces: Segment
   /** Quitter la gare d'arrivée ; null si le lieu est la gare même ou s'il n'y a pas de train. */
@@ -165,6 +168,8 @@ function meilleurVers(h: Horaires, d: DepuisGares, ami: Ami, km: number, gares: 
       euros: prixAcces(km, ami.transport),
       depart: null,
       arrivee: null,
+      departIndice: null,
+      arriveeIndice: null,
       acces: segment(km, ami.transport),
       sortie: null,
       correspondances: 0,
@@ -184,6 +189,8 @@ function meilleurVers(h: Horaires, d: DepuisGares, ami: Ami, km: number, gares: 
         euros: d.euros[g.gare]! + prixAcces(g.km, 'tc'),
         depart: h.stations[gareDepart]!.nom,
         arrivee: h.stations[g.gare]!.nom,
+        departIndice: gareDepart,
+        arriveeIndice: g.gare,
         acces: segment(kmAcces(d, gareDepart), ami.transport),
         sortie: g.km > 0 ? segment(g.km, 'tc') : null,
         correspondances: d.correspondances[g.gare]!,
@@ -191,6 +198,27 @@ function meilleurVers(h: Horaires, d: DepuisGares, ami: Ami, km: number, gares: 
     }
   }
   return best
+}
+
+/** Sécurité contre une chaîne `precedente` bouclée (donnée corrompue) : plus qu'assez pour un trajet réel. */
+const CHEMIN_PAS_MAX = 400
+
+/**
+ * Remonte la gare précédente depuis `arrivee` jusqu'à `depart`, à partir de `ligne` (celle de la
+ * gare de départ, déjà chargée). S'arrête à `depart`, sur une précédente injoignable (INJOIGNABLE :
+ * donnée incohérente) ou après `CHEMIN_PAS_MAX` pas, et renvoie les indices de gares dans l'ordre
+ * du trajet (le résultat peut alors ne pas remonter jusqu'à `depart`).
+ */
+export function cheminGares(ligne: Ligne, depart: number, arrivee: number): number[] {
+  const chemin: number[] = [arrivee]
+  let courante = arrivee
+  for (let i = 0; i < CHEMIN_PAS_MAX && courante !== depart; i++) {
+    const precedente = ligne.precedente[courante]
+    if (precedente === undefined || precedente === INJOIGNABLE) break
+    chemin.push(precedente)
+    courante = precedente
+  }
+  return chemin.reverse()
 }
 
 /** `gares` : gares proches du point, à passer quand elles sont déjà connues (cache par ville). */

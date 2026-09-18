@@ -3,12 +3,13 @@ import { creerHoraires, decoderLigne, decoderVoisins } from '../../src/donnees/h
 
 afterEach(() => vi.unstubAllGlobals())
 
-function ligneBinaire(entrees: [number, number, number][]): ArrayBuffer {
-  const v = new DataView(new ArrayBuffer(entrees.length * 5))
-  entrees.forEach(([m, k, f], j) => {
-    v.setUint16(j * 5, m, true)
-    v.setUint16(j * 5 + 2, k, true)
-    v.setUint8(j * 5 + 4, f)
+function ligneBinaire(entrees: [number, number, number, number?][]): ArrayBuffer {
+  const v = new DataView(new ArrayBuffer(entrees.length * 7))
+  entrees.forEach(([m, k, f, p = 65535], j) => {
+    v.setUint16(j * 7, m, true)
+    v.setUint16(j * 7 + 2, k, true)
+    v.setUint8(j * 7 + 4, f)
+    v.setUint16(j * 7 + 5, p, true)
   })
   return v.buffer
 }
@@ -27,8 +28,13 @@ test('decoderLigne lit le nombre de correspondances dans les bits 1 à 4', () =>
   expect(Array.from(l.correspondances)).toEqual([1, 15])
 })
 
+test('decoderLigne lit la gare précédente', () => {
+  const l = decoderLigne(ligneBinaire([[0, 0, 0, 65535], [60, 10, 0, 2]]))
+  expect(Array.from(l.precedente)).toEqual([65535, 2])
+})
+
 test('decoderLigne refuse une taille incohérente', () => {
-  expect(() => decoderLigne(new ArrayBuffer(7))).toThrow('horaires')
+  expect(() => decoderLigne(new ArrayBuffer(10))).toThrow('horaires')
 })
 
 test('decoderVoisins lit gares et distances', () => {

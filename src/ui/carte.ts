@@ -1,10 +1,11 @@
 import L from 'leaflet'
+import type { CoordGare, PersonneTrajetCarte } from '../calcul/trace'
 import type { VilleClassee } from '../calcul/villes'
 import type { Tranche } from '../calcul/zones'
 import type { Ami, Lieu } from '../types'
 import { COULEUR_CONTOUR_ZONE, EPAISSEUR_CONTOUR_ZONE, OPACITE_CONTOUR_ZONE, OPACITE_ZONE } from './rendu-zones'
 import 'leaflet/dist/leaflet.css'
-import { echapper, valeur } from './format'
+import { echapper, nomCourt } from './format'
 import type { EtiquetteVille } from './etiquettes'
 import { ICONE_PLEIN_ECRAN } from './icones'
 import { grouperEcran, listeNoms } from './grappes'
@@ -30,9 +31,7 @@ function margeBasse(): L.PointTuple {
   return [MARGE_CADRAGE[0], bas]
 }
 /** Valeurs de tokens.css (--pastille, --accent) : Leaflet dessine en SVG, sans accès aux variables. */
-const COULEUR_LIGNE = '#1f2733'
 const COULEUR_LIGNE_VILLE = '#0b5d2a'
-const COULEUR_LIEU = '#15803d'
 const TAILLE_MARQUEUR = 28
 const TAILLE_GRAPPE = 34
 const TAILLE_CIBLE = 36
@@ -43,6 +42,16 @@ const RAYON_GRAPPE_PX = 26
 const SEUIL_MOBILE_ETIQUETTES = 600
 const MAX_ETIQUETTES = 32
 const MAX_ETIQUETTES_MOBILE = 16
+/** Étiquettes de gares (nom court) : au plus 6 à la fois, pour ne pas encombrer la carte. */
+const MAX_ETIQUETTES_GARES = 6
+const RAYON_GARE = 4
+const STYLE_TRAIN: L.PolylineOptions = {
+  color: COULEUR_LIGNE_VILLE, weight: 3, opacity: 0.9, lineJoin: 'round', interactive: false, className: 'trace-train',
+}
+/** Accès/sortie de gare, et trajet direct sans train : ligne fine et pointillée. */
+const STYLE_POINTILLE: L.PolylineOptions = { color: COULEUR_LIGNE_VILLE, weight: 1.5, opacity: 0.7, dashArray: '2 6', interactive: false }
+/** Hors mode transports (vol d'oiseau, voiture, chacun son moyen) : ligne droite pleine. */
+const STYLE_DROITE: L.PolylineOptions = { color: COULEUR_LIGNE_VILLE, weight: 2, opacity: 0.8, interactive: false }
 
 export interface Carte {
   /** `misEnAvant` : identifiant d'une personne dont le marqueur reçoit une brève pulsation (ajout/édition). */
@@ -52,9 +61,11 @@ export interface Carte {
   sansCentre(): void
   /** Cadre la carte sur un point (bouton « Voir sur la carte »). */
   centrerSur(lat: number, lon: number): void
-  lignes(depuis: Ami[], vers: Lieu | null): void
-  /** Lignes vers la ville choisie (carte de ville ou étiquette cliquée), en vert foncé (D3). */
-  lignesVille(depuis: Ami[], vers: Lieu | null): void
+  /**
+   * Trajets vers la cible choisie (carte de ville, étiquette cliquée ou lieu testé) : une seule
+   * couche, effacée puis redessinée à chaque appel, quel que soit le déclencheur (D8).
+   */
+  trajets(personnes: PersonneTrajetCarte[], cible: Lieu | null): void
   /** Étiquettes de villes façon Chronotrains ; recalculées ici même sur zoomend/moveend. */
   etiquettes(candidats: EtiquetteVille[], choisir: (v: VilleClassee) => void): void
   recalculer(): void
@@ -92,8 +103,7 @@ export function creerCarte(element: HTMLElement): Carte {
   L.tileLayer(TUILES, { attribution: ATTRIBUTION, maxZoom: 19 }).addTo(carte)
   new ControlePleinEcran().addTo(carte)
   const coucheZones = L.layerGroup().addTo(carte)
-  const coucheLignes = L.layerGroup().addTo(carte)
-  const coucheLignesVille = L.layerGroup().addTo(carte)
+  const coucheTrajets = L.layerGroup().addTo(carte)
   const coucheAmis = L.layerGroup().addTo(carte)
   const paneEtiquettes = carte.createPane('etiquettes')
   // Sous markerPane (600) et le repère (zIndexOffset négatif y compris), au-dessus des zones (overlayPane 400).
@@ -214,25 +224,47 @@ export function creerCarte(element: HTMLElement): Carte {
         maxZoom: ZOOM_REPAIRE,
       })
     },
-    lignes(depuis, vers) {
-      coucheLignes.clearLayers()
-      if (!vers) return
-      for (const a of depuis) {
-        L.polyline([[a.lat, a.lon], [vers.lat, vers.lon]], { color: COULEUR_LIGNE, weight: 1.5, opacity: 0.6, interactive: false }).addTo(coucheLignes)
+    trajets(personnes, cible) {
+      coucheTrajets.clearLayers()
+      if (!cible) return
+      // Au plus 6 étiquettes de gares : l'arrivée (la ville visée) d'abord, puis les départs.
+      const gardees = new Set<number>()
+      const retenirEtiquette = (i: number): void => {
+        if (gardees.size < MAX_ETIQUETTES_GARES) gardees.add(i)
       }
-      L.circleMarker([vers.lat, vers.lon], { radius: RAYON_LIEU, color: COULEUR_LIEU, fillOpacity: 1 })
-        .bindTooltip(echapper(vers.label))
-        .addTo(coucheLignes)
-    },
-    lignesVille(depuis, vers) {
-      coucheLignesVille.clearLayers()
-      if (!vers) return
-      for (const a of depuis) {
-        L.polyline([[a.lat, a.lon], [vers.lat, vers.lon]], { color: COULEUR_LIGNE_VILLE, weight: 2, opacity: 0.8, interactive: false }).addTo(coucheLignesVille)
+      for (const p of personnes) if (p.gareArrivee !== null) retenirEtiquette(p.gareArrivee)
+      for (const p of personnes) if (p.gareDepart !== null) retenirEtiquette(p.gareDepart)
+
+      const dessinees = new Set<number>()
+      const dessinerGare = (i: number, g: CoordGare): void => {
+        if (dessinees.has(i)) return
+        dessinees.add(i)
+        const marqueur = L.circleMarker([g.lat, g.lon], {
+          radius: RAYON_GARE, weight: 2, color: COULEUR_LIGNE_VILLE, fillColor: '#fff', fillOpacity: 1, interactive: false,
+        }).addTo(coucheTrajets)
+        if (gardees.has(i)) {
+          marqueur.bindTooltip(echapper(nomCourt(g.nom)), { permanent: true, direction: 'top', offset: [0, -6], className: 'etiquette-gare' })
+        }
       }
-      L.circleMarker([vers.lat, vers.lon], { radius: RAYON_LIEU, color: COULEUR_LIGNE_VILLE, fillOpacity: 1 })
-        .bindTooltip(echapper(vers.label))
-        .addTo(coucheLignesVille)
+
+      for (const p of personnes) {
+        const infobulle = echapper(p.noms.join(', '))
+        if (p.chemin && p.chemin.length > 0 && p.gareDepart !== null && p.gareArrivee !== null) {
+          const depart = p.chemin[0]!
+          const arrivee = p.chemin[p.chemin.length - 1]!
+          L.polyline([[p.lat, p.lon], [depart.lat, depart.lon]], STYLE_POINTILLE).bindTooltip(infobulle).addTo(coucheTrajets)
+          L.polyline(p.chemin.map((g): L.LatLngTuple => [g.lat, g.lon]), STYLE_TRAIN).addTo(coucheTrajets)
+          L.polyline([[arrivee.lat, arrivee.lon], [cible.lat, cible.lon]], STYLE_POINTILLE).addTo(coucheTrajets)
+          dessinerGare(p.gareDepart, depart)
+          dessinerGare(p.gareArrivee, arrivee)
+        } else {
+          const style = p.directSansTrain ? STYLE_POINTILLE : STYLE_DROITE
+          L.polyline([[p.lat, p.lon], [cible.lat, cible.lon]], style).bindTooltip(infobulle).addTo(coucheTrajets)
+        }
+      }
+      L.circleMarker([cible.lat, cible.lon], { radius: RAYON_LIEU, color: COULEUR_LIGNE_VILLE, fillOpacity: 1 })
+        .bindTooltip(echapper(cible.label))
+        .addTo(coucheTrajets)
     },
     etiquettes(candidats, choisir) {
       dernieresEtiquettes = { candidats, choisir }

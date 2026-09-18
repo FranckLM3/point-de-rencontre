@@ -294,6 +294,65 @@ test('mode transports en prix : légende et menu en euros', async ({ page }) => 
   await expect(page).toHaveURL(/grandeur=prix/)
 })
 
+/**
+ * Ces deux tests utilisent « Tester un lieu » plutôt qu'une carte de ville : la cible est ainsi
+ * connue à l'avance (gares déterministes), et le chemin passe par le même appel unique
+ * (`carte.trajets`, D8) qu'une carte de ville ou une étiquette cliquée sur la carte.
+ */
+async function testerUnLieu(page: Page, recherche: string, libelle: string): Promise<void> {
+  await page.getByLabel('Tester un lieu').fill(recherche)
+  await page.getByRole('button', { name: libelle }).click()
+}
+
+test('mode transports : le trajet en train suit les gares réelles, pas une ligne directe', async ({ page }) => {
+  await simuler(page)
+  await simulerHoraires(page)
+  const lyon = { geometry: { coordinates: [4.86, 45.76] }, properties: { label: 'Près de Lyon' } }
+  await page.route('https://data.geopf.fr/**', (route) => route.fulfill({ json: { type: 'FeatureCollection', features: [lyon] } }))
+  await page.goto('./')
+  await entrer(page)
+  await ouvrirVoletSiVisible(page)
+  await passerEnTransports(page)
+
+  await testerUnLieu(page, 'lyon', lyon.properties.label)
+  // Depuis Paris (Léa), le trajet vers Lyon passe par Dijon : au moins 3 points, pas une ligne à 2 points.
+  const points = await page.locator('svg path.trace-train').evaluateAll((paths) =>
+    paths.map((p) => (p.getAttribute('d')?.match(/[ML]/g) ?? []).length),
+  )
+  expect(points.some((n) => n > 2)).toBe(true)
+})
+
+test('mode transports : sélectionner une cible plusieurs fois ne double jamais les tracés (D8)', async ({ page }) => {
+  await simuler(page)
+  await simulerHoraires(page)
+  // Près de Dijon : à plus de 30 km de Paris et de Lyon pour les deux Crocos (le trajet direct,
+  // pointillé, ne l'emporte jamais), mais à moins de 50 km d'une gare (Dijon-Ville elle-même).
+  const dijon = { geometry: { coordinates: [5.0415, 47.322] }, properties: { label: 'Vers Dijon' } }
+  const presDeDijon = { geometry: { coordinates: [5.1, 47.35] }, properties: { label: 'Près de Dijon' } }
+  await page.route('https://data.geopf.fr/**', async (route) => {
+    const q = new URL(route.request().url()).searchParams.get('q') ?? ''
+    const feature = q.includes('autre') ? presDeDijon : dijon
+    return route.fulfill({ json: { type: 'FeatureCollection', features: [feature] } })
+  })
+  await page.goto('./')
+  await entrer(page)
+  await ouvrirVoletSiVisible(page)
+  await passerEnTransports(page)
+
+  const traces = page.locator('svg path.trace-train')
+  await testerUnLieu(page, 'dijon', dijon.properties.label)
+  // Un tracé par point de départ distinct : Léa (Paris) et Tom (Lyon).
+  await expect(traces).toHaveCount(2)
+
+  // Sélectionner la même cible une deuxième fois : toujours deux tracés, jamais quatre.
+  await testerUnLieu(page, 'dijon', dijon.properties.label)
+  await expect(traces).toHaveCount(2)
+
+  // Une cible différente : la couche précédente est bien effacée, toujours deux tracés.
+  await testerUnLieu(page, 'autre', presDeDijon.properties.label)
+  await expect(traces).toHaveCount(2)
+})
+
 test('horaires indisponibles : bandeau, repli en vol d’oiseau, puis réessai', async ({ page }) => {
   await simuler(page)
   const horaires = await simulerHoraires(page)

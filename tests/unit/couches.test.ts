@@ -2,12 +2,13 @@ import { expect, test, vi } from 'vitest'
 import { choisirMesure, cleCouche, cleDepuis, creerChargeurTc, creerCouches, creerMoteurTc } from '../../src/calcul/couches'
 import type { Grille } from '../../src/calcul/grille'
 import { mesureOiseau } from '../../src/calcul/villes'
-import type { Horaires, Ligne } from '../../src/donnees/horaires'
+import { INJOIGNABLE, type Horaires, type Ligne } from '../../src/donnees/horaires'
 import type { Ami } from '../../src/types'
 
 const ligne = (m: number[], k: number[], g: number[], c: number[] = m.map(() => 0)): Ligne => ({
   minutes: Uint16Array.from(m), km: Uint16Array.from(k),
   grandeLigne: Uint8Array.from(g), correspondances: Uint8Array.from(c),
+  precedente: Uint16Array.from(m.map(() => INJOIGNABLE)),
 })
 
 // Gare 0 à Marseille, gare 1 à Paris.

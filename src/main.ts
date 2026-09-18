@@ -7,6 +7,7 @@ import './styles/app.css'
 import { agreger, meilleurIndice } from './calcul/agregat'
 import { choisirMesure, creerChargeurTc, creerCouches, type ChargeurTc, type Couches } from './calcul/couches'
 import { coordonnees, type Grille } from './calcul/grille'
+import { personnesTrajetCarte } from './calcul/trace'
 import { pasTranches, uniteDe } from './calcul/unites'
 import { classerVilles, evaluer, type Mesure, type VilleClassee, villeLaPlusProche } from './calcul/villes'
 import { seuils, zones } from './calcul/zones'
@@ -16,7 +17,7 @@ import { enregistrerGroupe, listerGroupes } from './donnees/groupes'
 import { creerHoraires } from './donnees/horaires'
 import { chargerGrille, chargerVilles } from './donnees/statiques'
 import { ecrireEtat, lireEtat } from './etat/url'
-import type { Ami, Etat, Groupe, Ville } from './types'
+import type { Ami, Etat, Groupe, Lieu, Ville } from './types'
 import { rendreAmis } from './ui/amis'
 import { amisChoisis, cleFocus, cleZones, libelleClic } from './ui/assemblage'
 import { creerCarte, type Carte } from './ui/carte'
@@ -128,12 +129,25 @@ function retirerLieu(s: Session): void {
   $('#champ-lieu').focus()
 }
 
+/** Cible affichée sur la carte : la ville choisie prime sur un lieu testé (une seule à la fois,
+ * pour ne jamais dessiner deux trajets vers le même point, D8). */
+function cibleCarte(s: Session): Lieu | null {
+  return s.villeChoisie ? { lat: s.villeChoisie.ville.lat, lon: s.villeChoisie.ville.lon, label: s.villeChoisie.ville.nom } : s.etat.lieu
+}
+
+/** Dessine les trajets vers la cible : même fonction pour la carte de ville, l'étiquette cliquée
+ * sur la carte et le lieu testé (D8, un seul chemin d'appel, une seule couche). */
+function dessinerTrajets(s: Session, choisis: Ami[]): void {
+  const cible = cibleCarte(s)
+  s.carte.trajets(personnesTrajetCarte(choisis, s.etat.mode, s.tc.pret(), cible), cible)
+}
+
 /** Ville choisie (carte de ville ou étiquette cliquée sur la carte) : mêmes lignes vertes dans les deux cas.
  * Dessine directement (pas de rafraîchir complet, qui reconstruirait #villes et refermerait la carte
  * dépliée) ; s.villeChoisie est repris par rendreCarte à chaque rendu suivant pour rester affiché. */
 function choisirVille(s: Session, choisis: Ami[], v: VilleClassee): void {
   s.villeChoisie = v
-  s.carte.lignesVille(choisis, { lat: v.ville.lat, lon: v.ville.lon, label: v.ville.nom })
+  dessinerTrajets(s, choisis)
 }
 
 function rendrePanneau(s: Session, choisis: Ami[], mesure: Mesure, villes: VilleClassee[]): void {
@@ -227,8 +241,7 @@ function rendreCarte(s: Session, choisis: Ami[], villesClassees: VilleClassee[],
   const ids = choisis.map((a) => a.id)
   s.carte.amis(s.amis, new Set(ids), s.recemment)
   s.recemment = null
-  s.carte.lignes(choisis, s.etat.lieu)
-  s.carte.lignesVille(choisis, s.villeChoisie ? { lat: s.villeChoisie.ville.lat, lon: s.villeChoisie.ville.lon, label: s.villeChoisie.ville.nom } : null)
+  dessinerTrajets(s, choisis)
   const cle = cleZones(s.etat, ids, s.version)
   if (cle === s.cleZones) return
   s.cleZones = cle

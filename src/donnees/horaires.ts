@@ -14,6 +14,8 @@ export interface Ligne {
   grandeLigne: Uint8Array
   /** Nombre de changements de train, 0 à 15. */
   correspondances: Uint8Array
+  /** Gare précédente sur le trajet le plus rapide vers chaque gare ; INJOIGNABLE pour la source et une gare injoignable. */
+  precedente: Uint16Array
 }
 
 export interface Voisins {
@@ -32,7 +34,7 @@ export interface Horaires {
 
 export const INJOIGNABLE = 65535
 export const NB_VOISINS = 3
-const OCTETS_PAR_GARE = 5
+const OCTETS_PAR_GARE = 7
 /** Bit 0 du drapeau : une grande ligne est empruntée. */
 const GRANDE_LIGNE = 1
 /** Bits 1 à 4 du drapeau : nombre de correspondances. */
@@ -46,6 +48,7 @@ export function decoderLigne(tampon: ArrayBuffer): Ligne {
   const ligne: Ligne = {
     minutes: new Uint16Array(n), km: new Uint16Array(n),
     grandeLigne: new Uint8Array(n), correspondances: new Uint8Array(n),
+    precedente: new Uint16Array(n),
   }
   for (let j = 0; j < n; j++) {
     ligne.minutes[j] = v.getUint16(j * OCTETS_PAR_GARE, true)
@@ -53,6 +56,7 @@ export function decoderLigne(tampon: ArrayBuffer): Ligne {
     const drapeaux = v.getUint8(j * OCTETS_PAR_GARE + 4)
     ligne.grandeLigne[j] = drapeaux & GRANDE_LIGNE
     ligne.correspondances[j] = (drapeaux >> 1) & CORRESPONDANCES
+    ligne.precedente[j] = v.getUint16(j * OCTETS_PAR_GARE + 5, true)
   }
   return ligne
 }
