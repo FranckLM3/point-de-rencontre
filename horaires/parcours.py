@@ -86,6 +86,14 @@ def _departs_source(index: Index, source: int) -> list[int]:
     return sorted(h for h in heures if DEBUT_FENETRE_S <= h <= FIN_FENETRE_S)
 
 
+def _quitte_l_origine_a_temps(info: tuple, dep: int, liaison_s: int) -> bool:
+    """Sans train encore pris, le premier train doit partir dans la fenêtre (liaison depuis la source comprise).
+
+    Sinon un départ en journée permettrait d'attendre à quai un train du soir.
+    """
+    return info[2] > 0 or dep - liaison_s <= FIN_FENETRE_S
+
+
 @dataclass
 class _Etiquettes:
     par_train: list[int]
@@ -116,7 +124,7 @@ def _un_depart(index: Index, source: int, depart: int, e: _Etiquettes) -> list[i
         if pris is None:
             if not montee:
                 continue
-            if libre[de] <= dep:
+            if libre[de] <= dep and _quitte_l_origine_a_temps(info_libre[de], dep, libre[de] - depart):
                 avant = info_libre[de]
                 if par_train[de] + CORRESPONDANCE_S <= dep and info_train[de][2] < avant[2]:
                     avant = info_train[de]
@@ -128,7 +136,7 @@ def _un_depart(index: Index, source: int, depart: int, e: _Etiquettes) -> list[i
         elif montee and pris[2] > 1:
             # Déjà à bord : remonter ici avec moins de trains, à durée égale, compte moins de correspondances.
             n = pris[2] - 1
-            if libre[de] <= dep and info_libre[de][2] < n:
+            if libre[de] <= dep and info_libre[de][2] < n and _quitte_l_origine_a_temps(info_libre[de], dep, libre[de] - depart):
                 n = info_libre[de][2]
                 pris = (info_libre[de][0], info_libre[de][1], n + 1)
             if par_train[de] + CORRESPONDANCE_S <= dep and info_train[de][2] < n:

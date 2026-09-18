@@ -30,6 +30,30 @@ class DureesExactesTest(unittest.TestCase):
         r = reseau_synthetique(2, [(H(20, 10), H(21), 0, 1, "N"), (H(5, 50), H(6, 30), 0, 1, "M")])
         self.assertEqual(meilleurs_trajets(r, 0)[1].minutes, 65535)
 
+    def test_pas_d_attente_a_la_source_jusqu_apres_la_fenetre(self):
+        # Un train à 13 h ouvre un départ ; il ne doit pas permettre d'attendre le train de 20 h 05.
+        r = reseau_synthetique(3, [(H(13), H(14), 0, 1, "A"), (H(20, 5), H(20, 10), 0, 2, "B")])
+        self.assertEqual(meilleurs_trajets(r, 0)[2].minutes, 65535)
+
+    def test_pas_d_attente_chez_la_voisine_apres_la_fenetre(self):
+        # Même règle après 9 min à pied : le train de 20 h 15 impose de partir à 20 h 06.
+        r = reseau_synthetique(
+            4,
+            [(H(13), H(14), 0, 1, "A"), (H(20, 15), H(20, 20), 2, 3, "B")],
+            liaisons=[[(2, 540)], [], [(0, 540)], []],
+        )
+        self.assertEqual(meilleurs_trajets(r, 0)[3].minutes, 65535)
+
+    def test_marche_puis_dernier_train_de_la_fenetre(self):
+        # Parti à pied à 19 h 56, on attrape le train de 20 h 05 à la gare voisine : 14 min.
+        r = reseau_synthetique(3, [(H(20, 5), H(20, 10), 1, 2, "B")], liaisons=[[(1, 540)], [(0, 540)], []])
+        self.assertEqual(meilleurs_trajets(r, 0)[2].minutes, 14)
+
+    def test_correspondance_du_soir_toujours_possible(self):
+        # Parti à 19 h 30, on peut enchaîner avec un train de 20 h 40.
+        r = reseau_synthetique(3, [(H(19, 30), H(20, 30), 0, 1, "A"), (H(20, 40), H(21), 1, 2, "B")])
+        self.assertEqual(meilleurs_trajets(r, 0)[2].minutes, 90)
+
     def test_train_de_nuit(self):
         r = reseau_synthetique(2, [(H(20), H(25, 30), 0, 1, "N")])
         self.assertEqual(meilleurs_trajets(r, 0)[1].minutes, 330)
