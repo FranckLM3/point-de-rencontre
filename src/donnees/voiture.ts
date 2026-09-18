@@ -50,11 +50,20 @@ export interface FileCalculVoiture {
   enCours(amiId: string): boolean
 }
 
+export interface RappelsFileCalculVoiture {
+  /** Message français rendu par la fonction (quota dépassé, etc.), à afficher dans un bandeau. */
+  onErreur?: (message: string) => void
+  /** Un calcul vient de se terminer (succès ou échec) : l'appelant peut relire les couches. */
+  onTermine?: (amiId: string) => void
+}
+
+const MESSAGE_ERREUR_DEFAUT = 'Impossible de calculer ce trajet en voiture pour le moment.'
+
 /**
  * File d'un seul appel à la fois à la fonction Edge `voiture` : elle interroge la matrice
  * OpenRouteService, coûteuse en quota, donc jamais deux calculs en parallèle.
  */
-export function creerFileCalculVoiture(): FileCalculVoiture {
+export function creerFileCalculVoiture(rappels: RappelsFileCalculVoiture = {}): FileCalculVoiture {
   const enTraitement = new Set<string>()
   const attente: string[] = []
   let actif = false
@@ -67,14 +76,19 @@ export function creerFileCalculVoiture(): FileCalculVoiture {
     supabase()
       .functions.invoke('voiture', { body: { ami_id: amiId } })
       .then(({ error }: { error: unknown }) => {
-        if (error) console.error(`Erreur fonction voiture (ami ${amiId}) :`, error)
+        if (error) {
+          console.error(`Erreur fonction voiture (ami ${amiId}) :`, error)
+          rappels.onErreur?.((error as { message?: string }).message ?? MESSAGE_ERREUR_DEFAUT)
+        }
       })
       .catch((e: unknown) => {
         console.error(`Erreur fonction voiture (ami ${amiId}) :`, e)
+        rappels.onErreur?.(MESSAGE_ERREUR_DEFAUT)
       })
       .finally(() => {
         enTraitement.delete(amiId)
         actif = false
+        rappels.onTermine?.(amiId)
         traiterSuivant()
       })
   }

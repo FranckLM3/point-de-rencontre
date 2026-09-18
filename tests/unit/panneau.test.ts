@@ -100,6 +100,16 @@ test('ligne : nom échappé, ville et moyen de transport visibles', () => {
   expect(el.textContent).toContain('voiture')
 })
 
+test('ligne : « calcul en cours » pour un Croco en voiture dont la couche n’est pas encore prête (décision 6)', () => {
+  const el = document.createElement('div')
+  rendreAmis(el, { amis, groupes: [], selection: new Set(), enCalcul: new Set(['b']) }, actions())
+  const ligneTom = el.querySelector<HTMLElement>('.ligne-ami[data-personne="b"]')!
+  expect(ligneTom.querySelector('.calcul-en-cours')).not.toBeNull()
+  expect(ligneTom.textContent).toContain('calcul en cours')
+  const ligneLea = el.querySelector<HTMLElement>('.ligne-ami[data-personne="a"]')!
+  expect(ligneLea.querySelector('.calcul-en-cours')).toBeNull()
+})
+
 test('les personnes sont regroupées par ville, avec un en-tête qui bascule tout le groupe', () => {
   const el = document.createElement('div')
   const a = actions()
@@ -199,13 +209,14 @@ test('Annuler referme le formulaire de groupe', () => {
   expect(el.querySelector<HTMLFormElement>('form.groupe')!.hidden).toBe(true)
 })
 
-test('filtres : seuls Vol d’oiseau et Transports existent (plan 3 pour le reste)', () => {
+test('filtres : Transports, Voiture, Chacun son moyen (le vol d’oiseau n’est qu’un repli interne, décision 1)', () => {
   const el = document.createElement('div')
   rendreFiltres(el, ETAT_DEFAUT, 2, vi.fn())
   const modes = [...el.querySelectorAll<HTMLButtonElement>('[data-mode]')].map((b) => b.dataset.mode)
-  expect(modes).toEqual(['oiseau', 'tc'])
-  expect(el.querySelector('[data-mode="oiseau"]')!.textContent).toBe('Vol d’oiseau')
+  expect(modes).toEqual(['tc', 'voiture', 'mixte'])
   expect(el.querySelector('[data-mode="tc"]')!.textContent).toBe('Transports')
+  expect(el.querySelector('[data-mode="voiture"]')!.textContent).toBe('Voiture')
+  expect(el.querySelector('[data-mode="mixte"]')!.textContent).toBe('Chacun son moyen')
   expect(el.querySelector('h1')!.textContent).toContain('entre 2')
   expect(el.querySelector('select')!.hasAttribute('aria-pressed')).toBe(false)
 })
@@ -218,17 +229,18 @@ test('filtres : changer de mode remet le maximum à zéro', () => {
   expect(changer).toHaveBeenCalledWith({ mode: 'tc', max: null })
   const tc = document.createElement('div')
   rendreFiltres(tc, { ...ETAT_DEFAUT, mode: 'tc' }, 2, changer)
-  cliquer(tc, '[data-mode="oiseau"]')
-  expect(changer).toHaveBeenCalledWith({ mode: 'oiseau', max: null })
+  cliquer(tc, '[data-mode="voiture"]')
+  expect(changer).toHaveBeenCalledWith({ mode: 'voiture', max: null })
 })
 
 test('filtres : le mode reste dans un ordre fixe, aria-pressed reflète l’actif', () => {
   const el = document.createElement('div')
   rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'tc' }, 2, vi.fn())
   const modes = [...el.querySelectorAll<HTMLButtonElement>('[data-mode]')].map((b) => b.dataset.mode)
-  expect(modes).toEqual(['oiseau', 'tc'])
+  expect(modes).toEqual(['tc', 'voiture', 'mixte'])
   expect(el.querySelector('[data-mode="tc"]')!.getAttribute('aria-pressed')).toBe('true')
-  expect(el.querySelector('[data-mode="oiseau"]')!.getAttribute('aria-pressed')).toBe('false')
+  expect(el.querySelector('[data-mode="voiture"]')!.getAttribute('aria-pressed')).toBe('false')
+  expect(el.querySelector('[data-mode="mixte"]')!.getAttribute('aria-pressed')).toBe('false')
 })
 
 test('filtres : les groupes sont des interrupteurs étiquetés (Mode, Mesure, Critère)', () => {
@@ -236,12 +248,13 @@ test('filtres : les groupes sont des interrupteurs étiquetés (Mode, Mesure, Cr
   rendreFiltres(el, ETAT_DEFAUT, 2, vi.fn())
   const groupeMode = el.querySelector('[role="group"][aria-label="Mode"]')!
   expect(groupeMode.querySelector('[data-mode]')).not.toBeNull()
-  expect(el.querySelector('[role="group"][aria-label="Mesure"]')).toBeNull()
+  // ETAT_DEFAUT est en mode mixte : la Mesure (Temps/Prix) s'applique aussi à ce mode.
+  expect(el.querySelector('[role="group"][aria-label="Mesure"]')).not.toBeNull()
   const groupeCritere = el.querySelector('[role="group"][aria-label="Critère"]')!
   expect(groupeCritere.querySelector('[data-critere]')).not.toBeNull()
 })
 
-test('filtres : Mesure (Temps / Prix) seulement en transports', () => {
+test('filtres : Mesure (Temps / Prix) en transports, voiture et mixte, pas à vol d’oiseau', () => {
   const el = document.createElement('div')
   const changer = vi.fn()
   rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'tc', max: 120 }, 2, changer)
@@ -254,6 +267,38 @@ test('filtres : Mesure (Temps / Prix) seulement en transports', () => {
   expect(prix.getAttribute('aria-pressed')).toBe('false')
   cliquer(el, '[data-grandeur="prix"]')
   expect(changer).toHaveBeenCalledWith({ grandeur: 'prix', max: null })
+
+  const voiture = document.createElement('div')
+  rendreFiltres(voiture, { ...ETAT_DEFAUT, mode: 'voiture' }, 2, vi.fn())
+  expect(voiture.querySelector('[role="group"][aria-label="Mesure"]')).not.toBeNull()
+
+  const oiseau = document.createElement('div')
+  rendreFiltres(oiseau, { ...ETAT_DEFAUT, mode: 'oiseau' }, 2, vi.fn())
+  expect(oiseau.querySelector('[role="group"][aria-label="Mesure"]')).toBeNull()
+})
+
+test('filtres : « Personnes par voiture » visible seulement en prix, en voiture ou en mixte', () => {
+  const enTemps = document.createElement('div')
+  rendreFiltres(enTemps, { ...ETAT_DEFAUT, mode: 'voiture', grandeur: 'temps' }, 2, vi.fn())
+  expect(enTemps.querySelector('[role="group"][aria-label="Personnes par voiture"]')).toBeNull()
+
+  const enTransports = document.createElement('div')
+  rendreFiltres(enTransports, { ...ETAT_DEFAUT, mode: 'tc', grandeur: 'prix' }, 2, vi.fn())
+  expect(enTransports.querySelector('[role="group"][aria-label="Personnes par voiture"]')).toBeNull()
+
+  const el = document.createElement('div')
+  const changer = vi.fn()
+  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'voiture', grandeur: 'prix', personnesParVoiture: 1 }, 2, changer)
+  const groupe = el.querySelector('[role="group"][aria-label="Personnes par voiture"]')!
+  const boutons = [...groupe.querySelectorAll('button')]
+  expect(boutons.map((b) => b.textContent)).toEqual(['1', '2', '3', '4'])
+  expect(boutons[0]!.getAttribute('aria-pressed')).toBe('true')
+  boutons[2]!.click()
+  expect(changer).toHaveBeenCalledWith({ personnesParVoiture: 3 })
+
+  const mixte = document.createElement('div')
+  rendreFiltres(mixte, { ...ETAT_DEFAUT, mode: 'mixte', grandeur: 'prix' }, 2, vi.fn())
+  expect(mixte.querySelector('[role="group"][aria-label="Personnes par voiture"]')).not.toBeNull()
 })
 
 test('filtres : critère et distance maximum', () => {

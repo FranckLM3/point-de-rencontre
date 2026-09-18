@@ -99,6 +99,13 @@ h1 { font-family: var(--police-marque); font-size: var(--titre); font-weight: 70
 .ville-ami { color: var(--texte-doux); font-size: .8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ligne-ami .picto-transport { flex: none; color: var(--texte-doux); }
 .ligne-ami.exclu .nom-ami, .ligne-ami.exclu .ville-ami { color: var(--texte-doux); }
+
+/* Décision 6 : couche voiture pas encore calculée, texte discret plutôt qu'un vrai spinner. */
+.calcul-en-cours {
+  flex: none; font-size: .75rem; color: var(--texte-doux); font-style: italic; animation: pulse-doux 1.6s ease-in-out infinite;
+}
+@keyframes pulse-doux { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .calcul-en-cours { animation: none; } }
 .crayon {
   flex: none; border: 0; background: none; color: var(--texte-doux); cursor: pointer; border-radius: 8px;
   display: grid; place-items: center; width: 32px; height: 32px;

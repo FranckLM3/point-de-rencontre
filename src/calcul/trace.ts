@@ -1,4 +1,4 @@
-import type { MoteurTc } from './couches'
+import type { MoteurTc, MoteurVoiture } from './couches'
 import { cheminGares, versPointTc } from './tc'
 import type { Ami, Lieu, Mode } from '../types'
 
@@ -21,6 +21,9 @@ export interface PersonneTrajetCarte {
   gareArrivee: number | null
   /** Vrai en mode transports quand le trajet le plus rapide ne passe par aucune gare. */
   directSansTrain: boolean
+  /** Vrai quand le trajet est effectivement fait en voiture (mode voiture, ou mixte avec la
+   * couche prête) : ligne droite pointillée sur la carte (décision 7, pas de tracé de route). */
+  enVoiture: boolean
 }
 
 /** Mêmes coordonnées, un seul trajet dessiné (D8) : deux Crocos au même point partagent leur trace. */
@@ -38,7 +41,11 @@ function grouperParDepart(amis: Ami[]): Ami[][] {
 }
 
 /** Trajet d'un groupe (calculé sur son premier membre) vers la cible, en mode transports. */
-function trajetGroupeTc(moteur: MoteurTc, representant: Ami, cible: Lieu): Pick<PersonneTrajetCarte, 'chemin' | 'gareDepart' | 'gareArrivee' | 'directSansTrain'> {
+function trajetGroupeTc(
+  moteur: MoteurTc,
+  representant: Ami,
+  cible: Lieu,
+): Pick<PersonneTrajetCarte, 'chemin' | 'gareDepart' | 'gareArrivee' | 'directSansTrain'> {
   const d = moteur.depuis(representant)
   const t = versPointTc(moteur.horaires, d, representant, cible.lat, cible.lon, moteur.gares(cible.lat, cible.lon))
   if (!t || t.departIndice === null || t.arriveeIndice === null) {
@@ -53,17 +60,33 @@ function trajetGroupeTc(moteur: MoteurTc, representant: Ami, cible: Lieu): Pick<
   return { chemin, gareDepart: t.departIndice, gareArrivee: t.arriveeIndice, directSansTrain: false }
 }
 
+const SANS_TRAIN = { chemin: null, gareDepart: null, gareArrivee: null, directSansTrain: false } as const
+
 /**
  * Trajets à dessiner sur la carte pour la cible choisie (ville, étiquette ou lieu testé), un par
- * point de départ distinct. En mode transports, le chemin suit les gares réelles (`cheminGares`) ;
- * dans les autres modes, ou sans train, `chemin` est null (ligne droite dessinée par la carte).
+ * point de départ distinct. En mode transports (ou en mixte pour une personne en transports), le
+ * chemin suit les gares réelles (`cheminGares`) ; en voiture (mode voiture, ou mixte avec la
+ * couche prête), une ligne droite pointillée (décision 7) ; sinon une ligne droite pleine.
  */
-export function personnesTrajetCarte(amis: Ami[], mode: Mode, moteur: MoteurTc | null, cible: Lieu | null): PersonneTrajetCarte[] {
+export function personnesTrajetCarte(
+  amis: Ami[],
+  mode: Mode,
+  moteurTc: MoteurTc | null,
+  moteurVoiture: MoteurVoiture | null,
+  cible: Lieu | null,
+): PersonneTrajetCarte[] {
   if (!cible) return []
   return grouperParDepart(amis).map((groupe) => {
     const representant = groupe[0]!
     const base = { noms: groupe.map((a) => a.nom), lat: representant.lat, lon: representant.lon }
-    if (mode !== 'tc' || !moteur) return { ...base, chemin: null, gareDepart: null, gareArrivee: null, directSansTrain: false }
-    return { ...base, ...trajetGroupeTc(moteur, representant, cible) }
+    if (mode === 'voiture') return { ...base, ...SANS_TRAIN, enVoiture: true }
+    if (mode === 'mixte') {
+      const coucheVoiturePrete = representant.transport === 'voiture' && moteurVoiture?.couche(representant.id) !== undefined
+      if (coucheVoiturePrete) return { ...base, ...SANS_TRAIN, enVoiture: true }
+      if (moteurTc) return { ...base, ...trajetGroupeTc(moteurTc, representant, cible), enVoiture: false }
+      return { ...base, ...SANS_TRAIN, enVoiture: false }
+    }
+    if (mode !== 'tc' || !moteurTc) return { ...base, ...SANS_TRAIN, enVoiture: false }
+    return { ...base, ...trajetGroupeTc(moteurTc, representant, cible), enVoiture: false }
   })
 }

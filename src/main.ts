@@ -5,19 +5,23 @@ import '@fontsource/fredoka/500.css'
 import '@fontsource/fredoka/700.css'
 import './styles/app.css'
 import { agreger, limiterAuMaximum, meilleurIndice } from './calcul/agregat'
-import { choisirMesure, creerChargeurTc, creerCouches, type ChargeurTc, type Couches } from './calcul/couches'
+import {
+  choisirMesure, creerChargeurTc, creerCouches, creerMoteurVoiture, type ChargeurTc, type Couches, type MoteurVoiture,
+} from './calcul/couches'
 import { coordonnees, type Grille } from './calcul/grille'
 import { personnesTrajetCarte } from './calcul/trace'
 import { pasTranches, uniteDe } from './calcul/unites'
+import { CONSOMMATION_DEFAUT, type Couche, type ParametresPrix } from './calcul/voiture'
 import { classerVilles, evaluer, type Mesure, type VilleClassee, villeLaPlusProche } from './calcul/villes'
 import { seuils, zones } from './calcul/zones'
 import { ajouterAmi, listerAmis, modifierAmi, supprimerAmi } from './donnees/amis'
 import { connecter, deconnecter, estConnecte } from './donnees/auth'
 import { enregistrerGroupe, listerGroupes } from './donnees/groupes'
 import { creerHoraires } from './donnees/horaires'
-import { chargerGrille, chargerVilles } from './donnees/statiques'
+import { chargerCarburant, chargerGrille, chargerGrille8km, chargerVilles, type PrixCarburant } from './donnees/statiques'
+import { chargerCouches, creerFileCalculVoiture, type FileCalculVoiture } from './donnees/voiture'
 import { ecrireEtat, lireEtat } from './etat/url'
-import type { Ami, Etat, Groupe, Lieu, Ville } from './types'
+import type { Ami, Etat, Groupe, Lieu, Mode, Ville } from './types'
 import { rendreAmis } from './ui/amis'
 import { amisChoisis, cleFocus, cleZones, libelleClic } from './ui/assemblage'
 import { creerCarte, type Carte } from './ui/carte'
@@ -38,6 +42,8 @@ const NB_GRANDES_VILLES = 40
 const MAX_ETIQUETTES = 32
 const TEXTE_CHARGEMENT = 'Chargement de la carte…'
 const TEXTE_HORAIRES = 'Chargement des horaires…'
+const TEXTE_VOITURE = 'Chargement de la voiture…'
+const TEXTE_HORAIRES_ET_VOITURE = 'Chargement des horaires et de la voiture…'
 const racine = document.querySelector<HTMLElement>('#app')!
 
 /** Tête de crocodile de la marque, décorative : le nom qui suit la nomme déjà. */
@@ -55,6 +61,15 @@ interface Session {
   couches: Couches
   /** Horaires des trains, chargés à la première activation du mode transports. */
   tc: ChargeurTc
+  /** Grille de 8 km et prix des carburants, chargés à la première activation du mode voiture ou mixte. */
+  voitureBase: { grille8: Grille; carburant: PrixCarburant } | null
+  /** Couches voiture déjà calculées, par personne (toutes celles en voiture, pas seulement cochées :
+   * sert aussi à l'indicateur « calcul en cours » de la liste, décision 6). */
+  voitureCouches: Map<string, Couche>
+  /** Augmente à chaque relecture des couches voiture (E4). */
+  voitureVersion: number
+  /** Un seul calcul voiture à la fois (quota OpenRouteService) ; déclenché depuis la fiche d'une personne. */
+  fileVoiture: FileCalculVoiture
   /** Augmente à chaque rendu : un calcul asynchrone périmé est ignoré. */
   rendu: number
   /** Augmente à chaque rechargement des personnes (E4). */
@@ -89,11 +104,62 @@ function signaler(message: string, relancer?: () => void): void {
   bandeau.append(' ', bouton)
 }
 
+/** Moteur voiture prêt pour le calcul (mode voiture ou mixte) ; `null` tant que la grille de 8 km
+ * et le prix des carburants ne sont pas chargés (première activation de l'un de ces deux modes). */
+function voitureMoteur(s: Session): MoteurVoiture | null {
+  if (!s.voitureBase) return null
+  const parametres: ParametresPrix = {
+    consommationL100: CONSOMMATION_DEFAUT, prixLitre: s.voitureBase.carburant.gazole, personnesParVoiture: s.etat.personnesParVoiture,
+  }
+  return creerMoteurVoiture(s.voitureBase.grille8, parametres, s.voitureCouches, s.voitureVersion)
+}
+
+/** Relit les couches voiture déjà calculées pour tous les Crocos en voiture (pas seulement cochés :
+ * l'indicateur « calcul en cours » de la liste en a besoin même hors sélection). Best-effort : une
+ * erreur ne bloque pas le reste de l'application. */
+async function actualiserCouchesVoiture(s: Session, amis: Ami[]): Promise<void> {
+  const ids = amis.filter((a) => a.transport === 'voiture').map((a) => a.id)
+  try {
+    s.voitureCouches = await chargerCouches(ids)
+    s.voitureVersion++
+  } catch (e) {
+    console.error('Couches voiture :', e)
+  }
+}
+
+/** Personnes en voiture dont la couche n'est pas encore calculée, parmi celles données. */
+function personnesEnCalcul(s: Session, amis: Ami[]): Ami[] {
+  return amis.filter((a) => a.transport === 'voiture' && !s.voitureCouches.has(a.id))
+}
+
+/** En mode voiture, une personne dont la couche n'est pas prête est exclue du calcul (zones, repaire,
+ * villes) le temps du calcul ; en mixte elle retombe sur les transports (couches.ts) et reste incluse. */
+function calculables(s: Session, choisis: Ami[]): Ami[] {
+  if (s.etat.mode !== 'voiture') return choisis
+  const enAttente = new Set(personnesEnCalcul(s, choisis).map((a) => a.id))
+  return choisis.filter((a) => !enAttente.has(a.id))
+}
+
+const PLURIEL = (n: number, singulier: string, pluriel: string): string => (n > 1 ? pluriel : singulier)
+
+/** Bandeau/note « calcul en cours » (décision 6) : exclusion en voiture, repli transports en mixte. */
+function avisVoiture(s: Session, choisis: Ami[]): string {
+  if (s.etat.mode !== 'voiture' && s.etat.mode !== 'mixte') return ''
+  const noms = personnesEnCalcul(s, choisis).map((a) => a.nom)
+  if (noms.length === 0) return ''
+  const liste = noms.join(', ')
+  if (s.etat.mode === 'voiture') {
+    return `Calcul du trajet en voiture en cours pour ${liste}. En attendant, la zone est calculée sans ${PLURIEL(noms.length, 'cette personne', 'ces personnes')}.`
+  }
+  return `Trajet en voiture pas encore calculé pour ${liste} : les transports sont utilisés en attendant.`
+}
+
 async function recharger(s: Session): Promise<void> {
   const [amis, groupes] = await Promise.all([listerAmis(), listerGroupes()])
   s.amis = amis
   s.groupes = groupes
   s.version++
+  await actualiserCouchesVoiture(s, amis)
   rafraichir(s)
 }
 
@@ -139,7 +205,7 @@ function cibleCarte(s: Session): Lieu | null {
  * sur la carte et le lieu testé (D8, un seul chemin d'appel, une seule couche). */
 function dessinerTrajets(s: Session, choisis: Ami[]): void {
   const cible = cibleCarte(s)
-  s.carte.trajets(personnesTrajetCarte(choisis, s.etat.mode, s.tc.pret(), cible), cible)
+  s.carte.trajets(personnesTrajetCarte(choisis, s.etat.mode, s.tc.pret(), voitureMoteur(s), cible), cible)
 }
 
 /** Ville choisie (carte de ville ou étiquette cliquée sur la carte) : mêmes lignes vertes dans les deux cas.
@@ -151,7 +217,8 @@ function choisirVille(s: Session, choisis: Ami[], v: VilleClassee): void {
 }
 
 function rendrePanneau(s: Session, choisis: Ami[], mesure: Mesure, villes: VilleClassee[]): void {
-  rendreAmis($('#amis'), { amis: s.amis, groupes: s.groupes, selection: new Set(choisis.map((a) => a.id)) }, {
+  const enCalcul = new Set(personnesEnCalcul(s, s.amis).map((a) => a.id))
+  rendreAmis($('#amis'), { amis: s.amis, groupes: s.groupes, selection: new Set(choisis.map((a) => a.id)), enCalcul }, {
     changerSelection: (ids) => changer(s, { selection: ids }),
     editer: (ami) => editer(s, ami),
     ajouter: () => ajouter(s),
@@ -161,6 +228,7 @@ function rendrePanneau(s: Session, choisis: Ami[], mesure: Mesure, villes: Ville
     },
   })
   rendreFiltres($('#filtres'), s.etat, choisis.length, (p) => changer(s, p))
+  $('#avis-voiture').textContent = avisVoiture(s, choisis)
   const { lieu, mode, critere, max } = s.etat
   const unite = uniteDe(mode, s.etat.grandeur)
   rendreRepaire($('#repaire'), s.repaire, unite, () => {
@@ -177,12 +245,14 @@ function rendrePanneau(s: Session, choisis: Ami[], mesure: Mesure, villes: Ville
 }
 
 /** Pire trajet et total exacts au meilleur point, pour la carte « Le repaire » (mêmes règles que classerVilles). */
-function calculerRepaire(s: Session, choisis: Ami[], meilleur: number): Session['repaire'] {
+function calculerRepaire(s: Session, calculables: Ami[], meilleur: number): Session['repaire'] {
   let pire = 0
   let total = 0
-  const moteur = s.tc.pret()
-  for (const a of choisis) {
-    const v = s.couches.obtenir(a, s.etat, moteur)[meilleur]!
+  const moteurTc = s.tc.pret()
+  const moteurVoiture = voitureMoteur(s)
+  for (const a of calculables) {
+    const v = s.couches.obtenir(a, s.etat, moteurTc, moteurVoiture)?.[meilleur]
+    if (v === undefined) continue
     total += v
     if (v > pire) pire = v
   }
@@ -192,25 +262,26 @@ function calculerRepaire(s: Session, choisis: Ami[], meilleur: number): Session[
 }
 
 /** Étiquettes de villes façon Chronotrains (D3) : villes classées d'abord, grandes villes en renfort. */
-function rendreEtiquettes(s: Session, choisis: Ami[], villesClassees: VilleClassee[], mesure: Mesure): void {
+function rendreEtiquettes(s: Session, choisis: Ami[], calculables: Ami[], villesClassees: VilleClassee[], mesure: Mesure): void {
   const { critere, mode, grandeur } = s.etat
   const unite = uniteDe(mode, grandeur)
-  const grandesClassees = classerVilles(s.grandesVilles, choisis, mesure, critere, null, NB_GRANDES_VILLES).sort(
+  const grandesClassees = classerVilles(s.grandesVilles, calculables, mesure, critere, null, NB_GRANDES_VILLES).sort(
     (a, b) => b.ville.population - a.ville.population,
   )
   const candidats = selectionEtiquettes(villesClassees, grandesClassees, MAX_ETIQUETTES)
-  // Ligne de prix (mode transports) même quand le critère actif est le temps : mesure séparée, mais
-  // seulement point à point sur les quelques villes déjà retenues (pas de nouveau calcul de grille).
-  const mesurePrix = mode === 'tc' && grandeur !== 'prix' ? choisirMesure({ mode, grandeur: 'prix' }, s.tc.pret()) : null
+  // Ligne de prix même quand le critère actif est le temps : mesure séparée, mais seulement point à
+  // point sur les quelques villes déjà retenues (pas de nouveau calcul de grille). Pas à vol d'oiseau.
+  const mesurePrix =
+    mode !== 'oiseau' && grandeur !== 'prix' ? choisirMesure({ mode, grandeur: 'prix' }, s.tc.pret(), voitureMoteur(s)) : null
   const enrichis = candidats.map((c) => {
-    const prixCalc = mesurePrix ? evaluer(c.ville.ville, choisis, mesurePrix) : null
+    const prixCalc = mesurePrix ? evaluer(c.ville.ville, calculables, mesurePrix) : null
     return { ...c, valeurAffichee: valeurEtiquette(c.ville, critere, unite), prix: prixCalc ? prixEtiquette(prixCalc, critere) : undefined }
   })
   s.carte.etiquettes(enrichis, (v) => choisirVille(s, choisis, v))
 }
 
-function rendreZones(s: Session, choisis: Ami[], villesClassees: VilleClassee[], mesure: Mesure): void {
-  if (choisis.length === 0) {
+function rendreZones(s: Session, choisis: Ami[], calculables: Ami[], villesClassees: VilleClassee[], mesure: Mesure): void {
+  if (calculables.length === 0) {
     s.carte.zones([])
     s.carte.sansCentre()
     s.carte.etiquettes([], () => {})
@@ -218,11 +289,15 @@ function rendreZones(s: Session, choisis: Ami[], villesClassees: VilleClassee[],
     s.repaire = null
     return
   }
-  const couchesChoisis = choisis.map((a) => s.couches.obtenir(a, s.etat, s.tc.pret()))
+  const moteurTc = s.tc.pret()
+  const moteurVoiture = voitureMoteur(s)
+  const couchesCalculables = calculables
+    .map((a) => s.couches.obtenir(a, s.etat, moteurTc, moteurVoiture))
+    .filter((c): c is Float32Array => c !== null)
   const taille = s.grille.nx * s.grille.ny
-  const critereValeurs = agreger(couchesChoisis, s.etat.critere, taille)
+  const critereValeurs = agreger(couchesCalculables, s.etat.critere, taille)
   // Le maximum s'applique toujours au pire trajet, quel que soit le critère affiché (décision 4).
-  const pireValeurs = s.etat.critere === 'pire' ? critereValeurs : agreger(couchesChoisis, 'pire', taille)
+  const pireValeurs = s.etat.critere === 'pire' ? critereValeurs : agreger(couchesCalculables, 'pire', taille)
   const valeurs = limiterAuMaximum(critereValeurs, pireValeurs, s.etat.max)
   let plusGrande = 0
   for (const v of valeurs) if (v > plusGrande) plusGrande = v
@@ -237,36 +312,37 @@ function rendreZones(s: Session, choisis: Ami[], villesClassees: VilleClassee[],
   } else {
     const [lon, lat] = coordonnees(s.grille, meilleur)
     s.carte.centre(lat, lon, infobulleCentre(valeurs[meilleur]!, s.etat.critere, unite))
-    s.repaire = calculerRepaire(s, choisis, meilleur)
+    s.repaire = calculerRepaire(s, calculables, meilleur)
   }
-  rendreEtiquettes(s, choisis, villesClassees, mesure)
+  rendreEtiquettes(s, choisis, calculables, villesClassees, mesure)
 }
 
-function rendreCarte(s: Session, choisis: Ami[], villesClassees: VilleClassee[], mesure: Mesure): void {
+function rendreCarte(s: Session, choisis: Ami[], calculables: Ami[], villesClassees: VilleClassee[], mesure: Mesure): void {
   const ids = choisis.map((a) => a.id)
   s.carte.amis(s.amis, new Set(ids), s.recemment)
   s.recemment = null
   dessinerTrajets(s, choisis)
-  const cle = cleZones(s.etat, ids, s.version)
+  const cle = cleZones(s.etat, ids, s.version, s.voitureVersion)
   if (cle === s.cleZones) return
   s.cleZones = cle
-  rendreZones(s, choisis, villesClassees, mesure)
+  rendreZones(s, choisis, calculables, villesClassees, mesure)
 }
 
 function afficher(s: Session, choisis: Ami[], mesure: Mesure, focus: string | null): void {
-  const villesClassees = classerVilles(s.villes, choisis, mesure, s.etat.critere, s.etat.max, NB_VILLES)
+  const disponibles = calculables(s, choisis)
+  const villesClassees = classerVilles(s.villes, disponibles, mesure, s.etat.critere, s.etat.max, NB_VILLES)
   // La carte d'abord : elle recalcule s.repaire (même clé que les zones), lu ensuite par le panneau.
-  rendreCarte(s, choisis, villesClassees, mesure)
+  rendreCarte(s, choisis, disponibles, villesClassees, mesure)
   rendrePanneau(s, choisis, mesure, villesClassees)
   const actif = document.activeElement
   const perdu = !actif || actif === document.body || !actif.isConnected
   if (focus && perdu) $('#panneau').querySelector<HTMLElement>(focus)?.focus()
 }
 
-/** Pendant le premier chargement des horaires : filtres à jour, résultats et zones vidés. */
-function attendreHoraires(s: Session, choisis: Ami[]): void {
+/** Pendant le premier chargement (horaires et/ou grille voiture) : filtres à jour, résultats et zones vidés. */
+function attendreChargement(s: Session, choisis: Ami[], texte: string): void {
   rendreFiltres($('#filtres'), s.etat, choisis.length, (p) => changer(s, p))
-  $('#chargement').textContent = TEXTE_HORAIRES
+  $('#chargement').textContent = texte
   $('#villes').textContent = ''
   $('#resultat-lieu').textContent = ''
   s.carte.zones([])
@@ -278,26 +354,31 @@ function attendreHoraires(s: Session, choisis: Ami[]): void {
   s.cleZones = null
 }
 
-function echecHoraires(s: Session, e: unknown): void {
-  console.error('Horaires :', e)
-  if (s.etat.mode !== 'tc') return
+/** Repli à vol d'oiseau (décision 1) quand les horaires ou la grille voiture ne se chargent pas :
+ * mode mémorisé pour le bouton « Réessayer », qui retente le mode voulu au départ. */
+function echecPreparation(s: Session, modeVoulu: Mode, e: unknown): void {
+  console.error('Préparation (horaires ou voiture) :', e)
   changer(s, { mode: 'oiseau', max: null })
-  signaler((e as Error).message, () => changer(s, { mode: 'tc', max: null }))
+  signaler(`Estimation à vol d’oiseau : ${(e as Error).message}`, () => changer(s, { mode: modeVoulu, max: null }))
 }
 
-function viderChargementHoraires(): void {
+function viderChargement(texte: string): void {
   const statut = $('#chargement')
-  if (statut.textContent === TEXTE_HORAIRES) statut.textContent = ''
+  if (statut.textContent === texte) statut.textContent = ''
 }
 
-async function preparerTc(s: Session, choisis: Ami[], rendu: number): Promise<boolean> {
-  if (!s.tc.pret()) attendreHoraires(s, choisis)
-  try {
-    await (await s.tc.obtenir()).preparer(choisis)
-  } finally {
-    viderChargementHoraires()
-  }
-  return rendu === s.rendu
+async function preparerTc(s: Session, choisis: Ami[]): Promise<void> {
+  await (await s.tc.obtenir()).preparer(choisis)
+}
+
+async function chargerBaseVoiture(): Promise<{ grille8: Grille; carburant: PrixCarburant }> {
+  const [grille8, carburant] = await Promise.all([chargerGrille8km(), chargerCarburant()])
+  return { grille8, carburant }
+}
+
+async function preparerVoitureBase(s: Session): Promise<void> {
+  if (s.voitureBase) return
+  s.voitureBase = await chargerBaseVoiture()
 }
 
 function rafraichir(s: Session): void {
@@ -307,14 +388,28 @@ function rafraichir(s: Session): void {
   const actif = document.activeElement
   const focus = $('#panneau').contains(actif) ? cleFocus(actif) : null
   const choisis = amisChoisis(s.amis, s.etat.selection)
-  if (s.etat.mode !== 'tc') {
-    viderChargementHoraires()
-    return afficher(s, choisis, choisirMesure(s.etat, null), focus)
+  const modeVoulu = s.etat.mode
+  const besoinTc = modeVoulu === 'tc' || modeVoulu === 'mixte'
+  const besoinVoiture = modeVoulu === 'voiture' || modeVoulu === 'mixte'
+  if (!besoinTc && !besoinVoiture) {
+    viderChargement(TEXTE_HORAIRES)
+    viderChargement(TEXTE_VOITURE)
+    viderChargement(TEXTE_HORAIRES_ET_VOITURE)
+    return afficher(s, choisis, choisirMesure(s.etat, null, null), focus)
   }
-  preparerTc(s, choisis, rendu).then(
-    (aJour) => { if (aJour) afficher(s, choisis, choisirMesure(s.etat, s.tc.pret()), focus) },
-    (e: unknown) => { if (rendu === s.rendu) echecHoraires(s, e) },
-  )
+  const manqueTc = besoinTc && !s.tc.pret()
+  const manqueVoiture = besoinVoiture && !s.voitureBase
+  const texteAttente = manqueTc && manqueVoiture ? TEXTE_HORAIRES_ET_VOITURE : manqueTc ? TEXTE_HORAIRES : manqueVoiture ? TEXTE_VOITURE : ''
+  if (texteAttente) attendreChargement(s, choisis, texteAttente)
+  Promise.all([besoinTc ? preparerTc(s, choisis) : Promise.resolve(), besoinVoiture ? preparerVoitureBase(s) : Promise.resolve()])
+    .then(() => {
+      if (texteAttente) viderChargement(texteAttente)
+      if (rendu === s.rendu) afficher(s, choisis, choisirMesure(s.etat, s.tc.pret(), voitureMoteur(s)), focus)
+    })
+    .catch((e: unknown) => {
+      if (texteAttente) viderChargement(texteAttente)
+      if (rendu === s.rendu) echecPreparation(s, modeVoulu, e)
+    })
 }
 
 const SQUELETTE = `
@@ -332,6 +427,7 @@ const SQUELETTE = `
       <div id="repaire"></div>
       <p id="chargement" class="chargement" role="status">${TEXTE_CHARGEMENT}</p>
       <div id="message" class="bandeau erreur" role="alert"></div>
+      <p id="avis-voiture" class="bandeau" role="status"></p>
       <div id="villes" class="villes"></div>
     </aside>
     <div class="carte" id="carte" role="region" aria-label="Carte des zones">
@@ -374,12 +470,24 @@ async function charger(carte: Carte, installer: (s: Session) => void): Promise<v
   signaler('')
   try {
     const [grille, villes, amis, groupes] = await Promise.all([chargerGrille(), chargerVilles(), listerAmis(), listerGroupes()])
+    const idsVoiture = amis.filter((a) => a.transport === 'voiture').map((a) => a.id)
+    const voitureCouches = await chargerCouches(idsVoiture).catch((e: unknown) => {
+      console.error('Couches voiture :', e)
+      return new Map<string, Couche>()
+    })
     const etat = lireEtat(location.search)
     const s: Session = {
       grille, villes, amis, groupes, etat, carte,
       recherche: rendreRechercheLieu($('#lieu'), etat.lieu, (lieu) => changer(s, { lieu })),
       couches: creerCouches(grille),
       tc: creerChargeurTc(creerHoraires),
+      voitureBase: null,
+      voitureCouches,
+      voitureVersion: 1,
+      fileVoiture: creerFileCalculVoiture({
+        onErreur: (message) => signaler(message),
+        onTermine: () => { void actualiserCouchesVoiture(s, s.amis).then(() => rafraichir(s)) },
+      }),
       rendu: 0,
       version: 0,
       recemment: null,

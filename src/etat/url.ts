@@ -1,5 +1,5 @@
 import type { Critere, Etat, Grandeur, Lieu, Mode } from '../types'
-import { PERSONNES_PAR_VOITURE_DEFAUT } from '../calcul/voiture'
+import { PERSONNES_PAR_VOITURE_DEFAUT, PERSONNES_PAR_VOITURE_MAX, PERSONNES_PAR_VOITURE_MIN } from '../calcul/voiture'
 
 /** Plan 3 : chacun son moyen par défaut, moyenne, 4 h sans que personne ne dépasse ce maximum. */
 export const ETAT_DEFAUT: Etat = {
@@ -12,8 +12,6 @@ export const ETAT_DEFAUT: Etat = {
 const MODES: Mode[] = ['mixte', 'voiture', 'tc']
 const CRITERES: Critere[] = ['moyenne', 'pire']
 const GRANDEURS: Grandeur[] = ['temps', 'prix']
-const PERSONNES_PAR_VOITURE_MIN = 1
-const PERSONNES_PAR_VOITURE_MAX = 4
 
 function lireLieu(brut: string | null): Lieu | null {
   if (!brut) return null

@@ -50,8 +50,10 @@ const STYLE_TRAIN: L.PolylineOptions = {
 }
 /** Accès/sortie de gare, et trajet direct sans train : ligne fine et pointillée. */
 const STYLE_POINTILLE: L.PolylineOptions = { color: COULEUR_LIGNE_VILLE, weight: 1.5, opacity: 0.7, dashArray: '2 6', interactive: false }
-/** Hors mode transports (vol d'oiseau, voiture, chacun son moyen) : ligne droite pleine. */
+/** Hors mode transports (vol d'oiseau, ou mixte en repli transports sans horaires) : ligne droite pleine. */
 const STYLE_DROITE: L.PolylineOptions = { color: COULEUR_LIGNE_VILLE, weight: 2, opacity: 0.8, interactive: false }
+/** En voiture (mode voiture, ou mixte avec la couche prête) : ligne droite pointillée, pas de tracé de route (décision 7). */
+const STYLE_VOITURE: L.PolylineOptions = { color: COULEUR_LIGNE_VILLE, weight: 2, opacity: 0.85, dashArray: '5 7', interactive: false }
 
 export interface Carte {
   /** `misEnAvant` : identifiant d'une personne dont le marqueur reçoit une brève pulsation (ajout/édition). */
@@ -270,7 +272,7 @@ export function creerCarte(element: HTMLElement): Carte {
           dessinerGare(p.gareDepart, depart)
           dessinerGare(p.gareArrivee, arrivee)
         } else {
-          const style = p.directSansTrain ? STYLE_POINTILLE : STYLE_DROITE
+          const style = p.enVoiture ? STYLE_VOITURE : p.directSansTrain ? STYLE_POINTILLE : STYLE_DROITE
           L.polyline([[p.lat, p.lon], [cible.lat, cible.lon]], style).bindTooltip(infobulle).addTo(coucheTrajets)
         }
       }

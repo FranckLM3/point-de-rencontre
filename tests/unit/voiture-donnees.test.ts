@@ -119,3 +119,29 @@ test('la file journalise une erreur de la fonction sans la relancer', async () =
   await vi.waitFor(() => expect(console.error).toHaveBeenCalled())
   await vi.waitFor(() => expect(file.enCours('a')).toBe(false))
 })
+
+test('une erreur de la fonction est signalée par onErreur, avec son message français', async () => {
+  invoke.mockResolvedValue({ data: null, error: { message: 'Quota dépassé, réessaie plus tard.' } })
+  const onErreur = vi.fn()
+  const file = creerFileCalculVoiture({ onErreur })
+  await file.demander('a')
+  await vi.waitFor(() => expect(onErreur).toHaveBeenCalledWith('Quota dépassé, réessaie plus tard.'))
+})
+
+test('une erreur sans message rend un message générique', async () => {
+  invoke.mockResolvedValue({ data: null, error: {} })
+  const onErreur = vi.fn()
+  const file = creerFileCalculVoiture({ onErreur })
+  await file.demander('a')
+  await vi.waitFor(() => expect(onErreur).toHaveBeenCalledWith('Impossible de calculer ce trajet en voiture pour le moment.'))
+})
+
+test('onTermine est appelé à la fin de chaque calcul, succès ou échec', async () => {
+  invoke.mockResolvedValueOnce({ data: { etat: 'calcule' }, error: null }).mockResolvedValueOnce({ data: null, error: { message: 'x' } })
+  const onTermine = vi.fn()
+  const file = creerFileCalculVoiture({ onTermine })
+  await file.demander('a')
+  await vi.waitFor(() => expect(onTermine).toHaveBeenCalledWith('a'))
+  await file.demander('b')
+  await vi.waitFor(() => expect(onTermine).toHaveBeenCalledWith('b'))
+})

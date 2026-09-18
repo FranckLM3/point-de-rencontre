@@ -1,6 +1,9 @@
 import { expect, test, vi } from 'vitest'
-import { choisirMesure, cleCouche, cleDepuis, creerChargeurTc, creerCouches, creerMoteurTc } from '../../src/calcul/couches'
+import {
+  choisirMesure, cleCouche, cleDepuis, creerChargeurTc, creerCouches, creerMoteurTc, creerMoteurVoiture,
+} from '../../src/calcul/couches'
 import type { Grille } from '../../src/calcul/grille'
+import type { Couche, ParametresPrix } from '../../src/calcul/voiture'
 import { mesureOiseau } from '../../src/calcul/villes'
 import { INJOIGNABLE, type Horaires, type Ligne } from '../../src/donnees/horaires'
 import type { Ami } from '../../src/types'
@@ -100,13 +103,13 @@ test('couches : vol d’oiseau ou transports, recalcul seulement si la clé chan
   const moteur = creerMoteurTc(h, 1)
   await moteur.preparer([marseille])
   const couches = creerCouches(grille)
-  const km = couches.obtenir(marseille, { mode: 'oiseau', grandeur: 'temps' }, null)
+  const km = couches.obtenir(marseille, { mode: 'oiseau', grandeur: 'temps' }, null)!
   expect(km[0]).toBeGreaterThan(600)
-  const temps = couches.obtenir(marseille, { mode: 'tc', grandeur: 'temps' }, moteur)
+  const temps = couches.obtenir(marseille, { mode: 'tc', grandeur: 'temps' }, moteur)!
   expect(temps[0]).toBeGreaterThan(194)
   expect(couches.obtenir(marseille, { mode: 'tc', grandeur: 'temps' }, moteur)).toBe(temps)
   expect(couches.obtenir(marseille, { mode: 'oiseau', grandeur: 'temps' }, null)).toBe(km)
-  const prix = couches.obtenir(marseille, { mode: 'tc', grandeur: 'prix' }, moteur)
+  const prix = couches.obtenir(marseille, { mode: 'tc', grandeur: 'prix' }, moteur)!
   expect(prix[0]).toBeCloseTo(77)
   const deplace = couches.obtenir({ ...marseille, lat: 43.3 }, { mode: 'tc', grandeur: 'temps' }, moteur)
   expect(deplace).not.toBe(temps)
@@ -144,4 +147,104 @@ test('chargeur : après un échec, un nouvel essai relance le chargement', async
   const moteur = await chargeur.obtenir()
   expect(moteur.horaires.stations).toHaveLength(2)
   expect(creer).toHaveBeenCalledTimes(2)
+})
+
+// Grille voiture synthétique 2x2 (un seul carreau), couvrant Marseille et Paris.
+const grille8: Grille = { lon0: 0, lat0: 40, pasLon: 10, pasLat: 10, nx: 2, ny: 2, dedans: new Uint8Array([1, 1, 1, 1]) }
+const coucheP: Couche = { minutes: Uint16Array.from([60, 120, 180, 240]), km: Uint16Array.from([50, 100, 150, 200]) }
+const parametres: ParametresPrix = { consommationL100: 10, prixLitre: 2, personnesParVoiture: 1 }
+
+test('cleCouche : voiture et mixte dépendent aussi de la version voiture et des personnes par voiture', () => {
+  const base = cleCouche({ mode: 'voiture', grandeur: 'temps' }, marseille, 0, 1, 1)
+  expect(cleCouche({ mode: 'voiture', grandeur: 'temps' }, marseille, 0, 2, 1)).not.toBe(base)
+  expect(cleCouche({ mode: 'voiture', grandeur: 'temps' }, marseille, 0, 1, 2)).not.toBe(base)
+  expect(cleCouche({ mode: 'mixte', grandeur: 'temps' }, marseille, 0, 2, 1)).not.toBe(
+    cleCouche({ mode: 'mixte', grandeur: 'temps' }, marseille, 0, 1, 1),
+  )
+  // Les autres modes ignorent ces deux paramètres.
+  expect(cleCouche({ mode: 'tc', grandeur: 'temps' }, marseille, 0, 99, 99)).toBe(cleCouche({ mode: 'tc', grandeur: 'temps' }, marseille, 0))
+})
+
+test('creerMoteurVoiture expose la grille, la version et l’accès aux couches par personne', () => {
+  const couches = new Map([['p', coucheP]])
+  const moteur = creerMoteurVoiture(grille8, parametres, couches, 2)
+  expect(moteur.grille8).toBe(grille8)
+  expect(moteur.version).toBe(2)
+  expect(moteur.couche('p')).toBe(coucheP)
+  expect(moteur.couche('inconnue')).toBeUndefined()
+})
+
+test('choisirMesure : vol d’oiseau si le mode voiture n’a pas encore de moteur', () => {
+  expect(choisirMesure({ mode: 'voiture', grandeur: 'temps' }, null, null)).toBe(mesureOiseau)
+})
+
+test('choisirMesure en voiture : temps ou prix interpolés, avec le détail du trajet', () => {
+  const moteur = creerMoteurVoiture(grille8, parametres, new Map([['p', coucheP]]))
+  const temps = choisirMesure({ mode: 'voiture', grandeur: 'temps' }, null, moteur)(paris, 45, 5)!
+  expect(temps.valeur).toBeGreaterThan(0)
+  expect(temps.precision).toMatch(/de route · .* km · ≈ .* €/)
+  const prix = choisirMesure({ mode: 'voiture', grandeur: 'prix' }, null, moteur)(paris, 45, 5)!
+  expect(prix.valeur).toBeGreaterThan(0)
+})
+
+test('choisirMesure en voiture : null tant que la couche de la personne n’est pas prête', () => {
+  const moteur = creerMoteurVoiture(grille8, parametres, new Map())
+  expect(choisirMesure({ mode: 'voiture', grandeur: 'temps' }, null, moteur)(paris, 45, 5)).toBeNull()
+})
+
+test('choisirMesure en mixte : voiture si la couche de la personne est prête, transports en attendant sinon', async () => {
+  const h = fauxHoraires()
+  const moteurTc = creerMoteurTc(h, 1)
+  await moteurTc.preparer([marseille, paris])
+
+  const moteurVoiturePret = creerMoteurVoiture(grille8, parametres, new Map([['p', coucheP]]))
+  const enVoiture = choisirMesure({ mode: 'mixte', grandeur: 'temps' }, moteurTc, moteurVoiturePret)(paris, 45, 5)!
+  expect(enVoiture.precision).toMatch(/de route/)
+
+  const moteurVoitureVide = creerMoteurVoiture(grille8, parametres, new Map())
+  const enAttente = choisirMesure({ mode: 'mixte', grandeur: 'temps' }, moteurTc, moteurVoitureVide)(paris, 48.8566, 2.3522)!
+  expect(enAttente.precision).not.toMatch(/de route/)
+
+  const pourTc = choisirMesure({ mode: 'mixte', grandeur: 'temps' }, moteurTc, moteurVoiturePret)(marseille, 48.8566, 2.3522)!
+  expect(pourTc.precision).not.toMatch(/de route/)
+})
+
+test('creerCouches en voiture : erreur explicite sans moteur voiture', () => {
+  const couches = creerCouches(grille)
+  expect(() => couches.obtenir(paris, { mode: 'voiture', grandeur: 'temps' }, null, null)).toThrow()
+})
+
+test('creerCouches en voiture : null tant que la couche n’est pas prête, une grille dès qu’elle l’est', () => {
+  const couches = creerCouches(grille)
+  const moteurVide = creerMoteurVoiture(grille8, parametres, new Map())
+  expect(couches.obtenir(paris, { mode: 'voiture', grandeur: 'temps' }, null, moteurVide)).toBeNull()
+  const moteurPret = creerMoteurVoiture(grille8, parametres, new Map([['p', coucheP]]), 1)
+  const valeurs = couches.obtenir(paris, { mode: 'voiture', grandeur: 'temps' }, null, moteurPret)!
+  expect(valeurs[0]).toBeGreaterThan(0)
+})
+
+test('creerCouches en voiture : mémoïsé par la version des couches et par personnes par voiture (prix)', () => {
+  const couches = creerCouches(grille)
+  const moteur1 = creerMoteurVoiture(grille8, parametres, new Map([['p', coucheP]]), 1)
+  const prix1 = couches.obtenir(paris, { mode: 'voiture', grandeur: 'prix' }, null, moteur1)!
+  expect(couches.obtenir(paris, { mode: 'voiture', grandeur: 'prix' }, null, moteur1)).toBe(prix1)
+  const moteur2 = creerMoteurVoiture(grille8, { ...parametres, personnesParVoiture: 2 }, new Map([['p', coucheP]]), 1)
+  const prix2 = couches.obtenir(paris, { mode: 'voiture', grandeur: 'prix' }, null, moteur2)!
+  expect(prix2).not.toBe(prix1)
+  expect(prix2[0]).toBeCloseTo(prix1[0]! / 2)
+})
+
+test('creerCouches en mixte : voiture si prête, repli transports sinon, exclusion sans aucun des deux', async () => {
+  const h = fauxHoraires()
+  const moteurTc = creerMoteurTc(h, 1)
+  await moteurTc.preparer([paris])
+  const couches = creerCouches(grille)
+
+  const moteurVoiturePret = creerMoteurVoiture(grille8, parametres, new Map([['p', coucheP]]))
+  expect(couches.obtenir(paris, { mode: 'mixte', grandeur: 'temps' }, moteurTc, moteurVoiturePret)).not.toBeNull()
+
+  const moteurVoitureVide = creerMoteurVoiture(grille8, parametres, new Map())
+  expect(couches.obtenir(paris, { mode: 'mixte', grandeur: 'temps' }, moteurTc, moteurVoitureVide)).not.toBeNull()
+
+  expect(couches.obtenir(paris, { mode: 'mixte', grandeur: 'temps' }, null, moteurVoitureVide)).toBeNull()
 })

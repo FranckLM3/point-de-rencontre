@@ -8,6 +8,8 @@ export interface DonneesAmis {
   amis: Ami[]
   groupes: Groupe[]
   selection: Set<string>
+  /** Identifiants des Crocos en voiture dont la couche n'est pas encore calculée (décision 6). */
+  enCalcul?: Set<string>
 }
 
 export interface ActionsAmis {
@@ -71,7 +73,10 @@ function entete(d: DonneesAmis): string {
     </form>`
 }
 
-const ligneAmi = (a: Ami, coche: boolean): string => `
+/** « calcul en cours » : décision 6, tant que la couche voiture d'un Croco en voiture n'est pas prête. */
+const TEXTE_CALCUL_EN_COURS = 'calcul en cours'
+
+const ligneAmi = (a: Ami, coche: boolean, enCalcul: boolean): string => `
   <li class="ligne-ami${coche ? '' : ' exclu'}" data-personne="${echapper(a.id)}">
     <span class="avatar-ami${coche ? '' : ' inactif'}" aria-hidden="true">${echapper(initiales(a.nom))}</span>
     <span class="info-ami">
@@ -79,11 +84,12 @@ const ligneAmi = (a: Ami, coche: boolean): string => `
       <span class="ville-ami">${echapper(villeCourte(a.adresse))}</span>
     </span>
     ${pictoTransport(a.transport)}
+    ${enCalcul ? `<span class="calcul-en-cours" role="status">${TEXTE_CALCUL_EN_COURS}</span>` : ''}
     <button type="button" class="crayon" data-edit="${echapper(a.id)}" aria-label="Modifier ${echapper(a.nom)}">${ICONE_CRAYON}</button>
     <button type="button" class="interrupteur" role="switch" data-id="${echapper(a.id)}" aria-checked="${coche}" aria-label="Inclure ${echapper(a.nom)}"></button>
   </li>`
 
-function ligneVille(ville: string, amis: Ami[], selection: Set<string>): string {
+function ligneVille(ville: string, amis: Ami[], selection: Set<string>, enCalcul: Set<string>): string {
   const coches = amis.filter((a) => selection.has(a.id)).length
   return `
     <li class="entete-ville" role="presentation">
@@ -91,18 +97,18 @@ function ligneVille(ville: string, amis: Ami[], selection: Set<string>): string 
         <span>${echapper(ville)}</span><span class="compte-ville">${coches}/${amis.length}</span>
       </button>
     </li>
-    ${amis.map((a) => ligneAmi(a, selection.has(a.id))).join('')}`
+    ${amis.map((a) => ligneAmi(a, selection.has(a.id), enCalcul.has(a.id))).join('')}`
 }
 
-function listeAmis(amis: Ami[], selection: Set<string>): string {
+function listeAmis(amis: Ami[], selection: Set<string>, enCalcul: Set<string>): string {
   const groupes = regrouperParVille(amis)
-  return `<ul class="liste-amis">${groupes.map((g) => ligneVille(g.ville, g.amis, selection)).join('')}</ul>`
+  return `<ul class="liste-amis">${groupes.map((g) => ligneVille(g.ville, g.amis, selection, enCalcul)).join('')}</ul>`
 }
 
 const gabarit = (d: DonneesAmis): string => `
   <div class="conteneur-liste-amis">
     <div class="entete-fixe">${entete(d)}</div>
-    ${listeAmis(d.amis, d.selection)}
+    ${listeAmis(d.amis, d.selection, d.enCalcul ?? new Set())}
   </div>
   <button type="button" class="pastille ajouter-croco" data-action="ajouter">+ Ajouter un Croco</button>`
 
@@ -159,7 +165,7 @@ function appliquerFiltre(el: HTMLElement, d: DonneesAmis, filtre: string): void 
   actuelle.outerHTML =
     visibles.length === 0
       ? `<p class="vide">Aucun Croco ne correspond à « ${echapper(filtre.trim())} ».</p>`
-      : listeAmis(visibles, d.selection)
+      : listeAmis(visibles, d.selection, d.enCalcul ?? new Set())
 }
 
 export function rendreAmis(el: HTMLElement, d: DonneesAmis, a: ActionsAmis): void {

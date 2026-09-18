@@ -19,6 +19,8 @@ export interface ParametresPrix {
 
 export const CONSOMMATION_DEFAUT = 6.5
 export const PERSONNES_PAR_VOITURE_DEFAUT = 1
+export const PERSONNES_PAR_VOITURE_MIN = 1
+export const PERSONNES_PAR_VOITURE_MAX = 4
 
 const SEUIL_PEAGE_KM = 80
 const TAUX_PEAGE_EUR_KM = 0.09

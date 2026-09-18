@@ -1,11 +1,13 @@
 import { maximaProposes, uniteDe, type Unite } from '../calcul/unites'
+import { PERSONNES_PAR_VOITURE_MAX } from '../calcul/voiture'
 import type { Etat, Grandeur, Mode } from '../types'
 import { sousTitre, titreCourt, valeur } from './format'
 
-/** Chacun son moyen et Tous en voiture reviendront avec le plan 3 : seuls oiseau et tc sont proposés. */
+/** Le vol d'oiseau n'est plus qu'un repli interne (décision 1) : trois modes seulement dans l'interface. */
 const MODES: { mode: Mode; libelle: string }[] = [
-  { mode: 'oiseau', libelle: 'Vol d’oiseau' },
   { mode: 'tc', libelle: 'Transports' },
+  { mode: 'voiture', libelle: 'Voiture' },
+  { mode: 'mixte', libelle: 'Chacun son moyen' },
 ]
 
 const GRANDEURS: { grandeur: Grandeur; libelle: string }[] = [
@@ -14,6 +16,7 @@ const GRANDEURS: { grandeur: Grandeur; libelle: string }[] = [
 ]
 
 const LIBELLE_MAX: Record<Unite, string> = { km: 'Distance maximum', min: 'Durée maximum', eur: 'Prix maximum' }
+const PERSONNES_PAR_VOITURE_OPTIONS = Array.from({ length: PERSONNES_PAR_VOITURE_MAX }, (_, i) => i + 1)
 
 const presse = (vrai: boolean): string => `aria-pressed="${vrai}"`
 
@@ -31,11 +34,20 @@ function boutonsModes(courant: Mode): string {
 }
 
 function interrupteurMesure(e: Etat): string {
-  if (e.mode !== 'tc') return ''
+  if (e.mode === 'oiseau') return ''
   const boutons = GRANDEURS.map(
     (g) => `<button type="button" class="pastille" data-grandeur="${g.grandeur}" ${presse(e.grandeur === g.grandeur)}>${g.libelle}</button>`,
   ).join('')
   return interrupteur('Mesure', boutons)
+}
+
+/** Visible seulement en prix, en voiture ou en mixte (décision 5) : divise le prix affiché. */
+function interrupteurPersonnesParVoiture(e: Etat): string {
+  if (e.grandeur !== 'prix' || (e.mode !== 'voiture' && e.mode !== 'mixte')) return ''
+  const boutons = PERSONNES_PAR_VOITURE_OPTIONS.map(
+    (n) => `<button type="button" class="pastille" data-personnes="${n}" ${presse(e.personnesParVoiture === n)}>${n}</button>`,
+  ).join('')
+  return interrupteur('Personnes par voiture', boutons)
 }
 
 function menuMaximum(e: Etat, unite: Unite): string {
@@ -56,6 +68,7 @@ export function rendreFiltres(el: HTMLElement, e: Etat, nombre: number, changer:
   el.innerHTML = `
     ${interrupteur('Mode', boutonsModes(e.mode))}
     ${interrupteurMesure(e)}
+    ${interrupteurPersonnesParVoiture(e)}
     <div class="filtre">
       <span class="etiquette-filtre">Critère</span>
       <div class="rang">
@@ -71,6 +84,9 @@ export function rendreFiltres(el: HTMLElement, e: Etat, nombre: number, changer:
   )
   el.querySelectorAll<HTMLButtonElement>('[data-grandeur]').forEach((b) =>
     b.addEventListener('click', () => changer({ grandeur: b.dataset.grandeur as Grandeur, max: null })),
+  )
+  el.querySelectorAll<HTMLButtonElement>('[data-personnes]').forEach((b) =>
+    b.addEventListener('click', () => changer({ personnesParVoiture: Number(b.dataset.personnes) })),
   )
   el.querySelectorAll<HTMLButtonElement>('[data-critere]').forEach((b) =>
     b.addEventListener('click', () => changer({ critere: b.dataset.critere as Etat['critere'] })),

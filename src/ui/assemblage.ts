@@ -1,8 +1,10 @@
 import type { Ami, Etat } from '../types'
 
-/** E4 : tout ce qui change les zones, et rien d'autre (le lieu testé n'y figure pas). */
-export function cleZones(e: Etat, ids: string[], version: number): string {
-  return [e.mode, e.critere, e.grandeur, e.max ?? '', [...ids].sort().join(','), version].join('|')
+/** E4 : tout ce qui change les zones, et rien d'autre (le lieu testé n'y figure pas). `versionVoiture`
+ * change quand une couche voiture arrive en arrière-plan (E4 aussi, sans quoi les zones resteraient
+ * périmées jusqu'au prochain changement de filtre). */
+export function cleZones(e: Etat, ids: string[], version: number, versionVoiture = 0): string {
+  return [e.mode, e.critere, e.grandeur, e.max ?? '', e.personnesParVoiture, [...ids].sort().join(','), version, versionVoiture].join('|')
 }
 
 /** `null` = tout le monde ; les identifiants inconnus sont ignorés. */
