@@ -54,8 +54,15 @@ export interface Proche {
   km: number
 }
 
+/**
+ * Deux gares à moins de 500 m comptent pour une, sauf une gare et une gare routière voisines
+ * (E7) : gardées toutes les deux, pour que le classement de `meilleurVers` puisse choisir entre
+ * elles plutôt que de perdre la gare de train au tri par seule proximité.
+ */
 const tropPres = (stations: Station[], s: Station, retenues: Proche[]): boolean =>
-  retenues.some((r) => haversineKm(s.lat, s.lon, stations[r.gare]!.lat, stations[r.gare]!.lon) <= ECART_MIN_KM)
+  retenues.some(
+    (r) => stations[r.gare]!.train === s.train && haversineKm(s.lat, s.lon, stations[r.gare]!.lat, stations[r.gare]!.lon) <= ECART_MIN_KM,
+  )
 
 /** Gares desservies à 50 km au plus, distinctes de plus de 500 m, la plus proche d'abord. */
 export function garesProches(stations: Station[], lat: number, lon: number, n = NB_VOISINS): Proche[] {
@@ -138,8 +145,17 @@ export interface TrajetTc {
 /** Distance de la personne à la gare où elle prend son premier train. */
 const kmAcces = (d: DepuisGares, gare: number): number => d.proches.find((p) => p.gare === gare)?.km ?? 0
 
+/**
+ * Pénalité au classement pour arriver dans une gare desservie seulement par autocar (E7) :
+ * à temps égal ou proche, une vraie gare est préférée. `train` absent (données anciennes) ne
+ * pénalise pas : seul `false` (constaté) le fait. Le temps affiché reste le temps réel.
+ */
+const PENALITE_GARE_ROUTIERE_MIN = 10
+const penaliteArrivee = (s: Station): number => (s.train === false ? PENALITE_GARE_ROUTIERE_MIN : 0)
+
 function meilleurVers(h: Horaires, d: DepuisGares, ami: Ami, km: number, gares: Proche[]): TrajetTc | null {
   let best: TrajetTc | null = null
+  let meilleurScore = Number.POSITIVE_INFINITY
   if (km <= DIRECT_MAX_KM) {
     best = {
       minutes: acces(km, ami.transport),
@@ -150,12 +166,15 @@ function meilleurVers(h: Horaires, d: DepuisGares, ami: Ami, km: number, gares: 
       sortie: null,
       correspondances: 0,
     }
+    meilleurScore = best.minutes
   }
   for (const g of gares) {
     const avant = d.minutes[g.gare]!
     if (!Number.isFinite(avant)) continue
     const minutes = avant + acces(g.km, 'tc')
-    if (best === null || minutes < best.minutes) {
+    const score = minutes + penaliteArrivee(h.stations[g.gare]!)
+    if (score < meilleurScore) {
+      meilleurScore = score
       const gareDepart = d.depart[g.gare]!
       best = {
         minutes,

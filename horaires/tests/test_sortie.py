@@ -7,8 +7,8 @@ from pathlib import Path
 
 from horaires.gtfs import Gare, charger
 from horaires.parcours import INJOIGNABLE, Trajet
-from horaires.sortie import encoder_ligne, ecrire_tout, gares_desservies, index_voisins
-from horaires.tests.fabrique import archive
+from horaires.sortie import encoder_ligne, ecrire_tout, gares_desservies, gares_train, index_voisins
+from horaires.tests.fabrique import archive, reseau_synthetique
 
 
 class SortieTest(unittest.TestCase):
@@ -37,7 +37,7 @@ class SortieTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             ecrire_tout(reseau, grille, Path(d), processus=1)
             stations = json.loads((Path(d) / "stations.json").read_text())
-            self.assertEqual(stations[0], {"nom": "Alpha", "lat": 45.0, "lon": 4.0, "desservie": True})
+            self.assertEqual(stations[0], {"nom": "Alpha", "lat": 45.0, "lon": 4.0, "desservie": True, "train": True})
             self.assertFalse(stations[3]["desservie"])
             self.assertEqual(len((Path(d) / "lignes" / "0.bin").read_bytes()), 5 * 4)
             version = json.loads((Path(d) / "version.json").read_text())
@@ -94,6 +94,21 @@ class VoisinsTest(unittest.TestCase):
         grille = {"lon0": 4.0, "lat0": 45.0, "pasLon": 1.0, "pasLat": 1.0, "nx": 1, "ny": 1, "dedans": [1]}
         octets = index_voisins(gares, grille, [True] * 4)
         self.assertEqual(_voisins(octets, 0), [0, 2, 3])
+
+
+class GaresTrainTest(unittest.TestCase):
+    def test_gare_desservie_seulement_par_un_car_nest_pas_train(self):
+        # 0 -> 1 en train ; 1 -> 2 en autocar seulement (car=True) : la gare 2 n'a pas de train.
+        r = reseau_synthetique(3, [(0, 100, 0, 1, "T"), (200, 300, 1, 2, "C", True, True, True)])
+        self.assertEqual(gares_train(r), [True, True, False])
+
+    def test_gare_desservie_par_train_et_car_est_train(self):
+        r = reseau_synthetique(3, [(0, 100, 0, 1, "T", True, True, True), (200, 300, 0, 1, "N")])
+        self.assertEqual(gares_train(r), [True, True, False])
+
+    def test_gare_sans_aucune_connexion_nest_pas_train(self):
+        r = reseau_synthetique(2, [])
+        self.assertEqual(gares_train(r), [False, False])
 
 
 if __name__ == "__main__":

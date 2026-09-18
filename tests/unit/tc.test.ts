@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest'
+import { haversineKm } from '../../src/calcul/geo'
 import type { Grille } from '../../src/calcul/grille'
 import { acces, coucheTc, depuisGares, garesProches, prixTrain, versPointTc } from '../../src/calcul/tc'
 import type { Horaires, Ligne, Station } from '../../src/donnees/horaires'
@@ -54,6 +55,24 @@ test('garesProches ignore les gares non desservies et celles à moins de 500 m d
   const g = garesProches(stations, 48.0, 2)
   expect(g.map((x) => stations[x.gare]!.nom)).toEqual(['A', 'B', 'C'])
   expect(g[0]!.km).toBeCloseTo(0.111, 2)
+})
+
+test('garesProches : une gare routière et une vraie gare à moins de 500 m sont gardées toutes les deux (E7)', () => {
+  const stations: Station[] = [
+    { nom: 'Gare routière', lat: 45.0, lon: 5.0, desservie: true, train: false },
+    { nom: 'Gare', lat: 45.001, lon: 5.0, desservie: true, train: true }, // ≈ 111 m
+  ]
+  const g = garesProches(stations, 45.0, 5.0, 2)
+  expect(g.map((x) => x.gare)).toEqual([0, 1])
+})
+
+test('garesProches : deux gares du même statut à moins de 500 m comptent toujours pour une', () => {
+  const stations: Station[] = [
+    { nom: 'A', lat: 45.0, lon: 5.0, desservie: true, train: true },
+    { nom: 'A bis', lat: 45.001, lon: 5.0, desservie: true, train: true },
+  ]
+  const g = garesProches(stations, 45.0, 5.0, 2)
+  expect(g.map((x) => x.gare)).toEqual([0])
 })
 
 test('depuisGares : temps et prix vers chaque gare, gare de départ retenue', () => {
@@ -159,4 +178,48 @@ test('versPointTc : lieu sur la gare même, pas de sortie', () => {
   const t = versPointTc(horaires, d, franck, 48.8449, 2.3735)!
   expect(t.arrivee).toBe('Paris Gare de Lyon')
   expect(t.sortie).toBeNull()
+})
+
+test('versPointTc : une gare desservie seulement par autocar subit une pénalité de 10 min au classement', () => {
+  // Deux gares d'arrivée à même temps de train (100 min) depuis Marseille, à 280 m l'une de
+  // l'autre (comme Lyon-Part-Dieu Gare Routière et Lyon Part Dieu en pratique, sous les 500 m qui
+  // les feraient sinon compter pour une seule gare, cf. E7) : une gare routière pile sur le lieu
+  // visé (0 min de sortie), une vraie gare à 280 m (environ 4,8 min à pied). Sans pénalité, la
+  // gare routière gagnerait (100 < 104,8) ; avec les 10 min de pénalité, la vraie gare l'emporte
+  // (110 > 104,8) — mais le temps affiché reste le temps réel, sans pénalité.
+  const stations: Station[] = [
+    { nom: 'Marseille Saint-Charles', lat: 43.3027, lon: 5.3804, desservie: true, train: true },
+    { nom: 'Gare routière', lat: 45.0, lon: 5.0, desservie: true, train: false },
+    { nom: 'Vraie gare', lat: 45.0025, lon: 5.0, desservie: true, train: true },
+  ]
+  const trois = new Map([[0, ligne([0, 100, 100], [0, 50, 50], [0, 0, 0], [0, 0, 0])]])
+  const h: Horaires = {
+    stations,
+    voisins: { gares: new Uint16Array(), hectometres: new Uint16Array() },
+    lignes: async () => {},
+    ligne: (i) => trois.get(i),
+  }
+  const d = depuisGares(h, franck)
+  const t = versPointTc(h, d, franck, 45.0, 5.0)!
+  expect(t.arrivee).toBe('Vraie gare')
+  const sortieAttendue = acces(haversineKm(45.0025, 5.0, 45.0, 5.0), 'tc')
+  expect(t.minutes).toBeCloseTo(d.minutes[2]! + sortieAttendue)
+})
+
+test('versPointTc : seule gare joignable, routière : gardée quand même, temps réel affiché', () => {
+  const stations: Station[] = [
+    { nom: 'Marseille Saint-Charles', lat: 43.3027, lon: 5.3804, desservie: true, train: true },
+    { nom: 'Gare routière isolée', lat: 45.0, lon: 5.0, desservie: true, train: false },
+  ]
+  const deux = new Map([[0, ligne([0, 100], [0, 50], [0, 0], [0, 0])]])
+  const h: Horaires = {
+    stations,
+    voisins: { gares: new Uint16Array(), hectometres: new Uint16Array() },
+    lignes: async () => {},
+    ligne: (i) => deux.get(i),
+  }
+  const d = depuisGares(h, franck)
+  const t = versPointTc(h, d, franck, 45.0, 5.0)!
+  expect(t.arrivee).toBe('Gare routière isolée')
+  expect(t.minutes).toBeCloseTo(d.minutes[1]!)
 })

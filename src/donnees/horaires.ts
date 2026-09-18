@@ -4,6 +4,8 @@ export interface Station {
   lon: number
   /** Au moins un train ou car s'y arrête le jour type. */
   desservie: boolean
+  /** Au moins une connexion non-autocar (absent sur des données générées avant ce champ). */
+  train?: boolean
 }
 
 export interface Ligne {

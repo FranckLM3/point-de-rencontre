@@ -44,6 +44,7 @@ class Connexion:
     grande_ligne: bool
     montee: bool = True  # montée autorisée à `de`
     descente: bool = True  # descente autorisée à `vers`
+    car: bool = False  # autocar : stop_id de type "Car..." ou route_type 3 (bus)
 
 
 @dataclass
@@ -77,6 +78,18 @@ def _date(texte: str) -> datetime.date:
 
 def _type_service(stop_id: str) -> str:
     return stop_id.removeprefix("StopPoint:OCE").rsplit("-", 1)[0]
+
+
+ROUTE_TYPE_CAR = "3"
+
+
+def _est_car(type_service: str, route_type: str) -> bool:
+    """Autocar : type de service « Car... » (remplacement/complément) ou route_type 3 (bus GTFS)."""
+    return type_service.startswith("Car") or route_type == ROUTE_TYPE_CAR
+
+
+def _routes(z: zipfile.ZipFile) -> dict[str, str]:
+    return {r["route_id"]: (r.get("route_type") or "").strip() for r in _lire(z, "routes.txt")}
 
 
 def _choisir_jour(services_par_date: dict[str, set[str]], debut: str) -> str:
@@ -200,16 +213,20 @@ def charger(contenu: bytes) -> Reseau:
         actifs = services_par_date[jour]
         gares, parent = _gares(z, anomalies)
         indice = {g.identifiant: i for i, g in enumerate(gares)}
-        trajets = {r["trip_id"] for r in _lire(z, "trips.txt") if r["service_id"] in actifs}
+        routes = _routes(z)
+        route_de_trajet = {r["trip_id"]: r["route_id"] for r in _lire(z, "trips.txt") if r["service_id"] in actifs}
+        trajets = set(route_de_trajet)
         passages = _passages(z, trajets, parent, anomalies)
 
     connexions: list[Connexion] = []
     for trajet, arrets in passages.items():
+        type_route = routes.get(route_de_trajet.get(trajet, ""), "")
         for (_, _, depart, a), (_, arrivee, _, b) in zip(arrets, arrets[1:]):
             de, vers = indice[parent[a["stop_id"]]], indice[parent[b["stop_id"]]]
             if de == vers:
                 continue
             ga, gb = gares[de], gares[vers]
+            type_service = _type_service(a["stop_id"])
             connexions.append(
                 Connexion(
                     depart=depart,
@@ -218,9 +235,10 @@ def charger(contenu: bytes) -> Reseau:
                     vers=vers,
                     trajet=trajet,
                     km=haversine_km(ga.lat, ga.lon, gb.lat, gb.lon),
-                    grande_ligne=_type_service(a["stop_id"]) in TYPES_GRANDE_LIGNE,
+                    grande_ligne=type_service in TYPES_GRANDE_LIGNE,
                     montee=_autorise(a.get("pickup_type")),
                     descente=_autorise(b.get("drop_off_type")),
+                    car=_est_car(type_service, type_route),
                 )
             )
     connexions.sort(key=lambda c: (c.depart, c.arrivee))

@@ -49,6 +49,16 @@ def gares_desservies(reseau: Reseau) -> list[bool]:
     return desservies
 
 
+def gares_train(reseau: Reseau) -> list[bool]:
+    """Vrai pour chaque gare desservie par au moins une connexion non-autocar (un vrai train)."""
+    train = [False] * len(reseau.gares)
+    for c in reseau.connexions:
+        if c.car:
+            continue
+        train[c.de] = train[c.vers] = True
+    return train
+
+
 def _case(lat: float, lon: float) -> tuple[int, int]:
     return math.floor(lat * CASES_PAR_DEGRE), math.floor(lon * CASES_PAR_DEGRE)
 
@@ -141,8 +151,10 @@ def ecrire_tout(reseau: Reseau, grille: dict, dossier: Path, processus: int) -> 
     try:
         (neuf / "lignes").mkdir()
         desservies = gares_desservies(reseau)
+        train = gares_train(reseau)
         stations = [
-            {"nom": g.nom, "lat": g.lat, "lon": g.lon, "desservie": d} for g, d in zip(reseau.gares, desservies)
+            {"nom": g.nom, "lat": g.lat, "lon": g.lon, "desservie": d, "train": t}
+            for g, d, t in zip(reseau.gares, desservies, train)
         ]
         (neuf / "stations.json").write_text(json.dumps(stations, ensure_ascii=False))
         (neuf / "voisins-4km.bin").write_bytes(index_voisins(reseau.gares, grille, desservies))

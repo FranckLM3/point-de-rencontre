@@ -1,7 +1,7 @@
 import unittest
 
 from horaires.gtfs import Gare, charger, liaisons_entre_gares
-from horaires.tests.fabrique import FEED_INFO, STOP_TIMES, STOPS, archive
+from horaires.tests.fabrique import FEED_INFO, ROUTES, STOP_TIMES, STOPS, archive
 
 
 class LectureTest(unittest.TestCase):
@@ -79,6 +79,29 @@ class MonteeDescenteTest(unittest.TestCase):
         )
         t2 = next(c for c in charger(archive(stop_times=horaires)).connexions if c.trajet == "T2")
         self.assertEqual((t2.montee, t2.descente), (True, False))
+
+
+class CarTest(unittest.TestCase):
+    def test_train_normal_nest_pas_car(self):
+        t1 = next(c for c in charger(archive()).connexions if c.trajet == "T1")
+        self.assertFalse(t1.car)
+
+    def test_stop_id_de_type_car_est_car(self):
+        # T2 part d'un point de type « Car TER » plutôt que « Train TER ».
+        stops = STOPS + "StopPoint:OCECar TER-2,Beta,,45.0000,5.0000,,,0,StopArea:OCE2\n"
+        stop_times = STOP_TIMES.replace(
+            "T2,09:10:00,09:10:00,StopPoint:OCETrain TER-2,0,,0,1,",
+            "T2,09:10:00,09:10:00,StopPoint:OCECar TER-2,0,,0,1,",
+        )
+        t2 = next(c for c in charger(archive(stops=stops, stop_times=stop_times)).connexions if c.trajet == "T2")
+        self.assertTrue(t2.car)
+
+    def test_route_type_3_est_car(self):
+        # R2 (Beta - Gamma, empruntée par T2 et T3) devient un service de bus (route_type 3).
+        routes = ROUTES.replace("R2,1,,Beta - Gamma,,2,,,", "R2,1,,Beta - Gamma,,3,,,")
+        connexions = charger(archive(routes=routes)).connexions
+        self.assertTrue(next(c for c in connexions if c.trajet == "T2").car)
+        self.assertFalse(next(c for c in connexions if c.trajet == "T1").car)
 
 
 class LectureTolerante(unittest.TestCase):
