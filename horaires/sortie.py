@@ -63,19 +63,30 @@ def _case(lat: float, lon: float) -> tuple[int, int]:
     return math.floor(lat * CASES_PAR_DEGRE), math.floor(lon * CASES_PAR_DEGRE)
 
 
-def _choisir_distinctes(gares: list[Gare], tries: list[tuple[float, int]]) -> list[tuple[float, int]]:
-    """Les plus proches d'abord, en sautant celles à moins de 500 m d'une gare déjà retenue."""
+def _distincte(gares: list[Gare], train: list[bool], candidat: int, retenues: list[tuple[float, int]]) -> bool:
+    """Même règle que `tropPres` (src/calcul/tc.ts), règle partagée entre Python et TS : deux gares
+    du même statut (train ou car) à moins de 500 m comptent pour une ; une gare et une gare
+    routière voisines (E7, ex. Lyon Part Dieu / Lyon-Part-Dieu Gare Routière) sont gardées toutes
+    les deux."""
+    g = gares[candidat]
+    return all(
+        train[j] != train[candidat] or haversine_km(g.lat, g.lon, gares[j].lat, gares[j].lon) > DISTANCE_GARES_DISTINCTES_KM
+        for _, j in retenues
+    )
+
+
+def _choisir_distinctes(gares: list[Gare], train: list[bool], tries: list[tuple[float, int]]) -> list[tuple[float, int]]:
+    """Les plus proches d'abord, en sautant celles à moins de 500 m d'une gare déjà retenue de même statut."""
     retenues: list[tuple[float, int]] = []
     for d, i in tries:
-        g = gares[i]
-        if all(haversine_km(g.lat, g.lon, gares[j].lat, gares[j].lon) > DISTANCE_GARES_DISTINCTES_KM for _, j in retenues):
+        if _distincte(gares, train, i, retenues):
             retenues.append((d, i))
             if len(retenues) == NB_VOISINS:
                 break
     return retenues
 
 
-def _voisines(gares: list[Gare], cases: dict[tuple[int, int], list[int]], lat: float, lon: float):
+def _voisines(gares: list[Gare], train: list[bool], cases: dict[tuple[int, int], list[int]], lat: float, lon: float):
     cy, cx = _case(lat, lon)
     retenues: list[tuple[float, int]] = []
     for rayon in range(1, RAYON_MAX_CASES + 1):
@@ -83,13 +94,13 @@ def _voisines(gares: list[Gare], cases: dict[tuple[int, int], list[int]], lat: f
             i for dy in range(-rayon, rayon + 1) for dx in range(-rayon, rayon + 1) for i in cases.get((cy + dy, cx + dx), [])
         )
         tries = sorted((haversine_km(lat, lon, gares[i].lat, gares[i].lon), i) for i in candidats)
-        retenues = _choisir_distinctes(gares, tries)
+        retenues = _choisir_distinctes(gares, train, tries)
         if len(retenues) == NB_VOISINS:
             break
     return retenues
 
 
-def index_voisins(gares: list[Gare], grille: dict, desservies: list[bool]) -> bytes:
+def index_voisins(gares: list[Gare], grille: dict, desservies: list[bool], train: list[bool]) -> bytes:
     """Pour chaque point de grille : 3 gares desservies et distinctes, les plus proches, en hectomètres."""
     dedans = _dedans(grille)
     cases: dict[tuple[int, int], list[int]] = {}
@@ -104,7 +115,7 @@ def index_voisins(gares: list[Gare], grille: dict, desservies: list[bool]) -> by
             continue
         lon = grille["lon0"] + (k % grille["nx"]) * grille["pasLon"]
         lat = grille["lat0"] + (k // grille["nx"]) * grille["pasLat"]
-        retenues = _voisines(gares, cases, lat, lon)
+        retenues = _voisines(gares, train, cases, lat, lon)
         for d, i in retenues:
             sortie += struct.pack("<HH", i, min(HECTOMETRES_MAX, round(d * 10)))
         sortie += vide * (NB_VOISINS - len(retenues))
@@ -157,7 +168,7 @@ def ecrire_tout(reseau: Reseau, grille: dict, dossier: Path, processus: int) -> 
             for g, d, t in zip(reseau.gares, desservies, train)
         ]
         (neuf / "stations.json").write_text(json.dumps(stations, ensure_ascii=False))
-        (neuf / "voisins-4km.bin").write_bytes(index_voisins(reseau.gares, grille, desservies))
+        (neuf / "voisins-4km.bin").write_bytes(index_voisins(reseau.gares, grille, desservies, train))
         _ecrire_lignes(reseau, neuf / "lignes", processus)
         version = {
             "feed_version": reseau.version,

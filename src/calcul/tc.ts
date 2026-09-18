@@ -12,7 +12,10 @@ const PRIX_BUS = 2
 const PRIX_MIN_TRAIN = 5
 const TAUX_GRANDE_LIGNE = 0.1
 const TAUX_REGIONAL = 0.12
-/** Deux gares plus proches que cela comptent pour une seule (même règle que l'index Python). */
+/** Deux gares plus proches que cela comptent pour une seule (même règle que `_distincte` dans
+ * horaires/sortie.py, qui construit l'index de gares voisines de la grille : les deux doivent
+ * rester cohérents, sous peine d'écarts entre les zones/le repaire (grille) et les villes/lieux
+ * (calcul point à point) comme observé pour Lyon Part Dieu / Lyon-Part-Dieu Gare Routière). */
 const ECART_MIN_KM = 0.5
 /** Au-delà, une gare ne sert ni au départ ni à l'arrivée (la Corse n'a pas de train dans ces données). */
 export const GARE_MAX_KM = 50

@@ -223,3 +223,43 @@ test('versPointTc : seule gare joignable, routière : gardée quand même, temps
   expect(t.arrivee).toBe('Gare routière isolée')
   expect(t.minutes).toBeCloseTo(d.minutes[1]!)
 })
+
+test('garesProches : une gare de train et une gare routière à 280 m sont gardées toutes les deux, la gare de train en premier (E7, même fixture que _distincte en Python)', () => {
+  const stations: Station[] = [
+    { nom: 'Lyon Part Dieu', lat: 45.0, lon: 5.0, desservie: true, train: true },
+    { nom: 'Lyon-Part-Dieu Gare Routière', lat: 45.0025, lon: 5.0, desservie: true, train: false },
+  ]
+  const g = garesProches(stations, 45.0, 5.0, 2)
+  expect(g.map((x) => x.gare)).toEqual([0, 1])
+})
+
+test('coucheTc (grille) et versPointTc (point) restent cohérents pour la même gare la plus proche (E7)', () => {
+  // Même situation que le bug corrigé (Lyon) : une gare de train et une gare routière voisines.
+  // La grille doit lister exactement les mêmes gares voisines, dans le même ordre, que
+  // garesProches recalculé point à point, sous peine d'écart entre zones/repaire et villes/lieux.
+  const stations: Station[] = [
+    { nom: 'Lyon Part Dieu', lat: 45.75, lon: 4.86, desservie: true, train: true },
+    { nom: 'Lyon-Part-Dieu Gare Routière', lat: 45.7523, lon: 4.86, desservie: true, train: false },
+  ]
+  const lignesMap = new Map([
+    [0, ligne([0, 5], [0, 0.3], [0, 0], [0, 0])],
+    [1, ligne([4, 0], [0.3, 0], [0, 0], [0, 0])],
+  ])
+  const cible = { lat: stations[0]!.lat, lon: stations[0]!.lon }
+  const proches = garesProches(stations, cible.lat, cible.lon)
+  const h: Horaires = {
+    stations,
+    voisins: {
+      gares: Uint16Array.from([...proches.map((p) => p.gare), ...Array(3 - proches.length).fill(65535)]),
+      hectometres: Uint16Array.from([...proches.map((p) => Math.round(p.km * 10)), ...Array(3 - proches.length).fill(0)]),
+    },
+    lignes: async () => {},
+    ligne: (i) => lignesMap.get(i),
+  }
+  const ami: Ami = { id: 'x', nom: 'X', adresse: '', lat: 45.7, lon: 4.86, transport: 'tc', navigo: false }
+  const grille: Grille = { lon0: cible.lon, lat0: cible.lat, pasLon: 1, pasLat: 1, nx: 1, ny: 1, dedans: new Uint8Array([1]) }
+  const d = depuisGares(h, ami)
+  const valeurGrille = coucheTc(grille, h, d, ami, 'temps')[0]!
+  const valeurPoint = versPointTc(h, d, ami, cible.lat, cible.lon)!.minutes
+  expect(Math.abs(valeurGrille - valeurPoint)).toBeLessThanOrEqual(1)
+})

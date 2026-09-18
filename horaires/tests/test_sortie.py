@@ -31,7 +31,7 @@ class SortieTest(unittest.TestCase):
     def test_index_voisins(self):
         reseau = charger(archive())
         grille = {"lon0": 4.0, "lat0": 45.0, "pasLon": 1.0, "pasLat": 1.0, "nx": 3, "ny": 1, "dedans": [1, 1, 0]}
-        octets = index_voisins(reseau.gares, grille, gares_desservies(reseau))
+        octets = index_voisins(reseau.gares, grille, gares_desservies(reseau), gares_train(reseau))
         self.assertEqual(len(octets), 3 * 12)
         gare, hm = struct.unpack_from("<HH", octets, 0)
         self.assertEqual((gare, hm), (0, 0))
@@ -90,7 +90,7 @@ class VoisinsTest(unittest.TestCase):
     def test_gare_non_desservie_jamais_voisine(self):
         reseau = _avec_epsilon(charger(archive()))
         grille = {"lon0": 4.0, "lat0": 45.0009, "pasLon": 2.0, "pasLat": 1.0, "nx": 2, "ny": 1, "dedans": [1, 1]}
-        octets = index_voisins(reseau.gares, grille, gares_desservies(reseau))
+        octets = index_voisins(reseau.gares, grille, gares_desservies(reseau), gares_train(reseau))
         self.assertEqual(_voisins(octets, 0), [0, 1, 2])
         # Au point de Gamma, Delta (300 m, sans train) n'est pas retenu.
         self.assertEqual(_voisins(octets, 1), [2, 1, 0])
@@ -98,8 +98,20 @@ class VoisinsTest(unittest.TestCase):
     def test_gares_a_moins_de_500_m_comptent_pour_une(self):
         gares = [Gare(str(i), str(i), 45.0 + d, 4.0) for i, d in enumerate([0.0, 0.003, 0.01, 0.02])]
         grille = {"lon0": 4.0, "lat0": 45.0, "pasLon": 1.0, "pasLat": 1.0, "nx": 1, "ny": 1, "dedans": [1]}
-        octets = index_voisins(gares, grille, [True] * 4)
+        octets = index_voisins(gares, grille, [True] * 4, [True] * 4)
         self.assertEqual(_voisins(octets, 0), [0, 2, 3])
+
+    def test_gare_routiere_et_vraie_gare_a_moins_de_500_m_gardees_toutes_les_deux(self):
+        # Même fixture côté TS (garesProches, E7) : une gare de train et une gare routière à
+        # 280 m l'une de l'autre, comme Lyon Part Dieu et Lyon-Part-Dieu Gare Routière. Même
+        # règle que `tropPres` (src/calcul/tc.ts) : le statut (train/car) compte, pas la seule
+        # distance, donc les deux sont gardées ; la plus proche du point (la gare de train) sort
+        # en premier.
+        gares = [Gare("g1", "Lyon Part Dieu", 45.0, 5.0), Gare("g2", "Lyon-Part-Dieu Gare Routière", 45.0025, 5.0)]
+        train = [True, False]
+        grille = {"lon0": 5.0, "lat0": 45.0, "pasLon": 1.0, "pasLat": 1.0, "nx": 1, "ny": 1, "dedans": [1]}
+        octets = index_voisins(gares, grille, [True, True], train)
+        self.assertEqual(_voisins(octets, 0), [0, 1, INJOIGNABLE])
 
 
 class GaresTrainTest(unittest.TestCase):
