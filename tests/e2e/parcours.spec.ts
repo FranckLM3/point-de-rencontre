@@ -404,6 +404,11 @@ test('mode voiture : détail du trajet en voiture, prix divisé par personnes pa
   await premiere.locator('.ville-entete').click()
   await expect(premiere.locator('.zone-detail')).toContainText('de route')
   await expect(premiere.locator('.zone-detail')).toContainText('km')
+  // Léa (transports, jamais de couche voiture) est exclue du calcul en mode voiture pur : sa ligne
+  // ne doit pas apparaître (et surtout pas porter, décalée, le trajet réel de Tom, D#).
+  await expect(premiere.locator('.detail')).toContainText('Tom')
+  await expect(premiere.locator('.detail')).not.toContainText('Pas de trajet')
+  await expect(premiere.locator('.detail')).not.toContainText('Léa')
 
   await page.getByRole('button', { name: 'Prix', exact: true }).click()
   await expect(page).toHaveURL(/grandeur=prix/)

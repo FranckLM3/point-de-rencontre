@@ -157,7 +157,7 @@ function avisVoiture(s: Session, choisis: Ami[]): string {
   if (noms.length === 0) return ''
   const liste = noms.join(', ')
   if (s.etat.mode === 'voiture') {
-    return `Calcul du trajet en voiture en cours pour ${liste}. En attendant, la zone est calculée sans ${PLURIEL(noms.length, 'cette personne', 'ces personnes')}.`
+    return `Trajet en voiture pas encore disponible pour ${liste} : la zone est calculée sans ${PLURIEL(noms.length, 'cette personne', 'ces personnes')} pour l’instant.`
   }
   return `Trajet en voiture pas encore calculé pour ${liste} : les transports sont utilisés en attendant.`
 }
@@ -234,7 +234,10 @@ function choisirVille(s: Session, choisis: Ami[], v: VilleClassee): void {
   dessinerTrajets(s, choisis)
 }
 
-function rendrePanneau(s: Session, choisis: Ami[], mesure: Mesure, villes: VilleClassee[]): void {
+/** `calculables` : mêmes personnes que celles passées à classerVilles pour calculer `villes` (E4) —
+ * `villes[i].parAmi` est aligné sur `calculables`, jamais sur `choisis` (D#, sans quoi une personne
+ * exclue en mode voiture décale tous les détails d'un cran, chacun affichant le trajet du suivant). */
+function rendrePanneau(s: Session, choisis: Ami[], calculables: Ami[], mesure: Mesure, villes: VilleClassee[]): void {
   const enCalcul = new Set(personnesEnCalcul(s, s.amis).map((a) => a.id))
   rendreAmis($('#amis'), { amis: s.amis, groupes: s.groupes, selection: new Set(choisis.map((a) => a.id)), enCalcul }, {
     changerSelection: (ids) => changer(s, { selection: ids }),
@@ -256,7 +259,7 @@ function rendrePanneau(s: Session, choisis: Ami[], mesure: Mesure, villes: Ville
   })
   const details = lieu ? choisis.map((a) => mesure(a, lieu.lat, lieu.lon)) : []
   rendreResultatLieu($('#resultat-lieu'), lieu, choisis, details, unite, () => retirerLieu(s))
-  rendreVilles($('#villes'), { villes, amis: choisis, nbPersonnes: s.amis.length, max, unite, mode, critere }, {
+  rendreVilles($('#villes'), { villes, amis: calculables, nbPersonnes: s.amis.length, max, unite, mode, critere }, {
     choisir: (c) => choisirVille(s, choisis, c),
     ajouter: () => ajouter(s),
   })
@@ -351,7 +354,7 @@ function afficher(s: Session, choisis: Ami[], mesure: Mesure, focus: string | nu
   const villesClassees = classerVilles(s.villes, disponibles, mesure, s.etat.critere, s.etat.max, NB_VILLES)
   // La carte d'abord : elle recalcule s.repaire (même clé que les zones), lu ensuite par le panneau.
   rendreCarte(s, choisis, disponibles, villesClassees, mesure)
-  rendrePanneau(s, choisis, mesure, villesClassees)
+  rendrePanneau(s, choisis, disponibles, mesure, villesClassees)
   const actif = document.activeElement
   const perdu = !actif || actif === document.body || !actif.isConnected
   if (focus && perdu) $('#panneau').querySelector<HTMLElement>(focus)?.focus()
