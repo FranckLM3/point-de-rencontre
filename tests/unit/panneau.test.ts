@@ -119,13 +119,13 @@ test('Annuler referme le formulaire de groupe', () => {
   expect(el.querySelector<HTMLFormElement>('form.groupe')!.hidden).toBe(true)
 })
 
-test('filtres : seuls « Chacun son moyen » et « Tous en voiture » restent désactivés', () => {
+test('filtres : seuls Vol d’oiseau et Transports existent (plan 3 pour le reste)', () => {
   const el = document.createElement('div')
   rendreFiltres(el, ETAT_DEFAUT, 2, vi.fn())
-  for (const m of ['mixte', 'voiture']) {
-    expect(el.querySelector<HTMLButtonElement>(`[data-mode="${m}"]`)!.disabled).toBe(true)
-  }
-  expect(el.querySelector<HTMLButtonElement>('[data-mode="tc"]')!.disabled).toBe(false)
+  const modes = [...el.querySelectorAll<HTMLButtonElement>('[data-mode]')].map((b) => b.dataset.mode)
+  expect(modes).toEqual(['oiseau', 'tc'])
+  expect(el.querySelector('[data-mode="oiseau"]')!.textContent).toBe('Vol d’oiseau')
+  expect(el.querySelector('[data-mode="tc"]')!.textContent).toBe('Transports')
   expect(el.querySelector('h1')!.textContent).toContain('entre 2')
   expect(el.querySelector('select')!.hasAttribute('aria-pressed')).toBe(false)
 })
@@ -142,24 +142,30 @@ test('filtres : changer de mode remet le maximum à zéro', () => {
   expect(changer).toHaveBeenCalledWith({ mode: 'oiseau', max: null })
 })
 
-test('filtres : le mode actif est en tête de la rangée', () => {
+test('filtres : le mode reste dans un ordre fixe, aria-pressed reflète l’actif', () => {
   const el = document.createElement('div')
   rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'tc' }, 2, vi.fn())
   const modes = [...el.querySelectorAll<HTMLButtonElement>('[data-mode]')].map((b) => b.dataset.mode)
-  expect(modes[0]).toBe('tc')
+  expect(modes).toEqual(['oiseau', 'tc'])
   expect(el.querySelector('[data-mode="tc"]')!.getAttribute('aria-pressed')).toBe('true')
   expect(el.querySelector('[data-mode="oiseau"]')!.getAttribute('aria-pressed')).toBe('false')
 })
 
-test('filtres : pastilles Temps et Prix en transports seulement', () => {
-  const oiseauEl = document.createElement('div')
-  rendreFiltres(oiseauEl, ETAT_DEFAUT, 2, vi.fn())
-  expect(oiseauEl.querySelector('[aria-label="Grandeur"]')).toBeNull()
+test('filtres : les groupes sont des interrupteurs étiquetés (Mode, Mesure, Critère)', () => {
+  const el = document.createElement('div')
+  rendreFiltres(el, ETAT_DEFAUT, 2, vi.fn())
+  const groupeMode = el.querySelector('[role="group"][aria-label="Mode"]')!
+  expect(groupeMode.querySelector('[data-mode]')).not.toBeNull()
+  expect(el.querySelector('[role="group"][aria-label="Mesure"]')).toBeNull()
+  const groupeCritere = el.querySelector('[role="group"][aria-label="Critère"]')!
+  expect(groupeCritere.querySelector('[data-critere]')).not.toBeNull()
+})
 
+test('filtres : Mesure (Temps / Prix) seulement en transports', () => {
   const el = document.createElement('div')
   const changer = vi.fn()
   rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'tc', max: 120 }, 2, changer)
-  const groupe = el.querySelector('[role="group"][aria-label="Grandeur"]')!
+  const groupe = el.querySelector('[role="group"][aria-label="Mesure"]')!
   const temps = groupe.querySelector('[data-grandeur="temps"]')!
   const prix = groupe.querySelector('[data-grandeur="prix"]')!
   expect(temps.textContent).toBe('Temps')

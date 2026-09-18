@@ -20,7 +20,6 @@ h1 { font-size: var(--titre); font-weight: 800; line-height: 1.1; margin: 4px 0;
 /* Marque : la tête de croco précède le nom, à sa hauteur de texte. */
 .marque { display: inline-flex; align-items: center; gap: 8px; }
 .croco { width: 1.5em; height: 1.5em; flex: none; }
-.defile { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
 .villes { display: grid; gap: 12px; }
 
 .pastille {
@@ -39,6 +38,17 @@ h1 { font-size: var(--titre); font-weight: 800; line-height: 1.1; margin: 4px 0;
 .pastille.verte { background: var(--accent-fond); color: var(--accent); border: 1px solid var(--accent); }
 .pastille.danger { background: var(--danger); color: #ffffff; border: 1px solid var(--danger); }
 .pousse { margin-left: auto; }
+
+/* Réglages : un groupe = une étiquette + un interrupteur (segments connectés). */
+.filtre { display: grid; gap: 4px; }
+.etiquette-filtre { font-weight: 500; font-size: .875rem; color: var(--texte-doux); }
+.segmente {
+  display: inline-flex; align-items: stretch; width: fit-content;
+  border: 1px solid var(--bord); border-radius: var(--rayon-pastille); overflow: hidden;
+}
+.segmente .pastille { border: 0; border-right: 1px solid var(--bord); border-radius: 0; }
+.segmente .pastille:last-child { border-right: 0; }
+.segmente .pastille:hover, .segmente .pastille:active { transform: none; }
 
 .ami { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); color: var(--texte); border: 1px solid var(--bord); }
 .ami input { accent-color: var(--accent); }

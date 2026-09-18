@@ -2,17 +2,10 @@ import { maximaProposes, uniteDe, type Unite } from '../calcul/unites'
 import type { Etat, Grandeur, Mode } from '../types'
 import { sousTitre, titreCourt, valeur } from './format'
 
-interface BoutonMode {
-  mode: Mode
-  libelle: string
-  actif: boolean
-}
-
-const MODES: BoutonMode[] = [
-  { mode: 'oiseau', libelle: 'Vol d’oiseau', actif: true },
-  { mode: 'mixte', libelle: 'Chacun son moyen', actif: false },
-  { mode: 'voiture', libelle: 'Tous en voiture', actif: false },
-  { mode: 'tc', libelle: 'Tous en transports', actif: true },
+/** Chacun son moyen et Tous en voiture reviendront avec le plan 3 : seuls oiseau et tc sont proposés. */
+const MODES: { mode: Mode; libelle: string }[] = [
+  { mode: 'oiseau', libelle: 'Vol d’oiseau' },
+  { mode: 'tc', libelle: 'Transports' },
 ]
 
 const GRANDEURS: { grandeur: Grandeur; libelle: string }[] = [
@@ -24,22 +17,25 @@ const LIBELLE_MAX: Record<Unite, string> = { km: 'Distance maximum', min: 'Duré
 
 const presse = (vrai: boolean): string => `aria-pressed="${vrai}"`
 
-/** Le mode courant passe en tête de la rangée (décision du plan 1), les autres gardent leur ordre. */
-function boutonsModes(courant: Mode): string {
-  const ordonnes = [...MODES].sort((a, b) => Number(b.mode === courant) - Number(a.mode === courant))
-  return ordonnes
-    .map((m) =>
-      `<button type="button" class="pastille" data-mode="${m.mode}"${m.actif ? '' : ' disabled title="Bientôt"'} ${presse(m.mode === courant)}>${m.libelle}</button>`,
-    )
-    .join('')
+/** Groupe d'interrupteurs connectés : bord partagé, segment actif rempli (styles .pastille). */
+function interrupteur(libelle: string, boutons: string): string {
+  return `
+    <div class="filtre">
+      <span class="etiquette-filtre">${libelle}</span>
+      <div class="segmente" role="group" aria-label="${libelle}">${boutons}</div>
+    </div>`
 }
 
-function pastillesGrandeur(e: Etat): string {
+function boutonsModes(courant: Mode): string {
+  return MODES.map((m) => `<button type="button" class="pastille" data-mode="${m.mode}" ${presse(m.mode === courant)}>${m.libelle}</button>`).join('')
+}
+
+function interrupteurMesure(e: Etat): string {
   if (e.mode !== 'tc') return ''
   const boutons = GRANDEURS.map(
     (g) => `<button type="button" class="pastille" data-grandeur="${g.grandeur}" ${presse(e.grandeur === g.grandeur)}>${g.libelle}</button>`,
   ).join('')
-  return `<div class="rang" role="group" aria-label="Grandeur">${boutons}</div>`
+  return interrupteur('Mesure', boutons)
 }
 
 function menuMaximum(e: Etat, unite: Unite): string {
@@ -55,18 +51,22 @@ function menuMaximum(e: Etat, unite: Unite): string {
 
 export function rendreFiltres(el: HTMLElement, e: Etat, nombre: number, changer: (p: Partial<Etat>) => void): void {
   const unite = uniteDe(e.mode, e.grandeur)
+  const critere = `<button type="button" class="pastille" data-critere="pire" ${presse(e.critere === 'pire')}>Pire trajet</button>
+      <button type="button" class="pastille" data-critere="moyenne" ${presse(e.critere === 'moyenne')}>Moyenne</button>`
   el.innerHTML = `
-    <div class="rang defile" role="group" aria-label="Mode de calcul">${boutonsModes(e.mode)}</div>
-    ${pastillesGrandeur(e)}
-    <div class="rang defile" role="group" aria-label="Critère">
-      <button type="button" class="pastille" data-critere="pire" ${presse(e.critere === 'pire')}>Pire trajet</button>
-      <button type="button" class="pastille" data-critere="moyenne" ${presse(e.critere === 'moyenne')}>Moyenne</button>
-      ${menuMaximum(e, unite)}
+    ${interrupteur('Mode', boutonsModes(e.mode))}
+    ${interrupteurMesure(e)}
+    <div class="filtre">
+      <span class="etiquette-filtre">Critère</span>
+      <div class="rang">
+        <div class="segmente" role="group" aria-label="Critère">${critere}</div>
+        ${menuMaximum(e, unite)}
+      </div>
     </div>
     <h1>${titreCourt(nombre)}</h1>
     <p class="sous-titre">${sousTitre({ mode: e.mode, unite, critere: e.critere, max: e.max })}</p>`
   // Les unités diffèrent d'un mode ou d'une grandeur à l'autre : le maximum repart de zéro.
-  el.querySelectorAll<HTMLButtonElement>('[data-mode]:not([disabled])').forEach((b) =>
+  el.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((b) =>
     b.addEventListener('click', () => changer({ mode: b.dataset.mode as Mode, max: null })),
   )
   el.querySelectorAll<HTMLButtonElement>('[data-grandeur]').forEach((b) =>

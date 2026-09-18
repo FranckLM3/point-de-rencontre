@@ -242,7 +242,7 @@ test('sur mobile, la carte est visible en arrivant et le volet s’ouvre sans d�
 
 /** Le mode transports calcule de façon asynchrone : on attend la fin du chargement, pas un délai. */
 async function passerEnTransports(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Tous en transports' }).click()
+  await page.getByRole('button', { name: 'Transports' }).click()
   await expect(page.locator('#chargement')).toHaveText('Chargement des horaires…')
   await expect(page.locator('#chargement')).toBeEmpty()
   await expect(page.locator('.sous-titre')).toContainText('En transports')
@@ -294,7 +294,7 @@ test('horaires indisponibles : bandeau, repli en vol d’oiseau, puis réessai',
   await entrer(page)
   await ouvrirVoletSiVisible(page)
 
-  await page.getByRole('button', { name: 'Tous en transports' }).click()
+  await page.getByRole('button', { name: 'Transports' }).click()
   await expect(page.locator('#message')).toContainText('Horaires des trains indisponibles pour le moment.')
   await expect(page.getByRole('button', { name: 'Vol d’oiseau' })).toHaveAttribute('aria-pressed', 'true')
 
