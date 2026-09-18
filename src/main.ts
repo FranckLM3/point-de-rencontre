@@ -128,10 +128,12 @@ function retirerLieu(s: Session): void {
   $('#champ-lieu').focus()
 }
 
-/** Ville choisie (carte de ville ou étiquette cliquée sur la carte) : mêmes lignes vertes dans les deux cas. */
-function choisirVille(s: Session, v: VilleClassee): void {
+/** Ville choisie (carte de ville ou étiquette cliquée sur la carte) : mêmes lignes vertes dans les deux cas.
+ * Dessine directement (pas de rafraîchir complet, qui reconstruirait #villes et refermerait la carte
+ * dépliée) ; s.villeChoisie est repris par rendreCarte à chaque rendu suivant pour rester affiché. */
+function choisirVille(s: Session, choisis: Ami[], v: VilleClassee): void {
   s.villeChoisie = v
-  rafraichir(s)
+  s.carte.lignesVille(choisis, { lat: v.ville.lat, lon: v.ville.lon, label: v.ville.nom })
 }
 
 function rendrePanneau(s: Session, choisis: Ami[], mesure: Mesure, villes: VilleClassee[]): void {
@@ -155,7 +157,7 @@ function rendrePanneau(s: Session, choisis: Ami[], mesure: Mesure, villes: Ville
   const details = lieu ? choisis.map((a) => mesure(a, lieu.lat, lieu.lon)) : []
   rendreResultatLieu($('#resultat-lieu'), lieu, choisis, details, unite, () => retirerLieu(s))
   rendreVilles($('#villes'), { villes, amis: choisis, nbPersonnes: s.amis.length, max, unite, mode, critere }, {
-    choisir: (c) => choisirVille(s, c),
+    choisir: (c) => choisirVille(s, choisis, c),
     ajouter: () => ajouter(s),
   })
 }
@@ -190,7 +192,7 @@ function rendreEtiquettes(s: Session, choisis: Ami[], villesClassees: VilleClass
     const prixCalc = mesurePrix ? evaluer(c.ville.ville, choisis, mesurePrix) : null
     return { ...c, valeurAffichee: valeurEtiquette(c.ville, critere, unite), prix: prixCalc ? prixEtiquette(prixCalc, critere) : undefined }
   })
-  s.carte.etiquettes(enrichis, (v) => choisirVille(s, v))
+  s.carte.etiquettes(enrichis, (v) => choisirVille(s, choisis, v))
 }
 
 function rendreZones(s: Session, choisis: Ami[], villesClassees: VilleClassee[], mesure: Mesure): void {

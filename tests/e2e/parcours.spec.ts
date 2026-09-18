@@ -149,7 +149,7 @@ test('connexion, sélection, ajout d’une personne, test d’un lieu', async ({
   await expect(page.getByRole('heading', { level: 1 })).toContainText('entre 2')
 
   await page.locator('#amis').getByRole('button', { name: '+ Ajouter un Croco' }).click()
-  await page.getByLabel('Nom', { exact: true }).fill('Zoé')
+  await page.getByLabel('Prénom ou surnom', { exact: true }).fill('Zoé')
   await page.getByLabel('Adresse').fill('canebiere')
   await page.getByRole('button', { name: MARSEILLE.properties.label }).click()
   await page.getByLabel('Voiture').check()
@@ -206,7 +206,7 @@ test('enregistrer un groupe', async ({ page }, testInfo) => {
   await page.locator('[data-action="groupe"]').click()
   await page.getByLabel('Nom du groupe').fill('Sud')
   await page.getByRole('button', { name: 'Enregistrer le groupe' }).click()
-  await expect(page.getByLabel('Groupe enregistré')).toContainText('Sud')
+  await expect(page.getByRole('button', { name: 'Sud' })).toBeVisible()
 })
 
 test('états vide et erreur', async ({ page }) => {

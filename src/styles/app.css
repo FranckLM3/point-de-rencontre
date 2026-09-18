@@ -290,9 +290,11 @@ form.groupe .champ { flex: 1 1 100%; }
 }
 .transport-segmente .segment:last-child { border-right: 0; }
 .transport-segmente .segment:has(input:checked) { background: var(--accent-fond); color: var(--accent); }
+/* Input par-dessus tout le segment (pas seulement un point invisible) : clic/tactile sur toute
+   la zone, et rien ne l'intercepte puisqu'il est au-dessus, contrairement au clip visuel classique. */
 .transport-segmente input {
-  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
-  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0;
+  opacity: 0; cursor: pointer;
 }
 .transport-segmente .segment:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
 
