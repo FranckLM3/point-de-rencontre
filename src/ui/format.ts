@@ -24,17 +24,17 @@ export function valeur(v: number, unite: Unite): string {
 /** « Paris Gare de Lyon Hall 1 - 2 » devient « Paris Gare de Lyon » ; les autres noms sont gardés tels quels. */
 export const nomCourt = (nom: string): string => nom.replace(/ Hall \d+( - \d+)?$/, '').trim()
 
-/** Une étape enchaînée : « 8 min de bus ». */
+/** Une étape enchaînée : « 8 min en transports ». */
 export const SUITE: Record<Segment['mode'], (d: string) => string> = {
   'à pied': (d) => `${d} à pied`,
-  bus: (d) => `${d} de bus`,
+  transports: (d) => `${d} en transports`,
   voiture: (d) => `${d} de voiture`,
 }
 
-/** Le trajet entier, sans train : « 35 min en bus ». */
+/** Le trajet entier, sans train : « 35 min en voiture ». */
 const SEUL: Record<Segment['mode'], (d: string) => string> = {
   'à pied': (d) => `${d} à pied`,
-  bus: (d) => `${d} en bus`,
+  transports: (d) => `${d} en transports`,
   voiture: (d) => `${d} en voiture`,
 }
 

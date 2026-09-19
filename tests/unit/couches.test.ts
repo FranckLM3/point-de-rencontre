@@ -89,11 +89,11 @@ test('choisirMesure en transports : temps ou prix, et précision des gares', asy
   await moteur.preparer([marseille])
   const temps = choisirMesure({ mode: 'tc', grandeur: 'temps' }, moteur)(marseille, 48.8566, 2.3522)!
   expect(temps.valeur).toBeGreaterThan(194)
-  expect(temps.precision).toMatch(/^\d+ min à pied · Marseille Saint-Charles → Paris Gare de Lyon · 1 correspondance · \d+ min de bus$/)
+  expect(temps.precision).toMatch(/^\d+ min à pied · Marseille Saint-Charles → Paris Gare de Lyon · 1 correspondance · \d+ min en transports$/)
   const prix = choisirMesure({ mode: 'tc', grandeur: 'prix' }, moteur)(marseille, 48.8566, 2.3522)!
   expect(prix.valeur).toBeCloseTo(75 + 2)
   const pres = choisirMesure({ mode: 'tc', grandeur: 'temps' }, moteur)(marseille, 43.2965, 5.37)!
-  expect(pres.precision).toMatch(/^\d+ min en bus$/)
+  expect(pres.precision).toMatch(/^\d+ min en voiture$/)
   // Ajaccio : aucune gare à moins de 50 km.
   expect(choisirMesure({ mode: 'tc', grandeur: 'temps' }, moteur)(marseille, 41.93, 8.74)).toBeNull()
 })

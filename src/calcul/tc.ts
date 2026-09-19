@@ -2,6 +2,7 @@ import type { Horaires, Ligne, Station } from '../donnees/horaires'
 import { INJOIGNABLE, NB_VOISINS } from '../donnees/horaires'
 import type { Ami, Grandeur, Transport } from '../types'
 import { haversineKm } from './geo'
+import { enReseauUrbain } from './reseaux-urbains'
 import type { Grille } from './grille'
 
 const DETOUR = 1.3
@@ -28,24 +29,34 @@ const distanceGare = (lat: number, lon: number, s: Station): number => {
 
 const minutesA = (km: number, vitesse: number): number => ((km * DETOUR) / vitesse) * 60
 
-export function acces(km: number, transport: Transport): number {
-  if (km <= MARCHE_MAX_KM) return minutesA(km, VITESSE.marche)
-  return minutesA(km, transport === 'voiture' ? VITESSE.voiture : VITESSE.bus)
-}
-
 /** Une étape du trajet hors train : rejoindre la gare, ou la quitter. */
 export interface Segment {
   minutes: number
-  mode: 'à pied' | 'bus' | 'voiture'
+  mode: 'à pied' | 'transports' | 'voiture'
 }
 
-export function segment(km: number, transport: Transport): Segment {
-  if (km <= MARCHE_MAX_KM) return { minutes: acces(km, transport), mode: 'à pied' }
-  return { minutes: acces(km, transport), mode: transport === 'voiture' ? 'voiture' : 'bus' }
+/**
+ * Moyen d'une étape hors train : à pied jusqu'à 1,5 km ; au-delà, en transports urbains dans un
+ * réseau urbain (`enVille`, bout de l'étape côté ville : domicile pour l'accès, lieu visé pour la
+ * sortie) sauf pour qui se déplace en voiture ; en voiture partout ailleurs.
+ */
+function moyen(km: number, transport: Transport, enVille: boolean): Segment['mode'] {
+  if (km <= MARCHE_MAX_KM) return 'à pied'
+  return enVille && transport !== 'voiture' ? 'transports' : 'voiture'
 }
 
-const prixAcces = (km: number, transport: Transport): number =>
-  km > MARCHE_MAX_KM && transport !== 'voiture' ? PRIX_BUS : 0
+const VITESSE_DE: Record<Segment['mode'], number> = { 'à pied': VITESSE.marche, transports: VITESSE.bus, voiture: VITESSE.voiture }
+
+export function acces(km: number, transport: Transport, enVille: boolean): number {
+  return minutesA(km, VITESSE_DE[moyen(km, transport, enVille)])
+}
+
+export function segment(km: number, transport: Transport, enVille: boolean): Segment {
+  return { minutes: acces(km, transport, enVille), mode: moyen(km, transport, enVille) }
+}
+
+const prixAcces = (km: number, transport: Transport, enVille: boolean): number =>
+  moyen(km, transport, enVille) === 'transports' ? PRIX_BUS : 0
 
 export function prixTrain(km: number, grandeLigne: boolean): number {
   if (km <= 0) return 0
@@ -112,11 +123,12 @@ export function depuisGares(h: Horaires, ami: Ami): DepuisGares {
     correspondances: new Uint8Array(n),
     proches: garesProches(h.stations, ami.lat, ami.lon),
   }
+  const domicileEnVille = enReseauUrbain(ami.lat, ami.lon)
   for (const p of r.proches) {
     const ligne = h.ligne(p.gare)
     if (!ligne) continue
-    const avant = acces(p.km, ami.transport)
-    const prixAvant = prixAcces(p.km, ami.transport)
+    const avant = acces(p.km, ami.transport, domicileEnVille)
+    const prixAvant = prixAcces(p.km, ami.transport, domicileEnVille)
     for (let g = 0; g < n; g++) {
       const m = ligne.minutes[g]!
       if (m === INJOIGNABLE) continue
@@ -159,18 +171,21 @@ const kmAcces = (d: DepuisGares, gare: number): number => d.proches.find((p) => 
 const PENALITE_GARE_ROUTIERE_MIN = 10
 const penaliteArrivee = (s: Station): number => (s.train === false ? PENALITE_GARE_ROUTIERE_MIN : 0)
 
-function meilleurVers(h: Horaires, d: DepuisGares, ami: Ami, km: number, gares: Proche[]): TrajetTc | null {
+function meilleurVers(h: Horaires, d: DepuisGares, ami: Ami, lat: number, lon: number, gares: Proche[]): TrajetTc | null {
+  const km = haversineKm(ami.lat, ami.lon, lat, lon)
+  const domicileEnVille = enReseauUrbain(ami.lat, ami.lon)
+  const lieuEnVille = enReseauUrbain(lat, lon)
   let best: TrajetTc | null = null
   let meilleurScore = Number.POSITIVE_INFINITY
   if (km <= DIRECT_MAX_KM) {
     best = {
-      minutes: acces(km, ami.transport),
-      euros: prixAcces(km, ami.transport),
+      minutes: acces(km, ami.transport, domicileEnVille),
+      euros: prixAcces(km, ami.transport, domicileEnVille),
       depart: null,
       arrivee: null,
       departIndice: null,
       arriveeIndice: null,
-      acces: segment(km, ami.transport),
+      acces: segment(km, ami.transport, domicileEnVille),
       sortie: null,
       correspondances: 0,
     }
@@ -179,20 +194,20 @@ function meilleurVers(h: Horaires, d: DepuisGares, ami: Ami, km: number, gares: 
   for (const g of gares) {
     const avant = d.minutes[g.gare]!
     if (!Number.isFinite(avant)) continue
-    const minutes = avant + acces(g.km, 'tc')
+    const minutes = avant + acces(g.km, 'tc', lieuEnVille)
     const score = minutes + penaliteArrivee(h.stations[g.gare]!)
     if (score < meilleurScore) {
       meilleurScore = score
       const gareDepart = d.depart[g.gare]!
       best = {
         minutes,
-        euros: d.euros[g.gare]! + prixAcces(g.km, 'tc'),
+        euros: d.euros[g.gare]! + prixAcces(g.km, 'tc', lieuEnVille),
         depart: h.stations[gareDepart]!.nom,
         arrivee: h.stations[g.gare]!.nom,
         departIndice: gareDepart,
         arriveeIndice: g.gare,
-        acces: segment(kmAcces(d, gareDepart), ami.transport),
-        sortie: g.km > 0 ? segment(g.km, 'tc') : null,
+        acces: segment(kmAcces(d, gareDepart), ami.transport, domicileEnVille),
+        sortie: g.km > 0 ? segment(g.km, 'tc', lieuEnVille) : null,
         correspondances: d.correspondances[g.gare]!,
       }
     }
@@ -230,7 +245,7 @@ export function versPointTc(
   lon: number,
   gares: Proche[] = garesProches(h.stations, lat, lon),
 ): TrajetTc | null {
-  return meilleurVers(h, d, ami, haversineKm(ami.lat, ami.lon, lat, lon), gares)
+  return meilleurVers(h, d, ami, lat, lon, gares)
 }
 
 export function coucheTc(grille: Grille, h: Horaires, d: DepuisGares, ami: Ami, grandeur: Grandeur): Float32Array {
@@ -245,7 +260,7 @@ export function coucheTc(grille: Grille, h: Horaires, d: DepuisGares, ami: Ami, 
       const kmGare = h.voisins.hectometres[k * NB_VOISINS + v]! / 10
       if (gare !== INJOIGNABLE && kmGare <= GARE_MAX_KM) gares.push({ gare, km: kmGare })
     }
-    const t = meilleurVers(h, d, ami, haversineKm(ami.lat, ami.lon, lat, lon), gares)
+    const t = meilleurVers(h, d, ami, lat, lon, gares)
     if (t) sortie[k] = grandeur === 'temps' ? t.minutes : t.euros
   }
   return sortie

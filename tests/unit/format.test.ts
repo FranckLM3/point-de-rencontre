@@ -80,8 +80,8 @@ test('descriptionTrajet : accès, gares, correspondances et sortie', () => {
     depart: 'Marseille Saint-Charles',
     arrivee: 'Paris Gare de Lyon Hall 1 - 2',
     correspondances: 1,
-    sortie: { minutes: 8, mode: 'bus' },
-  }))).toBe('22 min à pied · Marseille Saint-Charles → Paris Gare de Lyon · 1 correspondance · 8 min de bus')
+    sortie: { minutes: 8, mode: 'transports' },
+  }))).toBe('22 min à pied · Marseille Saint-Charles → Paris Gare de Lyon · 1 correspondance · 8 min en transports')
 })
 
 test('descriptionTrajet : pluriel des correspondances', () => {
@@ -97,12 +97,12 @@ test('descriptionTrajet : sans correspondance, rien n’est écrit', () => {
 })
 
 test('descriptionTrajet : accès nul non affiché', () => {
-  expect(descriptionTrajet(trajet({ depart: 'A', arrivee: 'B', sortie: { minutes: 0, mode: 'bus' } })))
+  expect(descriptionTrajet(trajet({ depart: 'A', arrivee: 'B', sortie: { minutes: 0, mode: 'transports' } })))
     .toBe('A → B')
 })
 
 test('descriptionTrajet : trajet direct sans train', () => {
-  expect(descriptionTrajet(trajet({ acces: { minutes: 35, mode: 'bus' } }))).toBe('35 min en bus')
+  expect(descriptionTrajet(trajet({ acces: { minutes: 35, mode: 'voiture' } }))).toBe('35 min en voiture')
   expect(descriptionTrajet(trajet({ acces: { minutes: 20, mode: 'voiture' } }))).toBe('20 min en voiture')
   expect(descriptionTrajet(trajet({ acces: { minutes: 14, mode: 'à pied' } }))).toBe('14 min à pied')
 })

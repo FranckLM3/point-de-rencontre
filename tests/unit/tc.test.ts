@@ -27,10 +27,11 @@ const horaires: Horaires = {
 }
 const franck: Ami = { id: 'f', nom: 'Franck', adresse: 'x', lat: 43.2955, lon: 5.3925, transport: 'tc', navigo: false }
 
-test('accès : à pied, en bus, en voiture', () => {
-  expect(acces(1, 'tc')).toBeCloseTo((1 * 1.3 / 4.5) * 60)
-  expect(acces(10, 'tc')).toBeCloseTo((10 * 1.3 / 20) * 60)
-  expect(acces(10, 'voiture')).toBeCloseTo((10 * 1.3 / 40) * 60)
+test('accès : à pied, en transports dans un réseau urbain, en voiture ailleurs', () => {
+  expect(acces(1, 'tc', false)).toBeCloseTo((1 * 1.3 / 4.5) * 60)
+  expect(acces(10, 'tc', true)).toBeCloseTo((10 * 1.3 / 20) * 60)
+  expect(acces(10, 'tc', false)).toBeCloseTo((10 * 1.3 / 40) * 60)
+  expect(acces(10, 'voiture', true)).toBeCloseTo((10 * 1.3 / 40) * 60)
 })
 
 test('prix du train', () => {
@@ -161,8 +162,8 @@ test('versPointTc : étapes du trajet, accès, sortie et correspondances', () =>
   expect(t.acces.mode).toBe('à pied')
   expect(t.acces.minutes).toBeGreaterThan(15)
   expect(t.acces.minutes).toBeLessThan(30)
-  // Environ 2 km depuis la Gare de Lyon : en bus.
-  expect(t.sortie!.mode).toBe('bus')
+  // Environ 2 km depuis la Gare de Lyon, dans Paris : en transports (métro, RER).
+  expect(t.sortie!.mode).toBe('transports')
   expect(t.sortie!.minutes).toBeGreaterThan(0)
   expect(t.correspondances).toBe(1)
   expect(t.minutes).toBeCloseTo(t.acces.minutes + 194 + t.sortie!.minutes)
@@ -174,7 +175,8 @@ test('versPointTc : trajet direct, un seul segment et pas de sortie', () => {
   expect(t.depart).toBeNull()
   expect(t.sortie).toBeNull()
   expect(t.correspondances).toBe(0)
-  expect(t.acces.mode).toBe('bus')
+  // Marseille n'a pas encore son réseau urbain : le trajet se fait en voiture.
+  expect(t.acces.mode).toBe('voiture')
   expect(t.acces.minutes).toBeCloseTo(t.minutes)
 })
 
@@ -207,7 +209,7 @@ test('versPointTc : une gare desservie seulement par autocar subit une pénalit�
   const d = depuisGares(h, franck)
   const t = versPointTc(h, d, franck, 45.0, 5.0)!
   expect(t.arrivee).toBe('Vraie gare')
-  const sortieAttendue = acces(haversineKm(45.0025, 5.0, 45.0, 5.0), 'tc')
+  const sortieAttendue = acces(haversineKm(45.0025, 5.0, 45.0, 5.0), 'tc', false)
   expect(t.minutes).toBeCloseTo(d.minutes[2]! + sortieAttendue)
 })
 
@@ -304,3 +306,4 @@ test('cheminGares : boucle sans fin bornée à 400 pas', () => {
   const chemin = cheminGares(l, 0, n - 1)
   expect(chemin.length).toBeLessThanOrEqual(401)
 })
+

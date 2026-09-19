@@ -1,6 +1,7 @@
 import type { MoteurTc, MoteurVoiture } from './couches'
 import type { Itineraires } from '../donnees/voiture'
 import type { Rails } from '../donnees/rails'
+import { enReseauUrbain } from './reseaux-urbains'
 import { cheminGares, versPointTc } from './tc'
 import type { Ami, Lieu, Mode } from '../types'
 
@@ -102,17 +103,6 @@ const SANS_TRAIN = {
   chemin: null, trace: null, gareDepart: null, gareArrivee: null, directSansTrain: false, traceVoiture: null,
   traceAcces: null, traceSortie: null,
 } as const
-
-/**
- * Zones où l'accès aux gares se fait en transports urbains (métro, RER, tram) et non en voiture :
- * la route n'y est ni demandée ni dessinée (pointillés droits). Île-de-France aujourd'hui ;
- * Lyon et Marseille s'ajouteront avec leurs réseaux (plan 4).
- */
-const ZONES_RESEAU_URBAIN = [{ nom: 'Île-de-France', latMin: 48.12, latMax: 49.24, lonMin: 1.44, lonMax: 3.56 }] as const
-
-export function enReseauUrbain(lat: number, lon: number): boolean {
-  return ZONES_RESEAU_URBAIN.some((z) => lat >= z.latMin && lat <= z.latMax && lon >= z.lonMin && lon <= z.lonMax)
-}
 
 /** Couples (départ, arrivée) des routes d'accès et de sortie à demander : hors réseau urbain et pas
  * encore en cache pour un trajet ferroviaire. */

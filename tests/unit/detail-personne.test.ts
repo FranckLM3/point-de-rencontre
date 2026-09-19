@@ -10,7 +10,7 @@ const lyon: Lieu = { lat: 45.76, lon: 4.83, label: 'Lyon' }
 
 const trajetTc: TrajetTc = {
   minutes: 192, euros: 45, depart: 'Marseille Saint-Charles', arrivee: 'Paris Gare de Lyon Hall 1 - 2',
-  departIndice: 0, arriveeIndice: 2, acces: { minutes: 12, mode: 'bus' }, sortie: { minutes: 8, mode: 'voiture' }, correspondances: 1,
+  departIndice: 0, arriveeIndice: 2, acces: { minutes: 12, mode: 'transports' }, sortie: { minutes: 8, mode: 'voiture' }, correspondances: 1,
 }
 
 const rendre = (trajet: (a: Ami) => TrajetDetaille | null, cible: Lieu | null = lyon, choisis = ['f', 'm']): HTMLElement => {
@@ -25,7 +25,7 @@ test('transports : étapes accès, train avec gare de correspondance, sortie, et
   expect(fiche.querySelector('h3')!.textContent).toContain('Franck')
   expect(fiche.querySelector('.total')!.textContent).toBe('Vers Lyon : 3 h 12 · ≈ 45 €')
   expect([...fiche.querySelectorAll('.etapes li')].map((li) => li.textContent)).toEqual([
-    "12 min de bus jusqu'à Marseille Saint-Charles",
+    "12 min en transports jusqu'à Marseille Saint-Charles",
     'Train Marseille Saint-Charles → Paris Gare de Lyon, via Lyon Part-Dieu · 1 correspondance',
     "8 min de voiture jusqu'à Lyon",
   ])
