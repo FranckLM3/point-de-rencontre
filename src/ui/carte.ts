@@ -279,7 +279,10 @@ export function creerCarte(element: HTMLElement): Carte {
           dessinerGare(p.gareArrivee, arrivee)
         } else {
           const style = p.enVoiture ? STYLE_VOITURE : p.directSansTrain ? STYLE_POINTILLE : STYLE_DROITE
-          L.polyline([[p.lat, p.lon], [cible.lat, cible.lon]], style).bindTooltip(infobulle).addTo(coucheTrajets)
+          // Itinéraire routier réel une fois en cache (décision 7 assouplie) ; ligne droite pointillée
+          // en attendant ou en cas d'échec (src/calcul/trace.ts, src/donnees/voiture.ts).
+          const points = p.enVoiture && p.traceVoiture ? p.traceVoiture : [[p.lat, p.lon], [cible.lat, cible.lon]]
+          L.polyline(points as L.LatLngTuple[], style).bindTooltip(infobulle).addTo(coucheTrajets)
         }
       }
       L.circleMarker([cible.lat, cible.lon], { radius: RAYON_LIEU, color: COULEUR_LIGNE_VILLE, fillOpacity: 1 })

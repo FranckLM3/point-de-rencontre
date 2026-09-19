@@ -5,6 +5,7 @@ import type { Couche, ParametresPrix } from '../../src/calcul/voiture'
 import type { Grille } from '../../src/calcul/grille'
 import { INJOIGNABLE, type Horaires, type Ligne, type Station } from '../../src/donnees/horaires'
 import type { Rails } from '../../src/donnees/rails'
+import type { Itineraires } from '../../src/donnees/voiture'
 import type { Ami, Lieu } from '../../src/types'
 
 const ligne = (m: number[], k: number[], g: number[], c: number[], p: number[]): Ligne => ({
@@ -121,6 +122,29 @@ test('mode voiture : ligne droite pointillée, sans chemin ferroviaire', () => {
   expect(resultat).toHaveLength(1)
   expect(resultat[0]!.chemin).toBeNull()
   expect(resultat[0]!.enVoiture).toBe(true)
+  expect(resultat[0]!.traceVoiture).toBeNull()
+})
+
+test('mode voiture : sans itineraires, pas de tracé de route (ligne droite en attendant)', () => {
+  const resultat = personnesTrajetCarte([lea], 'voiture', null, null, lyon, null, null)
+  expect(resultat[0]!.traceVoiture).toBeNull()
+})
+
+test('mode voiture : itinéraire en cache, son tracé remplace la ligne droite', () => {
+  const trace: [number, number][] = [[45.8, 4.9], [45.77, 4.87], [45.76, 4.86]]
+  const itineraires: Itineraires = {
+    regarder: (depart, arrivee) => (depart.lat === lea.lat && arrivee.lat === lyon.lat ? { coordonnees: trace, minutes: 12, km: 8 } : null),
+    demander: () => {},
+  }
+  const resultat = personnesTrajetCarte([lea], 'voiture', null, null, lyon, null, itineraires)
+  expect(resultat[0]!.traceVoiture).toEqual(trace)
+})
+
+test('mode voiture : itinéraire pas encore en cache, traceVoiture reste null', () => {
+  const itineraires: Itineraires = { regarder: () => null, demander: () => {} }
+  const resultat = personnesTrajetCarte([lea], 'voiture', null, null, lyon, null, itineraires)
+  expect(resultat[0]!.traceVoiture).toBeNull()
+  expect(resultat[0]!.enVoiture).toBe(true)
 })
 
 test('mode mixte : voiture pour Léa si sa couche est prête, chemin ferroviaire pour Franck', async () => {
@@ -134,6 +158,17 @@ test('mode mixte : voiture pour Léa si sa couche est prête, chemin ferroviaire
   expect(pourFranck.chemin).not.toBeNull()
   expect(pourLea.enVoiture).toBe(true)
   expect(pourLea.chemin).toBeNull()
+})
+
+test('mode mixte : itinéraire en cache pour Léa (couche voiture prête)', async () => {
+  const moteurTc = creerMoteurTc(fauxHoraires(), 1)
+  await moteurTc.preparer([franck, lea])
+  const moteurVoiture = creerMoteurVoiture(grille8, parametres, new Map([['l', coucheLea]]))
+  const trace: [number, number][] = [[45.8, 4.9], [45.76, 4.86]]
+  const itineraires: Itineraires = { regarder: () => ({ coordonnees: trace, minutes: 10, km: 6 }), demander: () => {} }
+  const resultat = personnesTrajetCarte([lea], 'mixte', moteurTc, moteurVoiture, lyon, null, itineraires)
+  expect(resultat[0]!.enVoiture).toBe(true)
+  expect(resultat[0]!.traceVoiture).toEqual(trace)
 })
 
 test('mode mixte : repli sur le chemin ferroviaire tant que la couche voiture de Léa n’est pas prête', async () => {

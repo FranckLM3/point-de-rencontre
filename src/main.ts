@@ -20,7 +20,7 @@ import { enregistrerGroupe, listerGroupes } from './donnees/groupes'
 import { creerHoraires } from './donnees/horaires'
 import { creerChargeurRails, creerRails, type ChargeurRails } from './donnees/rails'
 import { chargerCarburant, chargerGrille, chargerGrille8km, chargerVilles, type PrixCarburant } from './donnees/statiques'
-import { chargerCouches, creerFileCalculVoiture, type FileCalculVoiture } from './donnees/voiture'
+import { chargerCouches, creerFileCalculVoiture, creerItineraires, type FileCalculVoiture, type Itineraires } from './donnees/voiture'
 import { aRelancer } from './calcul/relance-voiture'
 import { ETAT_DEFAUT, ecrireEtat, lireEtat } from './etat/url'
 import type { Ami, Etat, Groupe, Lieu, Mode, Ville } from './types'
@@ -70,6 +70,9 @@ interface Session {
   rails: ChargeurRails
   /** Un seul chargement des rails tenté par session (pas de nouvelle tentative à chaque rendu). */
   railsDemande: boolean
+  /** Itinéraires routiers réels (mode voiture ou mixte), mis en cache pour la session par couple
+   * départ/arrivée : voir src/donnees/voiture.ts. */
+  itineraires: Itineraires
   /** Grille de 8 km et prix des carburants, chargés à la première activation du mode voiture ou mixte. */
   voitureBase: { grille8: Grille; carburant: PrixCarburant } | null
   /** Couches voiture déjà calculées, par personne (toutes celles en voiture, pas seulement cochées :
@@ -250,12 +253,21 @@ function cibleCarte(s: Session): Lieu | null {
  * sur la carte et le lieu testé (D8, un seul chemin d'appel, une seule couche). */
 function dessinerTrajets(s: Session, choisis: Ami[]): void {
   const cible = cibleCarte(s)
-  const trajets = personnesTrajetCarte(choisis, s.etat.mode, s.tc.pret(), voitureMoteur(s), cible, s.rails.pret())
+  const trajets = personnesTrajetCarte(choisis, s.etat.mode, s.tc.pret(), voitureMoteur(s), cible, s.rails.pret(), s.itineraires)
   s.carte.trajets(trajets, cible)
   // Chargement paresseux : seulement quand un vrai trajet ferroviaire est dessiné, une fois par session.
   if (!s.railsDemande && !s.rails.pret() && trajets.some((t) => t.chemin !== null)) {
     s.railsDemande = true
     void s.rails.obtenir().then(() => dessinerTrajets(s, choisis)).catch(() => {})
+  }
+  // Itinéraire routier réel : demandé (mis en cache) dès qu'un trajet en voiture est dessiné et pas
+  // encore en cache ; `demander` est idempotent (sans effet si déjà en cours ou déjà en cache).
+  if (cible) {
+    for (const t of trajets) {
+      if (t.enVoiture && !t.traceVoiture) {
+        s.itineraires.demander({ lat: t.lat, lon: t.lon }, { lat: cible.lat, lon: cible.lon }, () => dessinerTrajets(s, choisis))
+      }
+    }
   }
 }
 
@@ -550,6 +562,7 @@ async function charger(carte: Carte, installer: (s: Session) => void): Promise<v
       tc: creerChargeurTc(creerHoraires),
       rails: creerChargeurRails(creerRails),
       railsDemande: false,
+      itineraires: creerItineraires(),
       voitureBase: null,
       voitureCouches,
       voitureVersion: 1,

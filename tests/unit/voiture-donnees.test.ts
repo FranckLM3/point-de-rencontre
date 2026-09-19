@@ -19,7 +19,7 @@ const from = vi.fn<(table: string) => RequeteSimulee>()
 const invoke = vi.fn<(nom: string, options?: unknown) => Promise<{ data: unknown; error: unknown }>>()
 vi.mock('../../src/donnees/supabase', () => ({ supabase: () => ({ from, functions: { invoke } }) }))
 
-const { decoderCouche, chargerCouches, creerFileCalculVoiture } = await import('../../src/donnees/voiture')
+const { decoderCouche, chargerCouches, creerFileCalculVoiture, creerItineraires } = await import('../../src/donnees/voiture')
 
 beforeEach(() => {
   from.mockReset()
@@ -144,4 +144,62 @@ test('onTermine est appelé à la fin de chaque calcul, succès ou échec', asyn
   await vi.waitFor(() => expect(onTermine).toHaveBeenCalledWith('a'))
   await file.demander('b')
   await vi.waitFor(() => expect(onTermine).toHaveBeenCalledWith('b'))
+})
+
+const paris = { lat: 48.85, lon: 2.35 }
+const lyon = { lat: 45.76, lon: 4.83 }
+const itineraireBrut = { coordonnees: [[2.35, 48.85], [3.5, 47.3], [4.83, 45.76]], minutes: 280, km: 465 }
+
+test('itineraires : rien en cache avant toute demande', () => {
+  const it = creerItineraires()
+  expect(it.regarder(paris, lyon)).toBeNull()
+  expect(invoke).not.toHaveBeenCalled()
+})
+
+test('itineraires : demander appelle la fonction avec action itineraire, départ et arrivée en [lon, lat]', async () => {
+  invoke.mockResolvedValue({ data: itineraireBrut, error: null })
+  const it = creerItineraires()
+  it.demander(paris, lyon, () => {})
+  await vi.waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith('voiture', { body: { action: 'itineraire', depart: [2.35, 48.85], arrivee: [4.83, 45.76] } }),
+  )
+})
+
+test('itineraires : une fois en cache, regarder rend le résultat sans nouvel appel', async () => {
+  invoke.mockResolvedValue({ data: itineraireBrut, error: null })
+  const it = creerItineraires()
+  const surTermine = vi.fn()
+  it.demander(paris, lyon, surTermine)
+  await vi.waitFor(() => expect(surTermine).toHaveBeenCalled())
+  expect(it.regarder(paris, lyon)).toEqual(itineraireBrut)
+  it.demander(paris, lyon, () => {})
+  expect(invoke).toHaveBeenCalledTimes(1)
+})
+
+test('itineraires : deux demandes concurrentes pour le même trajet ne déclenchent qu’un appel', async () => {
+  invoke.mockResolvedValue({ data: itineraireBrut, error: null })
+  const it = creerItineraires()
+  it.demander(paris, lyon, () => {})
+  it.demander(paris, lyon, () => {})
+  await vi.waitFor(() => expect(it.regarder(paris, lyon)).not.toBeNull())
+  expect(invoke).toHaveBeenCalledTimes(1)
+})
+
+test('itineraires : une erreur laisse le cache à null (repli sur la ligne droite)', async () => {
+  invoke.mockResolvedValue({ data: null, error: { message: '429' } })
+  const it = creerItineraires()
+  const surTermine = vi.fn()
+  it.demander(paris, lyon, surTermine)
+  await vi.waitFor(() => expect(surTermine).toHaveBeenCalled())
+  expect(it.regarder(paris, lyon)).toBeNull()
+})
+
+test('itineraires : deux trajets distincts sont mis en cache séparément', async () => {
+  invoke.mockResolvedValue({ data: itineraireBrut, error: null })
+  const it = creerItineraires()
+  it.demander(paris, lyon, () => {})
+  it.demander(lyon, paris, () => {})
+  await vi.waitFor(() => expect(invoke).toHaveBeenCalledTimes(2))
+  expect(it.regarder(paris, lyon)).not.toBeNull()
+  expect(it.regarder(lyon, paris)).not.toBeNull()
 })

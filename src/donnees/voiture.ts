@@ -104,3 +104,70 @@ export function creerFileCalculVoiture(rappels: RappelsFileCalculVoiture = {}): 
     enCours: (amiId) => enTraitement.has(amiId),
   }
 }
+
+// --- Itinéraire routier réel (fonction Edge `voiture`, action 'itineraire') ---------------------
+
+export interface PointRoute {
+  lat: number
+  lon: number
+}
+
+export interface Itineraire {
+  /** [lat, lon] du tracé, dans l'ordre du départ vers l'arrivée (rendu par l'edge function en [lon, lat]). */
+  coordonnees: [number, number][]
+  minutes: number
+  km: number
+}
+
+interface ReponseItineraire {
+  coordonnees: [number, number][]
+  minutes: number
+  km: number
+}
+
+const ARRONDI_CLE = 1e5
+const arrondirCle = (x: number): number => Math.round(x * ARRONDI_CLE) / ARRONDI_CLE
+const cleItineraire = (depart: PointRoute, arrivee: PointRoute): string =>
+  `${arrondirCle(depart.lat)},${arrondirCle(depart.lon)}|${arrondirCle(arrivee.lat)},${arrondirCle(arrivee.lon)}`
+
+/**
+ * Itinéraires routiers réels (ORS Directions, via la fonction Edge), mis en cache pour la durée de
+ * la session (par couple départ/arrivée arrondi) : un seul appel réseau par trajet, jamais rejoué au
+ * fil des rendus. Tant qu'un trajet n'est pas en cache (jamais demandé, en cours, ou en échec), la
+ * ligne droite pointillée habituelle reste affichée (src/calcul/trace.ts).
+ */
+export interface Itineraires {
+  /** Itinéraire déjà en cache, sinon null (jamais demandé, en cours de calcul, ou échec). */
+  regarder(depart: PointRoute, arrivee: PointRoute): Itineraire | null
+  /** Déclenche la demande si elle n'a pas déjà été faite (idempotent) ; `surTermine` est appelé une
+   * fois le résultat (succès ou échec) en cache, pour que l'appelant puisse redessiner. */
+  demander(depart: PointRoute, arrivee: PointRoute, surTermine: () => void): void
+}
+
+export function creerItineraires(): Itineraires {
+  const cache = new Map<string, Itineraire | null>()
+  const enCours = new Set<string>()
+  return {
+    regarder: (depart, arrivee) => cache.get(cleItineraire(depart, arrivee)) ?? null,
+    demander: (depart, arrivee, surTermine) => {
+      const cle = cleItineraire(depart, arrivee)
+      if (cache.has(cle) || enCours.has(cle)) return
+      enCours.add(cle)
+      supabase()
+        .functions.invoke('voiture', {
+          body: { action: 'itineraire', depart: [depart.lon, depart.lat], arrivee: [arrivee.lon, arrivee.lat] },
+        })
+        .then(({ data, error }: { data: ReponseItineraire | null; error: unknown }) => {
+          cache.set(cle, error || !data ? null : { coordonnees: data.coordonnees, minutes: data.minutes, km: data.km })
+        })
+        .catch((e: unknown) => {
+          console.error('Itinéraire voiture :', e)
+          cache.set(cle, null)
+        })
+        .finally(() => {
+          enCours.delete(cle)
+          surTermine()
+        })
+    },
+  }
+}

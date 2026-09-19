@@ -1,4 +1,5 @@
 import type { MoteurTc, MoteurVoiture } from './couches'
+import type { Itineraires } from '../donnees/voiture'
 import type { Rails } from '../donnees/rails'
 import { cheminGares, versPointTc } from './tc'
 import type { Ami, Lieu, Mode } from '../types'
@@ -30,8 +31,14 @@ export interface PersonneTrajetCarte {
   /** Vrai en mode transports quand le trajet le plus rapide ne passe par aucune gare. */
   directSansTrain: boolean
   /** Vrai quand le trajet est effectivement fait en voiture (mode voiture, ou mixte avec la
-   * couche prête) : ligne droite pointillée sur la carte (décision 7, pas de tracé de route). */
+   * couche prête) : ligne droite pointillée sur la carte, sauf itinéraire routier connu (`traceVoiture`). */
   enVoiture: boolean
+  /**
+   * Points [lat, lon] de l'itinéraire routier réel du domicile vers la cible, quand `itineraires`
+   * le connaît déjà (chargé paresseusement, en cache pour la session) ; null tant qu'il n'est pas
+   * en cache (ligne droite pointillée en attendant, src/ui/carte.ts) ou hors mode voiture.
+   */
+  traceVoiture: [number, number][] | null
 }
 
 /** Mêmes coordonnées, un seul trajet dessiné (D8) : deux Crocos au même point partagent leur trace. */
@@ -86,13 +93,24 @@ function trajetGroupeTc(
   return { chemin, trace, gareDepart: t.departIndice, gareArrivee: t.arriveeIndice, directSansTrain: false }
 }
 
-const SANS_TRAIN = { chemin: null, trace: null, gareDepart: null, gareArrivee: null, directSansTrain: false } as const
+const SANS_TRAIN = {
+  chemin: null, trace: null, gareDepart: null, gareArrivee: null, directSansTrain: false, traceVoiture: null,
+} as const
+
+/** Points [lat, lon] de l'itinéraire routier connu du domicile vers la cible, sinon null (ligne
+ * droite pointillée en attendant ou en l'absence d'`itineraires`, décidé par l'appelant). */
+function traceVoitureVers(representant: Ami, cible: Lieu, itineraires: Itineraires | null): [number, number][] | null {
+  const itineraire = itineraires?.regarder({ lat: representant.lat, lon: representant.lon }, { lat: cible.lat, lon: cible.lon })
+  return itineraire ? itineraire.coordonnees : null
+}
 
 /**
  * Trajets à dessiner sur la carte pour la cible choisie (ville, étiquette ou lieu testé), un par
  * point de départ distinct. En mode transports (ou en mixte pour une personne en transports), le
- * chemin suit les gares réelles (`cheminGares`) ; en voiture (mode voiture, ou mixte avec la
- * couche prête), une ligne droite pointillée (décision 7) ; sinon une ligne droite pleine.
+ * chemin suit les gares réelles (`cheminGares`) ; en voiture (mode voiture, ou mixte avec la couche
+ * prête), l'itinéraire routier réel quand `itineraires` le connaît déjà, sinon une ligne droite
+ * pointillée en attendant (décision 7 assouplie : le tracé de route remplace la ligne droite une
+ * fois chargé) ; sinon une ligne droite pleine.
  */
 export function personnesTrajetCarte(
   amis: Ami[],
@@ -101,19 +119,24 @@ export function personnesTrajetCarte(
   moteurVoiture: MoteurVoiture | null,
   cible: Lieu | null,
   rails: Rails | null = null,
+  itineraires: Itineraires | null = null,
 ): PersonneTrajetCarte[] {
   if (!cible) return []
   return grouperParDepart(amis).map((groupe) => {
     const representant = groupe[0]!
     const base = { noms: groupe.map((a) => a.nom), lat: representant.lat, lon: representant.lon }
-    if (mode === 'voiture') return { ...base, ...SANS_TRAIN, enVoiture: true }
+    if (mode === 'voiture') {
+      return { ...base, ...SANS_TRAIN, enVoiture: true, traceVoiture: traceVoitureVers(representant, cible, itineraires) }
+    }
     if (mode === 'mixte') {
       const coucheVoiturePrete = representant.transport === 'voiture' && moteurVoiture?.couche(representant.id) !== undefined
-      if (coucheVoiturePrete) return { ...base, ...SANS_TRAIN, enVoiture: true }
-      if (moteurTc) return { ...base, ...trajetGroupeTc(moteurTc, representant, cible, rails), enVoiture: false }
+      if (coucheVoiturePrete) {
+        return { ...base, ...SANS_TRAIN, enVoiture: true, traceVoiture: traceVoitureVers(representant, cible, itineraires) }
+      }
+      if (moteurTc) return { ...base, ...trajetGroupeTc(moteurTc, representant, cible, rails), enVoiture: false, traceVoiture: null }
       return { ...base, ...SANS_TRAIN, enVoiture: false }
     }
     if (mode !== 'tc' || !moteurTc) return { ...base, ...SANS_TRAIN, enVoiture: false }
-    return { ...base, ...trajetGroupeTc(moteurTc, representant, cible, rails), enVoiture: false }
+    return { ...base, ...trajetGroupeTc(moteurTc, representant, cible, rails), enVoiture: false, traceVoiture: null }
   })
 }

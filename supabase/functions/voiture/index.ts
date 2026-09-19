@@ -1,10 +1,11 @@
-// Fonction Edge `voiture` : calcule, pour un Croco, les temps et distances en
-// voiture vers chaque point de la grille de 8 km, via la matrice OpenRouteService,
-// et les écrit dans `public.temps` (couche 'voiture').
-//
-// Entrée : POST { ami_id }, jeton de l'utilisateur connecté (vérifié par
-// supabase.auth.getUser), sinon 401. Ne journalise jamais d'adresse ni de
-// coordonnées (seulement l'identifiant de l'ami).
+// Fonction Edge `voiture`, deux actions, authentifiées de la même façon (jeton de l'utilisateur
+// connecté, vérifié par supabase.auth.getUser, sinon 401) :
+// - par défaut (ou action: 'couche') : POST { ami_id } calcule, pour un Croco, les temps et
+//   distances en voiture vers chaque point de la grille de 8 km, via la matrice OpenRouteService,
+//   et les écrit dans `public.temps` (couche 'voiture').
+// - action: 'itineraire' : POST { action, depart: [lon, lat], arrivee: [lon, lat] } rend le tracé
+//   routier réel entre deux points (ORS Directions), sans écriture en base.
+// Ne journalise jamais d'adresse ni de coordonnées (seulement l'identifiant de l'ami, ou rien).
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import {
   assemblerResultats,
@@ -15,6 +16,7 @@ import {
   versBytea,
   type Point,
 } from './encodage.ts'
+import { analyserCoordonnee, analyserReponseItineraire, corpsItineraire } from './itineraire.ts'
 import { enTetesCors } from './cors.ts'
 
 /** Bumper si le générateur ou le pas de la grille de 8 km change : force le recalcul de toutes les couches. */
@@ -22,6 +24,7 @@ const VERSION_GRILLE = 'grille-8km-v1'
 const COUCHE = 'voiture'
 const GRILLE_URL_DEFAUT = 'https://francklm3.github.io/point-de-rencontre/data/grille-8km.json'
 const URL_MATRICE_ORS = 'https://api.openrouteservice.org/v2/matrix/driving-car'
+const URL_DIRECTIONS_ORS = 'https://api.openrouteservice.org/v2/directions/driving-car/geojson'
 const HTTP_TROP_DE_REQUETES = 429
 const MESSAGE_QUOTA = 'Trop de calculs de trajets en ce moment (quota OpenRouteService atteint) : réessaie plus tard.'
 const MESSAGE_RESEAU = 'Le calcul des temps en voiture a échoué (problème réseau).'
@@ -89,12 +92,15 @@ async function traiter(req: Request): Promise<Response> {
   } = await client.auth.getUser()
   if (erreurUtilisateur || !user) return reponse({ erreur: 'Non authentifié.' }, 401)
 
-  let corpsRequete: { ami_id?: unknown }
+  let corpsRequete: { action?: unknown; ami_id?: unknown; depart?: unknown; arrivee?: unknown }
   try {
-    corpsRequete = (await req.json()) as { ami_id?: unknown }
+    corpsRequete = (await req.json()) as typeof corpsRequete
   } catch {
     return reponse({ erreur: 'Corps de requête invalide.' }, 400)
   }
+
+  if (corpsRequete.action === 'itineraire') return traiterItineraire(orsCle, corpsRequete)
+
   const amiId = corpsRequete.ami_id
   if (typeof amiId !== 'string' || amiId.length === 0) return reponse({ erreur: 'ami_id manquant.' }, 400)
 
@@ -170,4 +176,37 @@ async function traiter(req: Request): Promise<Response> {
   }
 
   return reponse({ etat: 'calcule' })
+}
+
+/** action: 'itineraire' : tracé routier réel entre deux points (ORS Directions), sans écriture en base. */
+async function traiterItineraire(orsCle: string, corps: { depart?: unknown; arrivee?: unknown }): Promise<Response> {
+  const depart = analyserCoordonnee(corps.depart)
+  const arrivee = analyserCoordonnee(corps.arrivee)
+  if (!depart || !arrivee) return reponse({ erreur: 'depart ou arrivee invalide.' }, 400)
+
+  let res: Response
+  try {
+    res = await fetch(URL_DIRECTIONS_ORS, {
+      method: 'POST',
+      headers: { Authorization: orsCle, 'Content-Type': 'application/json' },
+      body: JSON.stringify(corpsItineraire(depart, arrivee)),
+    })
+  } catch (e) {
+    console.error('voiture : réseau ORS (itinéraire)', e)
+    return reponse({ erreur: MESSAGE_RESEAU }, 502)
+  }
+  if (res.status === HTTP_TROP_DE_REQUETES) {
+    console.error('voiture : quota ORS atteint (itinéraire)')
+    return reponse({ erreur: MESSAGE_QUOTA }, HTTP_TROP_DE_REQUETES)
+  }
+  if (!res.ok) {
+    console.error(`voiture : ORS HTTP ${res.status} (itinéraire)`)
+    return reponse({ erreur: MESSAGE_RESEAU }, 502)
+  }
+  const itineraire = analyserReponseItineraire(await res.json())
+  if (!itineraire) {
+    console.error('voiture : réponse ORS sans tracé exploitable (itinéraire)')
+    return reponse({ erreur: MESSAGE_RESEAU }, 502)
+  }
+  return reponse(itineraire)
 }
