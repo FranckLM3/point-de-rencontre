@@ -15,6 +15,7 @@ import {
   versBytea,
   type Point,
 } from './encodage.ts'
+import { enTetesCors } from './cors.ts'
 
 /** Bumper si le générateur ou le pas de la grille de 8 km change : force le recalcul de toutes les couches. */
 const VERSION_GRILLE = 'grille-8km-v1'
@@ -58,6 +59,15 @@ interface ReponseMatrice {
 }
 
 Deno.serve(async (req: Request) => {
+  const cors = enTetesCors(req.headers.get('Origin'))
+  // Contrôle préalable du navigateur : sans réponse positive, l'appel réel n'est jamais envoyé.
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
+  const res = await traiter(req)
+  for (const [nom, valeur] of Object.entries(cors)) res.headers.set(nom, valeur)
+  return res
+})
+
+async function traiter(req: Request): Promise<Response> {
   if (req.method !== 'POST') return reponse({ erreur: 'Méthode non supportée.' }, 405)
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -160,4 +170,4 @@ Deno.serve(async (req: Request) => {
   }
 
   return reponse({ etat: 'calcule' })
-})
+}
