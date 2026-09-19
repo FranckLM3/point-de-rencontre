@@ -20,6 +20,7 @@ import { enregistrerGroupe, listerGroupes } from './donnees/groupes'
 import { creerHoraires } from './donnees/horaires'
 import { chargerCarburant, chargerGrille, chargerGrille8km, chargerVilles, type PrixCarburant } from './donnees/statiques'
 import { chargerCouches, creerFileCalculVoiture, type FileCalculVoiture } from './donnees/voiture'
+import { aRelancer } from './calcul/relance-voiture'
 import { ecrireEtat, lireEtat } from './etat/url'
 import type { Ami, Etat, Groupe, Lieu, Mode, Ville } from './types'
 import { rendreAmis } from './ui/amis'
@@ -50,6 +51,8 @@ const racine = document.querySelector<HTMLElement>('#app')!
 const CROCO = mascotteCroco('croco', 28)
 
 interface Session {
+  /** Repli à vol d'oiseau en cours : son bandeau est réaffiché à chaque rafraîchissement. */
+  repli: { message: string; modeVoulu: Mode } | null
   grille: Grille
   villes: Ville[]
   amis: Ami[]
@@ -70,6 +73,8 @@ interface Session {
   voitureVersion: number
   /** Un seul calcul voiture à la fois (quota OpenRouteService) ; déclenché depuis la fiche d'une personne. */
   fileVoiture: FileCalculVoiture
+  /** Crocos dont le calcul voiture a déjà été relancé pendant cette session (pas de boucle sur un échec). */
+  voitureTentes: Set<string>
   /** Augmente à chaque rendu : un calcul asynchrone périmé est ignoré. */
   rendu: number
   /** Augmente à chaque rechargement des personnes (E4). */
@@ -117,6 +122,12 @@ function voitureMoteur(s: Session): MoteurVoiture | null {
 /** Relit les couches voiture déjà calculées pour tous les Crocos en voiture (pas seulement cochés :
  * l'indicateur « calcul en cours » de la liste en a besoin même hors sélection). Best-effort : une
  * erreur ne bloque pas le reste de l'application. */
+/** Relance le calcul des Crocos en voiture dont la couche manque (calcul jamais abouti, ou fiche
+ * enregistrée avant que la fonction soit joignable), une fois par session. */
+function relancerCouchesManquantes(s: Session): void {
+  for (const id of aRelancer(s.amis, new Set(s.voitureCouches.keys()), s.voitureTentes)) void s.fileVoiture.demander(id)
+}
+
 async function actualiserCouchesVoiture(s: Session, amis: Ami[]): Promise<void> {
   const ids = amis.filter((a) => a.transport === 'voiture').map((a) => a.id)
   try {
@@ -168,6 +179,7 @@ async function recharger(s: Session): Promise<void> {
   s.groupes = groupes
   s.version++
   await actualiserCouchesVoiture(s, amis)
+  relancerCouchesManquantes(s)
   rafraichir(s)
 }
 
@@ -379,8 +391,19 @@ function attendreChargement(s: Session, choisis: Ami[], texte: string): void {
  * mode mémorisé pour le bouton « Réessayer », qui retente le mode voulu au départ. */
 function echecPreparation(s: Session, modeVoulu: Mode, e: unknown): void {
   console.error('Préparation (horaires ou voiture) :', e)
+  s.repli = { message: `Estimation à vol d’oiseau : ${(e as Error).message}`, modeVoulu }
   changer(s, { mode: 'oiseau', max: null })
-  signaler(`Estimation à vol d’oiseau : ${(e as Error).message}`, () => changer(s, { mode: modeVoulu, max: null }))
+}
+
+/** Bandeau du repli tant que l'appli reste à vol d'oiseau ; vide sinon (tout autre rafraîchissement). */
+function afficherBandeauRepli(s: Session): void {
+  if (s.repli && s.etat.mode === 'oiseau') {
+    const { message, modeVoulu } = s.repli
+    signaler(message, () => changer(s, { mode: modeVoulu, max: null }))
+    return
+  }
+  s.repli = null
+  signaler('')
 }
 
 function viderChargement(texte: string): void {
@@ -404,7 +427,7 @@ async function preparerVoitureBase(s: Session): Promise<void> {
 
 function rafraichir(s: Session): void {
   history.replaceState(null, '', ecrireEtat(s.etat))
-  signaler('')
+  afficherBandeauRepli(s)
   const rendu = ++s.rendu
   const actif = document.activeElement
   const focus = $('#panneau').contains(actif) ? cleFocus(actif) : null
@@ -505,6 +528,8 @@ async function charger(carte: Carte, installer: (s: Session) => void): Promise<v
       voitureBase: null,
       voitureCouches,
       voitureVersion: 1,
+      voitureTentes: new Set(),
+      repli: null,
       fileVoiture: creerFileCalculVoiture({
         onErreur: (message) => signaler(message),
         onTermine: () => { void actualiserCouchesVoiture(s, s.amis).then(() => rafraichir(s)) },
@@ -519,6 +544,7 @@ async function charger(carte: Carte, installer: (s: Session) => void): Promise<v
     }
     installer(s)
     statut.textContent = ''
+    relancerCouchesManquantes(s)
     rafraichir(s)
   } catch (e) {
     console.error('Échec du chargement :', e)
