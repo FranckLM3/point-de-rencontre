@@ -1,7 +1,6 @@
 import type { MoteurTc, MoteurVoiture } from './couches'
 import type { Itineraires } from '../donnees/voiture'
 import type { Rails } from '../donnees/rails'
-import { enReseauUrbain } from './reseaux-urbains'
 import { cheminGares, versPointTc } from './tc'
 import type { Ami, Lieu, Mode } from '../types'
 
@@ -45,6 +44,10 @@ export interface PersonneTrajetCarte {
   traceAcces: [number, number][] | null
   /** Même chose de la gare d'arrivée jusqu'à la cible (dernier kilomètre). */
   traceSortie: [number, number][] | null
+  /** Vrai quand l'accès à la gare, ou la sortie, se fait en voiture (et non à pied ou en métro) :
+   * seules ces étapes suivent la route. */
+  accesEnVoiture: boolean
+  sortieEnVoiture: boolean
 }
 
 /** Mêmes coordonnées, un seul trajet dessiné (D8) : deux Crocos au même point partagent leur trace. */
@@ -83,11 +86,11 @@ function trajetGroupeTc(
   representant: Ami,
   cible: Lieu,
   rails: Rails | null,
-): Pick<PersonneTrajetCarte, 'chemin' | 'trace' | 'gareDepart' | 'gareArrivee' | 'directSansTrain'> {
+): Pick<PersonneTrajetCarte, 'chemin' | 'trace' | 'gareDepart' | 'gareArrivee' | 'directSansTrain' | 'accesEnVoiture' | 'sortieEnVoiture'> {
   const d = moteur.depuis(representant)
   const t = versPointTc(moteur.horaires, d, representant, cible.lat, cible.lon, moteur.gares(cible.lat, cible.lon))
   if (!t || t.departIndice === null || t.arriveeIndice === null) {
-    return { chemin: null, trace: null, gareDepart: null, gareArrivee: null, directSansTrain: t !== null }
+    return { chemin: null, trace: null, gareDepart: null, gareArrivee: null, directSansTrain: t !== null, accesEnVoiture: false, sortieEnVoiture: false }
   }
   const ligne = moteur.horaires.ligne(t.departIndice)
   const indices = ligne ? cheminGares(ligne, t.departIndice, t.arriveeIndice) : [t.departIndice, t.arriveeIndice]
@@ -96,16 +99,19 @@ function trajetGroupeTc(
     return { lat: s.lat, lon: s.lon, nom: s.nom }
   })
   const trace = construireTrace(indices, chemin, rails)
-  return { chemin, trace, gareDepart: t.departIndice, gareArrivee: t.arriveeIndice, directSansTrain: false }
+  return {
+    chemin, trace, gareDepart: t.departIndice, gareArrivee: t.arriveeIndice, directSansTrain: false,
+    accesEnVoiture: t.acces.mode === 'voiture', sortieEnVoiture: t.sortie?.mode === 'voiture',
+  }
 }
 
 const SANS_TRAIN = {
   chemin: null, trace: null, gareDepart: null, gareArrivee: null, directSansTrain: false, traceVoiture: null,
-  traceAcces: null, traceSortie: null,
+  traceAcces: null, traceSortie: null, accesEnVoiture: false, sortieEnVoiture: false,
 } as const
 
-/** Couples (départ, arrivée) des routes d'accès et de sortie à demander : hors réseau urbain et pas
- * encore en cache pour un trajet ferroviaire. */
+/** Couples (départ, arrivée) des routes d'accès et de sortie à demander : étapes faites en voiture
+ * d'un trajet ferroviaire, pas encore en cache. */
 export function routesADemander(
   trajets: PersonneTrajetCarte[],
   cible: Lieu,
@@ -115,10 +121,10 @@ export function routesADemander(
     if (!t.chemin || t.chemin.length === 0) continue
     const premiere = t.chemin[0]!
     const derniere = t.chemin[t.chemin.length - 1]!
-    if (!t.traceAcces && !enReseauUrbain(t.lat, t.lon)) {
+    if (t.accesEnVoiture && !t.traceAcces) {
       routes.push({ depart: { lat: t.lat, lon: t.lon }, arrivee: { lat: premiere.lat, lon: premiere.lon } })
     }
-    if (!t.traceSortie && !enReseauUrbain(cible.lat, cible.lon)) {
+    if (t.sortieEnVoiture && !t.traceSortie) {
       routes.push({ depart: { lat: derniere.lat, lon: derniere.lon }, arrivee: { lat: cible.lat, lon: cible.lon } })
     }
   }
@@ -129,19 +135,20 @@ export function routesADemander(
  * cible), quand `itineraires` les a déjà en cache ; null sinon. */
 function routesGares(
   representant: Ami,
-  chemin: CoordGare[] | null,
+  tc: Pick<PersonneTrajetCarte, 'chemin' | 'accesEnVoiture' | 'sortieEnVoiture'>,
   cible: Lieu,
   itineraires: Itineraires | null,
 ): Pick<PersonneTrajetCarte, 'traceAcces' | 'traceSortie'> {
+  const { chemin } = tc
   if (!chemin || chemin.length === 0 || !itineraires) return { traceAcces: null, traceSortie: null }
   const premiere = chemin[0]!
   const derniere = chemin[chemin.length - 1]!
-  const acces = enReseauUrbain(representant.lat, representant.lon)
-    ? null
-    : itineraires.regarder({ lat: representant.lat, lon: representant.lon }, { lat: premiere.lat, lon: premiere.lon })
-  const sortie = enReseauUrbain(cible.lat, cible.lon)
-    ? null
-    : itineraires.regarder({ lat: derniere.lat, lon: derniere.lon }, { lat: cible.lat, lon: cible.lon })
+  const acces = tc.accesEnVoiture
+    ? itineraires.regarder({ lat: representant.lat, lon: representant.lon }, { lat: premiere.lat, lon: premiere.lon })
+    : null
+  const sortie = tc.sortieEnVoiture
+    ? itineraires.regarder({ lat: derniere.lat, lon: derniere.lon }, { lat: cible.lat, lon: cible.lon })
+    : null
   return { traceAcces: acces?.coordonnees ?? null, traceSortie: sortie?.coordonnees ?? null }
 }
 
@@ -153,7 +160,7 @@ function trajetTcAvecRoutes(
   itineraires: Itineraires | null,
 ): Omit<PersonneTrajetCarte, 'noms' | 'lat' | 'lon' | 'enVoiture'> {
   const tc = trajetGroupeTc(moteur, representant, cible, rails)
-  return { ...tc, traceVoiture: null, ...routesGares(representant, tc.chemin, cible, itineraires) }
+  return { ...tc, traceVoiture: null, ...routesGares(representant, tc, cible, itineraires) }
 }
 
 /** Points [lat, lon] de l'itinéraire routier connu du domicile vers la cible, sinon null (ligne

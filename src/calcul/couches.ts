@@ -2,7 +2,7 @@ import type { Horaires } from '../donnees/horaires'
 import type { Ami, Etat } from '../types'
 import { distancesOiseau } from './agregat'
 import type { Grille } from './grille'
-import { coucheTc, depuisGares, garesProches, versPointTc, type DepuisGares, type Proche } from './tc'
+import { coucheTc, departsPossibles, depuisGares, garesProches, versPointTc, type DepuisGares, type Proche } from './tc'
 import { descriptionTrajet, descriptionVoiture } from '../ui/format'
 import { coucheVoiture, indexPointsFrance, prixVoiture, valeurVoiture, type Couche, type ParametresPrix } from './voiture'
 import { mesureOiseau, type Mesure } from './villes'
@@ -43,14 +43,15 @@ export function creerMoteurTc(horaires: Horaires, version: number): MoteurTc {
   return {
     horaires,
     version,
-    preparer: (amis) => horaires.lignes(amis.flatMap((a) => garesDe(a.lat, a.lon).map((g) => g.gare))),
+    // Gares proches et, dans un réseau urbain, ses gares SNCF bien placées (departsPossibles).
+    preparer: (amis) => horaires.lignes(amis.flatMap((a) => departsPossibles(horaires, a).departs.map((p) => p.gare))),
     depuis: (a) => {
       const cle = cleDepuis(a)
       const connu = depuis.get(cle)
       if (connu) return connu
       const d = depuisGares(horaires, a)
       // Tant qu'une ligne manque, le résultat est incomplet : on ne le garde pas.
-      if (d.proches.every((p) => horaires.ligne(p.gare) !== undefined)) depuis.set(cle, d)
+      if (d.departs.every((p) => horaires.ligne(p.gare) !== undefined)) depuis.set(cle, d)
       return d
     },
     gares: garesDe,

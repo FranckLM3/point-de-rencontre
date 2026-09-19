@@ -1,3 +1,5 @@
+import { chargerReseaux, type ReseauUrbain } from './urbain'
+
 export interface Station {
   nom: string
   lat: number
@@ -26,6 +28,8 @@ export interface Voisins {
 export interface Horaires {
   stations: Station[]
   voisins: Voisins
+  /** Métro, RER, tram (plan 4) ; absent ou vide : accès aux gares estimés (à pied puis en voiture). */
+  reseaux?: ReseauUrbain[]
   /** Charge (une fois) les lignes demandées. */
   lignes(indices: number[]): Promise<void>
   /** Ligne déjà chargée, sinon undefined. */
@@ -93,6 +97,7 @@ export async function creerHoraires(): Promise<Horaires> {
     lire('stations.json').then((r) => r.json() as Promise<Station[]>),
     lire('voisins-4km.bin').then((r) => r.arrayBuffer()).then(decoderVoisins),
   ])
+  const reseaux = await chargerReseaux(stations)
   const chargees = new Map<number, Ligne>()
   const enCours = new Map<number, Promise<void>>()
   const charger = (i: number): Promise<void> => {
@@ -109,6 +114,7 @@ export async function creerHoraires(): Promise<Horaires> {
   return {
     stations,
     voisins,
+    reseaux,
     lignes: async (indices) => { await Promise.all([...new Set(indices)].map(charger)) },
     ligne: (i) => chargees.get(i),
   }

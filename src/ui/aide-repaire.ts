@@ -23,7 +23,7 @@ const MOYEN: Record<Mode, string> = {
 
 const TRAIN =
   'En train : horaires SNCF réels d’un mardi, départs de 6 h à 20 h, correspondances comprises. ' +
-  'Pour rejoindre la gare et en repartir : à pied jusqu’à 1,5 km, au-delà en voiture, ou en métro et RER en Île-de-France.'
+  'Pour rejoindre la gare et en repartir : à pied jusqu’à 1,5 km ; en métro, RER ou tram (horaires réels) en Île-de-France, à Lyon et à Marseille ; en voiture ailleurs.'
 const VOITURE = 'En voiture : durée et distance sur la route réelle ; le prix compte le carburant et un péage estimé.'
 
 function paragraphes(unite: Unite, critere: Critere, c: ContexteAide): string[] {

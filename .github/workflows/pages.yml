@@ -53,7 +53,9 @@ jobs:
       - name: Empreinte du calcul
         id: empreinte
         run: |
-          echo "valeur=$(sha256sum horaires/*.py public/data/grille-4km.json | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
+          # Liste explicite (même ordre que l'ancien horaires/*.py) : urbain.py a sa propre réserve.
+          fichiers="horaires/__init__.py horaires/__main__.py horaires/geo.py horaires/gtfs.py horaires/parcours.py horaires/rails.py horaires/sortie.py"
+          echo "valeur=$(sha256sum $fichiers public/data/grille-4km.json | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
       - name: Dernier calcul en réserve
         id: reserve
         uses: actions/cache/restore@v4
@@ -113,6 +115,36 @@ jobs:
         with:
           path: public/data/tc
           key: ${{ steps.version.outputs.cle }}
+      # Réseaux urbains (métro, RER, tram ; plan 4) : moins d'une minute de calcul, même principe
+      # de réserve que les horaires SNCF. Sans réserve ni calcul réussi, la page est publiée sans
+      # eux (règle voiture partout), avec un avertissement.
+      - name: Empreinte des réseaux urbains
+        id: empreinte_urbain
+        run: |
+          echo "valeur=$(sha256sum horaires/urbain.py horaires/gtfs.py horaires/geo.py | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
+      - name: Réseaux urbains en réserve
+        id: reserve_urbain
+        uses: actions/cache/restore@v4
+        with:
+          path: public/data/urbain
+          key: urbain-${{ steps.empreinte_urbain.outputs.valeur }}-aucune-cle-exacte
+          restore-keys: urbain-${{ steps.empreinte_urbain.outputs.valeur }}-
+      - name: Calculer les réseaux urbains
+        id: calcul_urbain
+        if: steps.reserve_urbain.outputs.cache-matched-key == '' || github.event_name == 'schedule' || github.event.inputs.rafraichir_horaires == 'true'
+        continue-on-error: true
+        run: python3 -m horaires.urbain --sortie public/data/urbain
+      - name: Garder les réseaux urbains en réserve
+        if: steps.calcul_urbain.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: public/data/urbain
+          key: urbain-${{ steps.empreinte_urbain.outputs.valeur }}-${{ github.run_id }}
+      - name: Vérifier les réseaux urbains
+        run: |
+          if [ ! -f public/data/urbain/reseaux.json ]; then
+            echo "::warning::Réseaux urbains indisponibles, publication sans eux (règle voiture partout)."
+          fi
       - name: Prix du carburant
         run: |
           node scripts/carburant.mjs || echo "::warning::Téléchargement du prix des carburants en échec, fichier commité conservé (public/data/carburant.json)."

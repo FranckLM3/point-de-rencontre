@@ -1,8 +1,9 @@
 import { expect, test } from 'vitest'
 import { haversineKm } from '../../src/calcul/geo'
 import type { Grille } from '../../src/calcul/grille'
-import { acces, cheminGares, coucheTc, depuisGares, garesProches, prixTrain, versPointTc } from '../../src/calcul/tc'
+import { cheminGares, coucheTc, depuisGares, garesProches, prixTrain, versPointTc } from '../../src/calcul/tc'
 import { INJOIGNABLE, type Horaires, type Ligne, type Station } from '../../src/donnees/horaires'
+import type { ReseauUrbain } from '../../src/donnees/urbain'
 import type { Ami } from '../../src/types'
 
 const ligne = (m: number[], k: number[], g: number[], c: number[] = m.map(() => 0), p: number[] = m.map(() => INJOIGNABLE)): Ligne => ({
@@ -16,7 +17,15 @@ const lignes = new Map([
   [0, ligne([0, 194], [0, 750], [0, 1], [0, 1])],
   [1, ligne([196, 0], [750, 0], [1, 0], [1, 0])],
 ])
+// Réseau parisien réduit : Gare de Lyon (rattachée à la gare SNCF 1) et Hôtel de Ville, 7 et 8 min.
+const paris: ReseauUrbain = {
+  id: 'idf', nom: 'Île-de-France',
+  stations: [{ nom: 'Gare de Lyon', lat: 48.8443, lon: 2.3743 }, { nom: 'Hôtel de Ville', lat: 48.8573, lon: 2.3522 }],
+  minutes: Uint8Array.from([0, 7, 8, 0]),
+  gares: [{ gare: 1, station: 0 }],
+}
 const horaires: Horaires = {
+  reseaux: [paris],
   stations: [
     { nom: 'Marseille Saint-Charles', lat: 43.3027, lon: 5.3804, desservie: true },
     { nom: 'Paris Gare de Lyon', lat: 48.8449, lon: 2.3735, desservie: true },
@@ -26,13 +35,6 @@ const horaires: Horaires = {
   ligne: (i) => lignes.get(i),
 }
 const franck: Ami = { id: 'f', nom: 'Franck', adresse: 'x', lat: 43.2955, lon: 5.3925, transport: 'tc', navigo: false }
-
-test('accès : à pied, en transports dans un réseau urbain, en voiture ailleurs', () => {
-  expect(acces(1, 'tc', false)).toBeCloseTo((1 * 1.3 / 4.5) * 60)
-  expect(acces(10, 'tc', true)).toBeCloseTo((10 * 1.3 / 20) * 60)
-  expect(acces(10, 'tc', false)).toBeCloseTo((10 * 1.3 / 40) * 60)
-  expect(acces(10, 'voiture', true)).toBeCloseTo((10 * 1.3 / 40) * 60)
-})
 
 test('prix du train', () => {
   expect(prixTrain(0, false)).toBe(0)
@@ -120,7 +122,8 @@ test('coucheTc : NaN hors de France, valeurs ailleurs', () => {
   expect(temps[0]).toBeGreaterThan(194)
   expect(Number.isNaN(temps[1])).toBe(true)
   const prix = coucheTc(grille, h, d, franck, 'prix')
-  expect(prix[0]).toBeCloseTo(75 + 2)
+  // Train 75 €, puis un ticket de métro (2,50 €) jusqu'au lieu.
+  expect(prix[0]).toBeCloseTo(75 + 2.5)
 })
 
 test('garesProches ignore les gares à plus de 50 km', () => {
@@ -133,7 +136,7 @@ test('garesProches ignore les gares à plus de 50 km', () => {
 test('depuisGares : personne à plus de 50 km de toute gare, aucune gare joignable', () => {
   const isole: Ami = { ...franck, lat: 41.93, lon: 8.74 }
   const d = depuisGares(horaires, isole)
-  expect(d.proches).toEqual([])
+  expect(d.departs).toEqual([])
   expect(Number.isFinite(d.minutes[1])).toBe(false)
   // Seul le trajet direct reste possible.
   expect(versPointTc(horaires, d, isole, 41.95, 8.75)!.depart).toBeNull()
@@ -146,7 +149,8 @@ test('versPointTc : lieu à plus de 50 km de toute gare, injoignable', () => {
 })
 
 test('coucheTc : gare voisine à plus de 50 km ignorée', () => {
-  const grille: Grille = { lon0: 2.3522, lat0: 48.8566, pasLon: 1, pasLat: 1, nx: 1, ny: 1, dedans: new Uint8Array([1]) }
+  // Point hors de tout réseau urbain, à 50,1 km de la gare voisine.
+  const grille: Grille = { lon0: 2.3522, lat0: 48.4, pasLon: 1, pasLat: 1, nx: 1, ny: 1, dedans: new Uint8Array([1]) }
   const h: Horaires = {
     ...horaires,
     voisins: { gares: Uint16Array.from([1, 65535, 65535]), hectometres: Uint16Array.from([501, 0, 0]) },
@@ -162,8 +166,10 @@ test('versPointTc : étapes du trajet, accès, sortie et correspondances', () =>
   expect(t.acces.mode).toBe('à pied')
   expect(t.acces.minutes).toBeGreaterThan(15)
   expect(t.acces.minutes).toBeLessThan(30)
-  // Environ 2 km depuis la Gare de Lyon, dans Paris : en transports (métro, RER).
+  // Environ 2 km depuis la Gare de Lyon, dans Paris : par le réseau (7 min + 5 min de correspondance + marche).
   expect(t.sortie!.mode).toBe('transports')
+  expect(t.sortie!.minutes).toBeGreaterThan(12)
+  expect(t.sortie!.minutes).toBeLessThan(14)
   expect(t.sortie!.minutes).toBeGreaterThan(0)
   expect(t.correspondances).toBe(1)
   expect(t.minutes).toBeCloseTo(t.acces.minutes + 194 + t.sortie!.minutes)
@@ -209,7 +215,7 @@ test('versPointTc : une gare desservie seulement par autocar subit une pénalit�
   const d = depuisGares(h, franck)
   const t = versPointTc(h, d, franck, 45.0, 5.0)!
   expect(t.arrivee).toBe('Vraie gare')
-  const sortieAttendue = acces(haversineKm(45.0025, 5.0, 45.0, 5.0), 'tc', false)
+  const sortieAttendue = ((haversineKm(45.0025, 5.0, 45.0, 5.0) * 1.3) / 4.5) * 60
   expect(t.minutes).toBeCloseTo(d.minutes[2]! + sortieAttendue)
 })
 

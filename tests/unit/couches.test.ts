@@ -89,9 +89,10 @@ test('choisirMesure en transports : temps ou prix, et précision des gares', asy
   await moteur.preparer([marseille])
   const temps = choisirMesure({ mode: 'tc', grandeur: 'temps' }, moteur)(marseille, 48.8566, 2.3522)!
   expect(temps.valeur).toBeGreaterThan(194)
-  expect(temps.precision).toMatch(/^\d+ min à pied · Marseille Saint-Charles → Paris Gare de Lyon · 1 correspondance · \d+ min en transports$/)
+  expect(temps.precision).toMatch(/^\d+ min à pied · Marseille Saint-Charles → Paris Gare de Lyon · 1 correspondance · \d+ min de voiture$/)
   const prix = choisirMesure({ mode: 'tc', grandeur: 'prix' }, moteur)(marseille, 48.8566, 2.3522)!
-  expect(prix.valeur).toBeCloseTo(75 + 2)
+  // Sans réseau urbain dans ces horaires simulés : la fin du trajet se fait en voiture, sans ticket.
+  expect(prix.valeur).toBeCloseTo(75)
   const pres = choisirMesure({ mode: 'tc', grandeur: 'temps' }, moteur)(marseille, 43.2965, 5.37)!
   expect(pres.precision).toMatch(/^\d+ min en voiture$/)
   // Ajaccio : aucune gare à moins de 50 km.
@@ -110,7 +111,7 @@ test('couches : vol d’oiseau ou transports, recalcul seulement si la clé chan
   expect(couches.obtenir(marseille, { mode: 'tc', grandeur: 'temps' }, moteur)).toBe(temps)
   expect(couches.obtenir(marseille, { mode: 'oiseau', grandeur: 'temps' }, null)).toBe(km)
   const prix = couches.obtenir(marseille, { mode: 'tc', grandeur: 'prix' }, moteur)!
-  expect(prix[0]).toBeCloseTo(77)
+  expect(prix[0]).toBeCloseTo(75)
   const deplace = couches.obtenir({ ...marseille, lat: 43.3 }, { mode: 'tc', grandeur: 'temps' }, moteur)
   expect(deplace).not.toBe(temps)
 })

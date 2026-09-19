@@ -93,10 +93,25 @@ const binaire = (corps: Buffer): Parameters<Route['fulfill']>[0] => ({
 
 const attendre = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
-/** Sert des horaires synthétiques à la place des fichiers de `public/data/tc`. */
+/**
+ * Réseau urbain réduit : Hôtel de Ville (à 400 m de Léa) et Gare de Lyon, 9 min dans chaque sens.
+ * Sert à la place de `public/data/urbain` (fichiers calculés en CI, absents du dépôt).
+ */
+const RESEAUX_URBAINS = {
+  reseaux: [{ id: 'idf', nom: 'Île-de-France', jour: '20261006', stations: [['Gare de Lyon', 48.8443, 2.3743], ['Hôtel de Ville', 48.8573, 2.3522]] }],
+}
+const MATRICE_IDF = Buffer.from([0, 9, 9, 0])
+
+/** Sert des horaires synthétiques à la place des fichiers de `public/data/tc` et `public/data/urbain`. */
 export async function simulerHoraires(page: Page): Promise<HorairesSimules> {
   const etat: HorairesSimules = { disponibles: true }
   const cacheVoisins = voisins()
+  await page.route('**/data/urbain/**', async (route) => {
+    const chemin = new URL(route.request().url()).pathname
+    if (chemin.endsWith('reseaux.json')) return route.fulfill({ json: RESEAUX_URBAINS })
+    if (chemin.endsWith('idf.bin')) return route.fulfill(binaire(MATRICE_IDF))
+    return route.fulfill({ status: 404, body: '' })
+  })
   await page.route('**/data/tc/**', async (route) => {
     if (!etat.disponibles) return route.fulfill({ status: 404, body: '' })
     const chemin = new URL(route.request().url()).pathname

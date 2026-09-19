@@ -1,15 +1,10 @@
 import type { Horaires, Ligne, Station } from '../donnees/horaires'
 import { INJOIGNABLE, NB_VOISINS } from '../donnees/horaires'
-import type { Ami, Grandeur, Transport } from '../types'
+import type { Ami, Grandeur } from '../types'
 import { haversineKm } from './geo'
-import { enReseauUrbain } from './reseaux-urbains'
+import { bout, etapeDirecte, etapeGare, garesDuReseau, type Bout, type Etape, type Segment } from './etapes'
 import type { Grille } from './grille'
 
-const DETOUR = 1.3
-const MARCHE_MAX_KM = 1.5
-const VITESSE = { marche: 4.5, bus: 20, voiture: 40 } as const
-const DIRECT_MAX_KM = 30
-const PRIX_BUS = 2
 const PRIX_MIN_TRAIN = 5
 const TAUX_GRANDE_LIGNE = 0.1
 const TAUX_REGIONAL = 0.12
@@ -27,36 +22,7 @@ const distanceGare = (lat: number, lon: number, s: Station): number => {
   return km <= GARE_MAX_KM ? km : Number.POSITIVE_INFINITY
 }
 
-const minutesA = (km: number, vitesse: number): number => ((km * DETOUR) / vitesse) * 60
-
-/** Une étape du trajet hors train : rejoindre la gare, ou la quitter. */
-export interface Segment {
-  minutes: number
-  mode: 'à pied' | 'transports' | 'voiture'
-}
-
-/**
- * Moyen d'une étape hors train : à pied jusqu'à 1,5 km ; au-delà, en transports urbains dans un
- * réseau urbain (`enVille`, bout de l'étape côté ville : domicile pour l'accès, lieu visé pour la
- * sortie) sauf pour qui se déplace en voiture ; en voiture partout ailleurs.
- */
-function moyen(km: number, transport: Transport, enVille: boolean): Segment['mode'] {
-  if (km <= MARCHE_MAX_KM) return 'à pied'
-  return enVille && transport !== 'voiture' ? 'transports' : 'voiture'
-}
-
-const VITESSE_DE: Record<Segment['mode'], number> = { 'à pied': VITESSE.marche, transports: VITESSE.bus, voiture: VITESSE.voiture }
-
-export function acces(km: number, transport: Transport, enVille: boolean): number {
-  return minutesA(km, VITESSE_DE[moyen(km, transport, enVille)])
-}
-
-export function segment(km: number, transport: Transport, enVille: boolean): Segment {
-  return { minutes: acces(km, transport, enVille), mode: moyen(km, transport, enVille) }
-}
-
-const prixAcces = (km: number, transport: Transport, enVille: boolean): number =>
-  moyen(km, transport, enVille) === 'transports' ? PRIX_BUS : 0
+export type { Segment }
 
 export function prixTrain(km: number, grandeLigne: boolean): number {
   if (km <= 0) return 0
@@ -111,31 +77,56 @@ export interface DepuisGares {
   depart: Int32Array
   /** Nombre de changements de train jusqu'à chaque gare. */
   correspondances: Uint8Array
-  proches: Proche[]
+  /** Gares de départ envisagées, et l'étape pour les rejoindre. */
+  departs: Depart[]
+  /** Le domicile : réseau urbain et stations proches, pour les trajets sans train. */
+  domicile: Bout
+}
+
+export interface Depart {
+  gare: number
+  etape: Etape
+}
+
+/** Une gare du réseau urbain plus longue à rejoindre que la meilleure de plus que cela n'est pas envisagée. */
+const ECART_DEPART_MAX_MIN = 45
+
+/**
+ * Gares de départ : les 3 plus proches, plus, dans un réseau urbain, ses gares SNCF (toutes les
+ * gares parisiennes pour un Parisien) à 45 min au plus de la mieux placée.
+ */
+export function departsPossibles(h: Horaires, ami: Ami): { domicile: Bout; departs: Depart[] } {
+  const domicile = bout(h.reseaux, ami.lat, ami.lon)
+  const proches = garesProches(h.stations, ami.lat, ami.lon).map((p) => p.gare)
+  const indices = [...new Set([...proches, ...garesDuReseau(domicile)])]
+  const tous = indices.map((gare) => ({ gare, etape: etapeGare(domicile, h.stations[gare]!, gare, ami, 'acces') }))
+  const meilleure = Math.min(...tous.map((t) => t.etape.segment.minutes))
+  const departs = tous.filter((t) => proches.includes(t.gare) || t.etape.segment.minutes <= meilleure + ECART_DEPART_MAX_MIN)
+  return { domicile, departs }
 }
 
 export function depuisGares(h: Horaires, ami: Ami): DepuisGares {
   const n = h.stations.length
+  const { domicile, departs } = departsPossibles(h, ami)
   const r: DepuisGares = {
     minutes: new Float32Array(n).fill(Number.POSITIVE_INFINITY),
     euros: new Float32Array(n).fill(Number.NaN),
     depart: new Int32Array(n).fill(-1),
     correspondances: new Uint8Array(n),
-    proches: garesProches(h.stations, ami.lat, ami.lon),
+    departs,
+    domicile,
   }
-  const domicileEnVille = enReseauUrbain(ami.lat, ami.lon)
-  for (const p of r.proches) {
+  for (const p of departs) {
     const ligne = h.ligne(p.gare)
     if (!ligne) continue
-    const avant = acces(p.km, ami.transport, domicileEnVille)
-    const prixAvant = prixAcces(p.km, ami.transport, domicileEnVille)
+    const avant = p.etape.segment.minutes
     for (let g = 0; g < n; g++) {
       const m = ligne.minutes[g]!
       if (m === INJOIGNABLE) continue
       const total = avant + m
       if (total < r.minutes[g]!) {
         r.minutes[g] = total
-        r.euros[g] = prixAvant + prixTrain(ligne.km[g]!, ligne.grandeLigne[g] === 1)
+        r.euros[g] = p.etape.euros + prixTrain(ligne.km[g]!, ligne.grandeLigne[g] === 1)
         r.depart[g] = p.gare
         r.correspondances[g] = ligne.correspondances[g]!
       }
@@ -160,9 +151,6 @@ export interface TrajetTc {
   correspondances: number
 }
 
-/** Distance de la personne à la gare où elle prend son premier train. */
-const kmAcces = (d: DepuisGares, gare: number): number => d.proches.find((p) => p.gare === gare)?.km ?? 0
-
 /**
  * Pénalité au classement pour arriver dans une gare desservie seulement par autocar (E7) :
  * à temps égal ou proche, une vraie gare est préférée. `train` absent (données anciennes) ne
@@ -172,43 +160,47 @@ const PENALITE_GARE_ROUTIERE_MIN = 10
 const penaliteArrivee = (s: Station): number => (s.train === false ? PENALITE_GARE_ROUTIERE_MIN : 0)
 
 function meilleurVers(h: Horaires, d: DepuisGares, ami: Ami, lat: number, lon: number, gares: Proche[]): TrajetTc | null {
-  const km = haversineKm(ami.lat, ami.lon, lat, lon)
-  const domicileEnVille = enReseauUrbain(ami.lat, ami.lon)
-  const lieuEnVille = enReseauUrbain(lat, lon)
+  const lieu = bout(h.reseaux, lat, lon)
+  // À l'arrivée, pas de voiture : qui est venu en train finit à pied ou en transports, sinon en taxi.
+  const voyageur: Ami = { ...ami, transport: 'tc' }
   let best: TrajetTc | null = null
   let meilleurScore = Number.POSITIVE_INFINITY
-  if (km <= DIRECT_MAX_KM) {
+  const direct = etapeDirecte(d.domicile, lieu, ami)
+  if (direct) {
     best = {
-      minutes: acces(km, ami.transport, domicileEnVille),
-      euros: prixAcces(km, ami.transport, domicileEnVille),
+      minutes: direct.segment.minutes,
+      euros: direct.euros,
       depart: null,
       arrivee: null,
       departIndice: null,
       arriveeIndice: null,
-      acces: segment(km, ami.transport, domicileEnVille),
+      acces: direct.segment,
       sortie: null,
       correspondances: 0,
     }
     meilleurScore = best.minutes
   }
-  for (const g of gares) {
-    const avant = d.minutes[g.gare]!
+  const arrivees = [...new Set([...gares.map((g) => g.gare), ...garesDuReseau(lieu)])]
+  for (const g of arrivees) {
+    const avant = d.minutes[g]!
     if (!Number.isFinite(avant)) continue
-    const minutes = avant + acces(g.km, 'tc', lieuEnVille)
-    const score = minutes + penaliteArrivee(h.stations[g.gare]!)
+    const gare = h.stations[g]!
+    const sortie = etapeGare(lieu, gare, g, voyageur, 'sortie')
+    const minutes = avant + sortie.segment.minutes
+    const score = minutes + penaliteArrivee(gare)
     if (score < meilleurScore) {
       meilleurScore = score
-      const gareDepart = d.depart[g.gare]!
+      const gareDepart = d.depart[g]!
       best = {
         minutes,
-        euros: d.euros[g.gare]! + prixAcces(g.km, 'tc', lieuEnVille),
+        euros: d.euros[g]! + sortie.euros,
         depart: h.stations[gareDepart]!.nom,
-        arrivee: h.stations[g.gare]!.nom,
+        arrivee: gare.nom,
         departIndice: gareDepart,
-        arriveeIndice: g.gare,
-        acces: segment(kmAcces(d, gareDepart), ami.transport, domicileEnVille),
-        sortie: g.km > 0 ? segment(g.km, 'tc', lieuEnVille) : null,
-        correspondances: d.correspondances[g.gare]!,
+        arriveeIndice: g,
+        acces: d.departs.find((p) => p.gare === gareDepart)!.etape.segment,
+        sortie: sortie.segment.minutes > 0 ? sortie.segment : null,
+        correspondances: d.correspondances[g]!,
       }
     }
   }

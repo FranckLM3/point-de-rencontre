@@ -290,7 +290,7 @@ export function creerCarte(element: HTMLElement): Carte {
           const depart = p.chemin[0]!
           const arrivee = p.chemin[p.chemin.length - 1]!
           // Accès et sortie en voiture : la vraie route quand elle est en cache (hors réseau urbain),
-          // sinon un pointillé droit (src/calcul/trace.ts, enReseauUrbain).
+          // sinon un pointillé droit (src/calcul/trace.ts, accesEnVoiture et sortieEnVoiture).
           if (p.traceAcces) L.polyline(p.traceAcces, STYLE_VOITURE).bindTooltip(infobulle).addTo(coucheTrajets)
           else L.polyline([[p.lat, p.lon], [depart.lat, depart.lon]], STYLE_POINTILLE).bindTooltip(infobulle).addTo(coucheTrajets)
           L.polyline(p.trace ?? p.chemin.map((g): L.LatLngTuple => [g.lat, g.lon]), STYLE_TRAIN).addTo(coucheTrajets)
