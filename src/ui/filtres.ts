@@ -1,5 +1,6 @@
 import { maximaProposes, uniteDe, type Unite } from '../calcul/unites'
 import { PERSONNES_PAR_VOITURE_MAX } from '../calcul/voiture'
+import { estParDefaut } from '../etat/url'
 import type { Etat, Grandeur, Mode } from '../types'
 import { sousTitre, titreCourt, valeur } from './format'
 
@@ -61,10 +62,19 @@ function menuMaximum(e: Etat, unite: Unite): string {
       </select>`
 }
 
-export function rendreFiltres(el: HTMLElement, e: Etat, nombre: number, changer: (p: Partial<Etat>) => void): void {
+export function rendreFiltres(
+  el: HTMLElement,
+  e: Etat,
+  nombre: number,
+  changer: (p: Partial<Etat>) => void,
+  reinitialiser: () => void,
+): void {
   const unite = uniteDe(e.mode, e.grandeur)
   const critere = `<button type="button" class="pastille" data-critere="pire" ${presse(e.critere === 'pire')}>Pire trajet</button>
       <button type="button" class="pastille" data-critere="moyenne" ${presse(e.critere === 'moyenne')}>Moyenne</button>`
+  const boutonReinitialiser = estParDefaut(e)
+    ? ''
+    : '<button type="button" class="pastille secondaire" id="reinitialiser-filtres">Réinitialiser</button>'
   el.innerHTML = `
     ${interrupteur('Mode', boutonsModes(e.mode))}
     ${interrupteurMesure(e)}
@@ -74,6 +84,7 @@ export function rendreFiltres(el: HTMLElement, e: Etat, nombre: number, changer:
       <div class="rang">
         <div class="segmente" role="group" aria-label="Critère">${critere}</div>
         ${menuMaximum(e, unite)}
+        ${boutonReinitialiser}
       </div>
     </div>
     <h1>${titreCourt(nombre)}</h1>
@@ -95,4 +106,5 @@ export function rendreFiltres(el: HTMLElement, e: Etat, nombre: number, changer:
     const v = (evt.target as HTMLSelectElement).value
     changer({ max: v ? Number(v) : null })
   })
+  el.querySelector('#reinitialiser-filtres')?.addEventListener('click', () => reinitialiser())
 }

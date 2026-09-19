@@ -219,7 +219,7 @@ test('Annuler referme le formulaire de groupe', () => {
 
 test('filtres : Transports, Voiture, Chacun son moyen (le vol d’oiseau n’est qu’un repli interne, décision 1)', () => {
   const el = document.createElement('div')
-  rendreFiltres(el, ETAT_DEFAUT, 2, vi.fn())
+  rendreFiltres(el, ETAT_DEFAUT, 2, vi.fn(), vi.fn())
   const modes = [...el.querySelectorAll<HTMLButtonElement>('[data-mode]')].map((b) => b.dataset.mode)
   expect(modes).toEqual(['tc', 'voiture', 'mixte'])
   expect(el.querySelector('[data-mode="tc"]')!.textContent).toBe('Transports')
@@ -229,21 +229,38 @@ test('filtres : Transports, Voiture, Chacun son moyen (le vol d’oiseau n’est
   expect(el.querySelector('select')!.hasAttribute('aria-pressed')).toBe(false)
 })
 
+test('filtres : bouton Réinitialiser absent quand l’état est déjà par défaut', () => {
+  const el = document.createElement('div')
+  rendreFiltres(el, ETAT_DEFAUT, 2, vi.fn(), vi.fn())
+  expect(el.querySelector('#reinitialiser-filtres')).toBeNull()
+})
+
+test('filtres : bouton Réinitialiser présent dès qu’un réglage diffère, et l’appelle au clic', () => {
+  const el = document.createElement('div')
+  const reinitialiser = vi.fn()
+  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'tc', critere: 'pire' }, 2, vi.fn(), reinitialiser)
+  const bouton = el.querySelector<HTMLButtonElement>('#reinitialiser-filtres')!
+  expect(bouton).not.toBeNull()
+  expect(bouton.className).toContain('secondaire')
+  cliquer(el, '#reinitialiser-filtres')
+  expect(reinitialiser).toHaveBeenCalledTimes(1)
+})
+
 test('filtres : changer de mode remet le maximum à zéro', () => {
   const el = document.createElement('div')
   const changer = vi.fn()
-  rendreFiltres(el, { ...ETAT_DEFAUT, max: 300 }, 2, changer)
+  rendreFiltres(el, { ...ETAT_DEFAUT, max: 300 }, 2, changer, vi.fn())
   cliquer(el, '[data-mode="tc"]')
   expect(changer).toHaveBeenCalledWith({ mode: 'tc', max: null })
   const tc = document.createElement('div')
-  rendreFiltres(tc, { ...ETAT_DEFAUT, mode: 'tc' }, 2, changer)
+  rendreFiltres(tc, { ...ETAT_DEFAUT, mode: 'tc' }, 2, changer, vi.fn())
   cliquer(tc, '[data-mode="voiture"]')
   expect(changer).toHaveBeenCalledWith({ mode: 'voiture', max: null })
 })
 
 test('filtres : le mode reste dans un ordre fixe, aria-pressed reflète l’actif', () => {
   const el = document.createElement('div')
-  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'tc' }, 2, vi.fn())
+  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'tc' }, 2, vi.fn(), vi.fn())
   const modes = [...el.querySelectorAll<HTMLButtonElement>('[data-mode]')].map((b) => b.dataset.mode)
   expect(modes).toEqual(['tc', 'voiture', 'mixte'])
   expect(el.querySelector('[data-mode="tc"]')!.getAttribute('aria-pressed')).toBe('true')
@@ -253,7 +270,7 @@ test('filtres : le mode reste dans un ordre fixe, aria-pressed reflète l’acti
 
 test('filtres : les groupes sont des interrupteurs étiquetés (Mode, Mesure, Critère)', () => {
   const el = document.createElement('div')
-  rendreFiltres(el, ETAT_DEFAUT, 2, vi.fn())
+  rendreFiltres(el, ETAT_DEFAUT, 2, vi.fn(), vi.fn())
   const groupeMode = el.querySelector('[role="group"][aria-label="Mode"]')!
   expect(groupeMode.querySelector('[data-mode]')).not.toBeNull()
   // ETAT_DEFAUT est en mode mixte : la Mesure (Temps/Prix) s'applique aussi à ce mode.
@@ -265,7 +282,7 @@ test('filtres : les groupes sont des interrupteurs étiquetés (Mode, Mesure, Cr
 test('filtres : Mesure (Temps / Prix) en transports, voiture et mixte, pas à vol d’oiseau', () => {
   const el = document.createElement('div')
   const changer = vi.fn()
-  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'tc', max: 120 }, 2, changer)
+  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'tc', max: 120 }, 2, changer, vi.fn())
   const groupe = el.querySelector('[role="group"][aria-label="Mesure"]')!
   const temps = groupe.querySelector('[data-grandeur="temps"]')!
   const prix = groupe.querySelector('[data-grandeur="prix"]')!
@@ -277,26 +294,26 @@ test('filtres : Mesure (Temps / Prix) en transports, voiture et mixte, pas à vo
   expect(changer).toHaveBeenCalledWith({ grandeur: 'prix', max: null })
 
   const voiture = document.createElement('div')
-  rendreFiltres(voiture, { ...ETAT_DEFAUT, mode: 'voiture' }, 2, vi.fn())
+  rendreFiltres(voiture, { ...ETAT_DEFAUT, mode: 'voiture' }, 2, vi.fn(), vi.fn())
   expect(voiture.querySelector('[role="group"][aria-label="Mesure"]')).not.toBeNull()
 
   const oiseau = document.createElement('div')
-  rendreFiltres(oiseau, { ...ETAT_DEFAUT, mode: 'oiseau' }, 2, vi.fn())
+  rendreFiltres(oiseau, { ...ETAT_DEFAUT, mode: 'oiseau' }, 2, vi.fn(), vi.fn())
   expect(oiseau.querySelector('[role="group"][aria-label="Mesure"]')).toBeNull()
 })
 
 test('filtres : « Personnes par voiture » visible seulement en prix, en voiture ou en mixte', () => {
   const enTemps = document.createElement('div')
-  rendreFiltres(enTemps, { ...ETAT_DEFAUT, mode: 'voiture', grandeur: 'temps' }, 2, vi.fn())
+  rendreFiltres(enTemps, { ...ETAT_DEFAUT, mode: 'voiture', grandeur: 'temps' }, 2, vi.fn(), vi.fn())
   expect(enTemps.querySelector('[role="group"][aria-label="Personnes par voiture"]')).toBeNull()
 
   const enTransports = document.createElement('div')
-  rendreFiltres(enTransports, { ...ETAT_DEFAUT, mode: 'tc', grandeur: 'prix' }, 2, vi.fn())
+  rendreFiltres(enTransports, { ...ETAT_DEFAUT, mode: 'tc', grandeur: 'prix' }, 2, vi.fn(), vi.fn())
   expect(enTransports.querySelector('[role="group"][aria-label="Personnes par voiture"]')).toBeNull()
 
   const el = document.createElement('div')
   const changer = vi.fn()
-  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'voiture', grandeur: 'prix', personnesParVoiture: 1 }, 2, changer)
+  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'voiture', grandeur: 'prix', personnesParVoiture: 1 }, 2, changer, vi.fn())
   const groupe = el.querySelector('[role="group"][aria-label="Personnes par voiture"]')!
   const boutons = [...groupe.querySelectorAll('button')]
   expect(boutons.map((b) => b.textContent)).toEqual(['1', '2', '3', '4'])
@@ -305,14 +322,14 @@ test('filtres : « Personnes par voiture » visible seulement en prix, en voitur
   expect(changer).toHaveBeenCalledWith({ personnesParVoiture: 3 })
 
   const mixte = document.createElement('div')
-  rendreFiltres(mixte, { ...ETAT_DEFAUT, mode: 'mixte', grandeur: 'prix' }, 2, vi.fn())
+  rendreFiltres(mixte, { ...ETAT_DEFAUT, mode: 'mixte', grandeur: 'prix' }, 2, vi.fn(), vi.fn())
   expect(mixte.querySelector('[role="group"][aria-label="Personnes par voiture"]')).not.toBeNull()
 })
 
 test('filtres : critère et distance maximum', () => {
   const el = document.createElement('div')
   const changer = vi.fn()
-  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'oiseau', max: null }, 2, changer)
+  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'oiseau', max: null }, 2, changer, vi.fn())
   cliquer(el, '[data-critere="moyenne"]')
   expect(changer).toHaveBeenCalledWith({ critere: 'moyenne' })
   const select = el.querySelector('select')!
@@ -325,7 +342,7 @@ test('filtres : critère et distance maximum', () => {
 
 test('filtres : maximum en durée ou en prix selon la grandeur', () => {
   const el = document.createElement('div')
-  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'tc', critere: 'pire', max: 180 }, 3, vi.fn())
+  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'tc', critere: 'pire', max: 180 }, 3, vi.fn(), vi.fn())
   const select = el.querySelector('select')!
   expect(select.getAttribute('aria-label')).toBe('Durée maximum')
   expect(select.options[0]!.textContent).toBe('Durée maximum')
@@ -337,7 +354,7 @@ test('filtres : maximum en durée ou en prix selon la grandeur', () => {
   )
 
   const prix = document.createElement('div')
-  rendreFiltres(prix, { ...ETAT_DEFAUT, mode: 'tc', grandeur: 'prix', max: null }, 3, vi.fn())
+  rendreFiltres(prix, { ...ETAT_DEFAUT, mode: 'tc', grandeur: 'prix', max: null }, 3, vi.fn(), vi.fn())
   const menu = prix.querySelector('select')!
   expect(menu.getAttribute('aria-label')).toBe('Prix maximum')
   expect([...menu.options].map((o) => o.textContent)).toContain('40 € max')

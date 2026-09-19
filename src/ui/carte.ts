@@ -63,6 +63,9 @@ export interface Carte {
   sansCentre(): void
   /** Cadre la carte sur un point (bouton « Voir sur la carte »). */
   centrerSur(lat: number, lon: number): void
+  /** Redemande le cadrage sur l'ensemble des personnes au prochain appel à `amis` (bouton
+   * « Réinitialiser ») : sans cela, `amis` ne recadre qu'une fois, au tout premier rendu. */
+  recadrerSurTous(): void
   /**
    * Trajets vers la cible choisie (carte de ville, étiquette cliquée ou lieu testé) : une seule
    * couche, effacée puis redessinée à chaque appel, quel que soit le déclencheur (D8).
@@ -229,6 +232,9 @@ export function creerCarte(element: HTMLElement): Carte {
       marqueurCentre?.remove()
       marqueurCentre = null
     },
+    recadrerSurTous() {
+      dejaCadre = false
+    },
     centrerSur(lat, lon) {
       // Un point unique en guise de bornes : fitBounds cadre alors sur ce point, en réservant la
       // place du volet fermé, sans code séparé pour le cas plein écran (marge basse nulle).
@@ -267,7 +273,7 @@ export function creerCarte(element: HTMLElement): Carte {
           const depart = p.chemin[0]!
           const arrivee = p.chemin[p.chemin.length - 1]!
           L.polyline([[p.lat, p.lon], [depart.lat, depart.lon]], STYLE_POINTILLE).bindTooltip(infobulle).addTo(coucheTrajets)
-          L.polyline(p.chemin.map((g): L.LatLngTuple => [g.lat, g.lon]), STYLE_TRAIN).addTo(coucheTrajets)
+          L.polyline(p.trace ?? p.chemin.map((g): L.LatLngTuple => [g.lat, g.lon]), STYLE_TRAIN).addTo(coucheTrajets)
           L.polyline([[arrivee.lat, arrivee.lon], [cible.lat, cible.lon]], STYLE_POINTILLE).addTo(coucheTrajets)
           dessinerGare(p.gareDepart, depart)
           dessinerGare(p.gareArrivee, arrivee)

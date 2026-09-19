@@ -311,6 +311,30 @@ test('mode transports en prix : légende et menu en euros', async ({ page }) => 
   await expect(page).toHaveURL(/grandeur=prix/)
 })
 
+test('bouton Réinitialiser : remet mode, critère et URL aux valeurs par défaut, puis disparaît', async ({ page }) => {
+  await simuler(page)
+  await page.goto('./')
+  await entrer(page)
+  await ouvrirVoletSiVisible(page)
+
+  await expect(page.locator('#reinitialiser-filtres')).toHaveCount(0)
+
+  await passerEnTransports(page)
+  await page.getByRole('button', { name: 'Pire trajet', exact: true }).click()
+  await expect(page).toHaveURL(/mode=tc/)
+  await expect(page).toHaveURL(/critere=pire/)
+
+  const reinitialiser = page.getByRole('button', { name: 'Réinitialiser' })
+  await expect(reinitialiser).toBeVisible()
+  await reinitialiser.click()
+
+  await expect(page).toHaveURL(/mode=mixte/)
+  await expect(page).toHaveURL(/critere=moyenne/)
+  await expect(page.locator('[data-mode="mixte"]')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('[data-critere="moyenne"]')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('#reinitialiser-filtres')).toHaveCount(0)
+})
+
 /**
  * Ces deux tests utilisent « Tester un lieu » plutôt qu'une carte de ville : la cible est ainsi
  * connue à l'avance (gares déterministes), et le chemin passe par le même appel unique

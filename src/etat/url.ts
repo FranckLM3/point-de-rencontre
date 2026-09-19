@@ -7,6 +7,19 @@ export const ETAT_DEFAUT: Etat = {
   personnesParVoiture: PERSONNES_PAR_VOITURE_DEFAUT,
 }
 
+/** Vrai quand aucun réglage ne diffère de `ETAT_DEFAUT` (bouton « Réinitialiser », src/ui/filtres.ts). */
+export function estParDefaut(e: Etat): boolean {
+  return (
+    e.mode === ETAT_DEFAUT.mode &&
+    e.critere === ETAT_DEFAUT.critere &&
+    e.grandeur === ETAT_DEFAUT.grandeur &&
+    e.max === ETAT_DEFAUT.max &&
+    e.selection === null &&
+    e.lieu === null &&
+    e.personnesParVoiture === ETAT_DEFAUT.personnesParVoiture
+  )
+}
+
 /** Modes proposés dans l'URL : le vol d'oiseau n'est plus qu'un repli interne (D1), une ancienne
  * URL avec mode=oiseau retombe donc sur le mode par défaut plutôt que de le garder. */
 const MODES: Mode[] = ['mixte', 'voiture', 'tc']

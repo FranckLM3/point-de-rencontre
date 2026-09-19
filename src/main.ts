@@ -18,10 +18,11 @@ import { ajouterAmi, listerAmis, modifierAmi, supprimerAmi } from './donnees/ami
 import { connecter, deconnecter, estConnecte } from './donnees/auth'
 import { enregistrerGroupe, listerGroupes } from './donnees/groupes'
 import { creerHoraires } from './donnees/horaires'
+import { creerChargeurRails, creerRails, type ChargeurRails } from './donnees/rails'
 import { chargerCarburant, chargerGrille, chargerGrille8km, chargerVilles, type PrixCarburant } from './donnees/statiques'
 import { chargerCouches, creerFileCalculVoiture, type FileCalculVoiture } from './donnees/voiture'
 import { aRelancer } from './calcul/relance-voiture'
-import { ecrireEtat, lireEtat } from './etat/url'
+import { ETAT_DEFAUT, ecrireEtat, lireEtat } from './etat/url'
 import type { Ami, Etat, Groupe, Lieu, Mode, Ville } from './types'
 import { rendreAmis } from './ui/amis'
 import { amisChoisis, cleFocus, cleZones, libelleClic } from './ui/assemblage'
@@ -64,6 +65,11 @@ interface Session {
   couches: Couches
   /** Horaires des trains, chargés à la première activation du mode transports. */
   tc: ChargeurTc
+  /** Tracés réels des voies ferrées, chargés au premier trajet ferroviaire dessiné (pas avant :
+   * décoratif seulement, le trajet se dessine en ligne droite entre gares en attendant). */
+  rails: ChargeurRails
+  /** Un seul chargement des rails tenté par session (pas de nouvelle tentative à chaque rendu). */
+  railsDemande: boolean
   /** Grille de 8 km et prix des carburants, chargés à la première activation du mode voiture ou mixte. */
   voitureBase: { grille8: Grille; carburant: PrixCarburant } | null
   /** Couches voiture déjà calculées, par personne (toutes celles en voiture, pas seulement cochées :
@@ -188,6 +194,15 @@ function changer(s: Session, p: Partial<Etat>): void {
   rafraichir(s)
 }
 
+/** Bouton « Réinitialiser » (src/ui/filtres.ts) : remet tous les réglages à `ETAT_DEFAUT`, retire
+ * le lieu testé (champ de recherche compris) et la ville choisie, recadre la carte sur tout le monde. */
+function reinitialiserFiltres(s: Session): void {
+  s.recherche.definir(null)
+  s.villeChoisie = null
+  s.carte.recadrerSurTous()
+  changer(s, { ...ETAT_DEFAUT })
+}
+
 /** Décision 6 : la fiche déclenche le calcul voiture après enregistrement, seulement quand
  * l'adresse (la clé du calcul, cf. donnees/voiture.ts) ou le transport a changé. */
 function demanderVoitureSiBesoin(s: Session, avant: Ami | null, apres: Ami): void {
@@ -235,7 +250,13 @@ function cibleCarte(s: Session): Lieu | null {
  * sur la carte et le lieu testé (D8, un seul chemin d'appel, une seule couche). */
 function dessinerTrajets(s: Session, choisis: Ami[]): void {
   const cible = cibleCarte(s)
-  s.carte.trajets(personnesTrajetCarte(choisis, s.etat.mode, s.tc.pret(), voitureMoteur(s), cible), cible)
+  const trajets = personnesTrajetCarte(choisis, s.etat.mode, s.tc.pret(), voitureMoteur(s), cible, s.rails.pret())
+  s.carte.trajets(trajets, cible)
+  // Chargement paresseux : seulement quand un vrai trajet ferroviaire est dessiné, une fois par session.
+  if (!s.railsDemande && !s.rails.pret() && trajets.some((t) => t.chemin !== null)) {
+    s.railsDemande = true
+    void s.rails.obtenir().then(() => dessinerTrajets(s, choisis)).catch(() => {})
+  }
 }
 
 /** Ville choisie (carte de ville ou étiquette cliquée sur la carte) : mêmes lignes vertes dans les deux cas.
@@ -260,7 +281,7 @@ function rendrePanneau(s: Session, choisis: Ami[], calculables: Ami[], mesure: M
       await recharger(s)
     },
   })
-  rendreFiltres($('#filtres'), s.etat, choisis.length, (p) => changer(s, p))
+  rendreFiltres($('#filtres'), s.etat, choisis.length, (p) => changer(s, p), () => reinitialiserFiltres(s))
   $('#avis-voiture').textContent = avisVoiture(s, choisis)
   const { lieu, mode, critere, max } = s.etat
   const unite = uniteDe(mode, s.etat.grandeur)
@@ -376,7 +397,7 @@ function afficher(s: Session, choisis: Ami[], mesure: Mesure, focus: string | nu
 
 /** Pendant le premier chargement (horaires et/ou grille voiture) : filtres à jour, résultats et zones vidés. */
 function attendreChargement(s: Session, choisis: Ami[], texte: string): void {
-  rendreFiltres($('#filtres'), s.etat, choisis.length, (p) => changer(s, p))
+  rendreFiltres($('#filtres'), s.etat, choisis.length, (p) => changer(s, p), () => reinitialiserFiltres(s))
   $('#chargement').textContent = texte
   $('#villes').textContent = ''
   $('#resultat-lieu').textContent = ''
@@ -527,6 +548,8 @@ async function charger(carte: Carte, installer: (s: Session) => void): Promise<v
       recherche: rendreRechercheLieu($('#lieu'), etat.lieu, (lieu) => changer(s, { lieu })),
       couches: creerCouches(grille),
       tc: creerChargeurTc(creerHoraires),
+      rails: creerChargeurRails(creerRails),
+      railsDemande: false,
       voitureBase: null,
       voitureCouches,
       voitureVersion: 1,

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { ETAT_DEFAUT, ecrireEtat, lireEtat } from '../../src/etat/url'
+import { ETAT_DEFAUT, ecrireEtat, estParDefaut, lireEtat } from '../../src/etat/url'
 import type { Etat } from '../../src/types'
 
 test('URL vide : état par défaut', () => {
@@ -64,4 +64,19 @@ test('aller-retour avec un label contenant & et =', () => {
     lieu: { lat: 45.75, lon: 4.85, label: 'Lyon & Villeurbanne = agglo' },
   }
   expect(lireEtat(ecrireEtat(e))).toEqual(e)
+})
+
+test('estParDefaut : vrai pour l’état par défaut', () => {
+  expect(estParDefaut(ETAT_DEFAUT)).toBe(true)
+})
+
+test('estParDefaut : faux dès qu’un seul réglage diffère', () => {
+  expect(estParDefaut({ ...ETAT_DEFAUT, mode: 'tc' })).toBe(false)
+  expect(estParDefaut({ ...ETAT_DEFAUT, critere: 'pire' })).toBe(false)
+  expect(estParDefaut({ ...ETAT_DEFAUT, grandeur: 'prix' })).toBe(false)
+  expect(estParDefaut({ ...ETAT_DEFAUT, max: 120 })).toBe(false)
+  expect(estParDefaut({ ...ETAT_DEFAUT, selection: ['a'] })).toBe(false)
+  expect(estParDefaut({ ...ETAT_DEFAUT, selection: [] })).toBe(false)
+  expect(estParDefaut({ ...ETAT_DEFAUT, lieu: { lat: 45, lon: 4, label: 'x' } })).toBe(false)
+  expect(estParDefaut({ ...ETAT_DEFAUT, personnesParVoiture: 2 })).toBe(false)
 })
