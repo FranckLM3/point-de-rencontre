@@ -1,5 +1,6 @@
 import type { Unite } from '../calcul/unites'
 import type { Critere } from '../types'
+import { aideRepaire, type ContexteAide } from './aide-repaire'
 import { echapper, valeur } from './format'
 
 export interface Repaire {
@@ -20,16 +21,23 @@ function ligneRepaire(r: Repaire, unite: Unite, critere: Critere): string {
   return `près de ${echapper(r.ville)} · ${valeur(r.pire, unite)} au pire · ${valeur(r.total, unite)} au total`
 }
 
-export function rendreRepaire(el: HTMLElement, r: Repaire | null, unite: Unite, voir: () => void, critere: Critere = 'pire'): void {
+export function rendreRepaire(
+  el: HTMLElement,
+  r: Repaire | null,
+  unite: Unite,
+  voir: () => void,
+  critere: Critere = 'pire',
+  aide: ContexteAide | null = null,
+): void {
   if (!r) {
     el.innerHTML = ''
     return
   }
   el.innerHTML = `
     <article class="ville-carte repaire">
-      <span class="sur-titre">Le repaire</span>
+      <span class="sur-titre">Le repaire</span>${aide ? aideRepaire(unite, critere, aide) : ''}
       <span class="ligne">${ligneRepaire(r, unite, critere)}</span>
       <button type="button" class="pastille verte" data-action="voir-carte">Voir sur la carte</button>
     </article>`
-  el.querySelector('button')!.addEventListener('click', () => voir())
+  el.querySelector('[data-action="voir-carte"]')!.addEventListener('click', () => voir())
 }

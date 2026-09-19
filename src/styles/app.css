@@ -433,3 +433,21 @@ form.groupe .champ { flex: 1 1 100%; }
 .detail-personne .etapes { margin: 0; padding-left: 1.2em; }
 .detail-personne .etapes li { padding: 2px 0; font-size: .9375rem; }
 .detail-personne .etapes li::marker { color: var(--accent); font-weight: 600; }
+
+/* « ? » du repaire : pastille ronde en haut à droite, explication dépliée sous le titre. */
+.ville-carte.repaire { position: relative; }
+.ville-carte.repaire .sur-titre { padding-right: calc(var(--cible-tactile) + 4px); }
+.aide summary {
+  position: absolute; top: 4px; right: 4px; width: var(--cible-tactile); height: var(--cible-tactile);
+  display: grid; place-items: center; list-style: none; cursor: pointer; border-radius: 50%;
+}
+.aide summary::-webkit-details-marker { display: none; }
+.aide summary span[aria-hidden] {
+  width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%;
+  border: 1.5px solid var(--accent); color: var(--accent); background: var(--surface);
+  font: 700 .9375rem/1 var(--police-marque); transition: background var(--duree), color var(--duree);
+}
+.aide summary:hover span[aria-hidden], .aide[open] summary span[aria-hidden] { background: var(--accent); color: var(--surface); }
+.aide summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.aide-texte { display: grid; gap: 6px; font-size: .9375rem; line-height: 1.5; color: var(--texte); }
+.aide-texte p { margin: 0; }

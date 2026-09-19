@@ -392,6 +392,16 @@ test('mode transports : le trajet en train suit les gares réelles, pas une lign
   expect(points.some((n) => n > 2)).toBe(true)
 })
 
+test('le « ? » du repaire déplie l’explication du calcul', async ({ page }) => {
+  await simuler(page)
+  await page.goto('./')
+  await entrer(page)
+  await ouvrirVoletSiVisible(page)
+  const aide = page.locator('#repaire details.aide')
+  await aide.locator('summary').click()
+  await expect(aide.locator('.aide-texte')).toContainText('le repaire est l’endroit où')
+})
+
 test('clic sur une personne de la carte : fiche avec les étapes de son trajet vers le lieu', async ({ page }) => {
   await simuler(page)
   const lyon = { geometry: { coordinates: [4.86, 45.76] }, properties: { label: 'Près de Lyon' } }

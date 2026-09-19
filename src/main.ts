@@ -321,7 +321,7 @@ function rendrePanneau(s: Session, choisis: Ami[], calculables: Ami[], mesure: M
     if (!s.repaire) return
     s.carte.centrerSur(s.repaire.lat, s.repaire.lon)
     fermerVolet()
-  }, critere)
+  }, critere, { mode, max })
   const details = lieu ? choisis.map((a) => mesure(a, lieu.lat, lieu.lon)) : []
   rendreResultatLieu($('#resultat-lieu'), lieu, choisis, details, unite, () => retirerLieu(s))
   rendreVilles($('#villes'), { villes, amis: calculables, nbPersonnes: s.amis.length, max, unite, mode, critere }, {
