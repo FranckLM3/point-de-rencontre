@@ -124,6 +124,11 @@ async function ouvrirVoletSiVisible(page: Page): Promise<void> {
   if (await poignee.isVisible()) await poignee.click()
 }
 
+async function fermerVoletSiVisible(page: Page): Promise<void> {
+  const poignee = page.locator('#poignee')
+  if ((await poignee.isVisible()) && (await poignee.getAttribute('aria-expanded')) === 'true') await poignee.click()
+}
+
 /** Bascule l'interrupteur « Inclure X » (D1) jusqu'à l'état voulu, sans dépendre de l'état de départ. */
 async function definirInclusion(page: Page, nom: string, inclure: boolean): Promise<void> {
   const interrupteur = page.getByRole('switch', { name: `Inclure ${nom}` })
@@ -385,6 +390,24 @@ test('mode transports : le trajet en train suit les gares réelles, pas une lign
     paths.map((p) => (p.getAttribute('d')?.match(/[ML]/g) ?? []).length),
   )
   expect(points.some((n) => n > 2)).toBe(true)
+})
+
+test('clic sur une personne de la carte : fiche avec les étapes de son trajet vers le lieu', async ({ page }) => {
+  await simuler(page)
+  const lyon = { geometry: { coordinates: [4.86, 45.76] }, properties: { label: 'Près de Lyon' } }
+  await page.route('https://data.geopf.fr/**', (route) => route.fulfill({ json: { type: 'FeatureCollection', features: [lyon] } }))
+  await page.goto('./')
+  await entrer(page)
+  await ouvrirVoletSiVisible(page)
+  await passerEnTransports(page)
+  await testerUnLieu(page, 'lyon', lyon.properties.label)
+  await fermerVoletSiVisible(page)
+
+  await page.locator('.leaflet-marker-icon[title="Léa"]').click()
+  const fiche = page.locator('.leaflet-popup .detail-personne')
+  await expect(fiche.locator('h3')).toContainText('Léa')
+  await expect(fiche.locator('.total')).toContainText('Vers Près de Lyon')
+  await expect(fiche.locator('.etapes li').filter({ hasText: /^Train / })).toHaveCount(1)
 })
 
 test('mode transports : sélectionner une cible plusieurs fois ne double jamais les tracés (D8)', async ({ page }) => {

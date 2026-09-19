@@ -25,7 +25,7 @@ export function valeur(v: number, unite: Unite): string {
 export const nomCourt = (nom: string): string => nom.replace(/ Hall \d+( - \d+)?$/, '').trim()
 
 /** Une étape enchaînée : « 8 min de bus ». */
-const SUITE: Record<Segment['mode'], (d: string) => string> = {
+export const SUITE: Record<Segment['mode'], (d: string) => string> = {
   'à pied': (d) => `${d} à pied`,
   bus: (d) => `${d} de bus`,
   voiture: (d) => `${d} de voiture`,
@@ -38,7 +38,7 @@ const SEUL: Record<Segment['mode'], (d: string) => string> = {
   voiture: (d) => `${d} en voiture`,
 }
 
-const correspondances = (nombre: number): string =>
+export const correspondances = (nombre: number): string =>
   `${nombre} correspondance${nombre > 1 ? 's' : ''}`
 
 /** Étapes du trajet : accès, gares, correspondances, sortie. Une étape nulle n'est pas écrite. */

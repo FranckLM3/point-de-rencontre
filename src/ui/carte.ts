@@ -55,9 +55,16 @@ const STYLE_DROITE: L.PolylineOptions = { color: COULEUR_LIGNE_VILLE, weight: 2,
 /** En voiture (mode voiture, ou mixte avec la couche prête) : ligne droite pointillée, pas de tracé de route (décision 7). */
 const STYLE_VOITURE: L.PolylineOptions = { color: COULEUR_LIGNE_VILLE, weight: 2, opacity: 0.85, dashArray: '5 7', interactive: false }
 
+/** Largeur maximale (px) de la fiche de trajet ouverte au clic sur une personne. */
+const LARGEUR_FICHE = 280
+const MARGE_FICHE_HAUT_GAUCHE: L.PointTuple = [72, 16]
+
 export interface Carte {
   /** `misEnAvant` : identifiant d'une personne dont le marqueur reçoit une brève pulsation (ajout/édition). */
   amis(liste: Ami[], selection: Set<string>, misEnAvant?: string | null): void
+  /** Contenu (HTML sûr) de la fiche qui s'ouvre au clic sur un marqueur : le détail du trajet des
+   * personnes qu'il regroupe. Lu à l'ouverture, donc toujours à jour de la cible choisie. */
+  detailAuClic(detail: (amis: Ami[]) => string): void
   zones(tranches: Tranche[]): void
   centre(lat: number, lon: number, libelle: string): void
   sansCentre(): void
@@ -122,6 +129,7 @@ export function creerCarte(element: HTMLElement): Carte {
   let dejaCadre = false
 
   let dernierRendu: { liste: Ami[]; selection: Set<string>; misEnAvant: string | null } | null = null
+  let detail: ((amis: Ami[]) => string) | null = null
   let dernieresEtiquettes: { candidats: EtiquetteVille[]; choisir: (v: VilleClassee) => void } | null = null
   /** Marqueurs de personnes/grappes en espace écran (layerPoint), pour que les étiquettes de ville les évitent. */
   let dernierEcranAmis: CercleEcran[] = []
@@ -153,6 +161,12 @@ export function creerCarte(element: HTMLElement): Carte {
         zIndexOffset: actif ? 100 : 0,
       })
         .bindTooltip(grappe ? echapper(listeNoms(amis)) : infobulleMarqueur(membres[0]!))
+        .bindPopup(() => detail?.(amis) ?? '', {
+          className: 'popup-detail', maxWidth: LARGEUR_FICHE,
+          // Les boutons de zoom occupent le coin haut gauche : la fiche se recadre en dessous d'eux.
+          autoPanPaddingTopLeft: MARGE_FICHE_HAUT_GAUCHE, autoPanPaddingBottomRight: [16, 16],
+        })
+        .on('popupopen', (e) => e.target.closeTooltip())
         .addTo(coucheAmis)
       const pt = carte.latLngToLayerPoint(latlng)
       ecranAmis.push({ x: pt.x, y: pt.y, rayon: taille / 2 })
@@ -196,6 +210,9 @@ export function creerCarte(element: HTMLElement): Carte {
   carte.on('moveend', () => dessinerEtiquettes())
 
   return {
+    detailAuClic(f) {
+      detail = f
+    },
     amis(liste, selection, misEnAvant = null) {
       dernierRendu = { liste, selection, misEnAvant }
       dessinerAmis()

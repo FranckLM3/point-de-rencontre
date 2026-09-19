@@ -10,6 +10,8 @@ import {
 } from './calcul/couches'
 import { coordonnees, type Grille } from './calcul/grille'
 import { personnesTrajetCarte, routesADemander } from './calcul/trace'
+import { trajetDetaille } from './calcul/detail'
+import { detailPersonnes } from './ui/detail-personne'
 import { pasTranches, uniteDe } from './calcul/unites'
 import { CONSOMMATION_DEFAUT, type Couche, type ParametresPrix } from './calcul/voiture'
 import { classerVilles, evaluer, type Mesure, type VilleClassee, villeLaPlusProche } from './calcul/villes'
@@ -274,6 +276,19 @@ function dessinerTrajets(s: Session, choisis: Ami[]): void {
       s.itineraires.demander(r.depart, r.arrivee, () => dessinerTrajets(s, choisis))
     }
   }
+}
+
+/** Fiche ouverte au clic sur une personne de la carte : les étapes de son trajet vers la cible. */
+function detailAuClic(s: Session, amis: Ami[]): string {
+  const cible = cibleCarte(s)
+  const moteurVoiture = voitureMoteur(s)
+  return detailPersonnes({
+    amis,
+    cible,
+    choisis: new Set(amisChoisis(s.amis, s.etat.selection).map((a) => a.id)),
+    trajet: (a) => (cible ? trajetDetaille(s.etat.mode, s.tc.pret(), moteurVoiture, a, cible.lat, cible.lon) : null),
+    parametres: moteurVoiture?.parametres ?? null,
+  })
 }
 
 /** Ville choisie (carte de ville ou étiquette cliquée sur la carte) : mêmes lignes vertes dans les deux cas.
@@ -622,6 +637,7 @@ async function demarrer(): Promise<void> {
     session.recherche.definir(lieu)
     changer(session, { lieu })
   })
+  carte.detailAuClic((amis) => (session ? detailAuClic(session, amis) : ''))
   await charger(carte, (s) => { session = s })
 }
 
