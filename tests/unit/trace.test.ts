@@ -5,6 +5,7 @@ import type { Couche, ParametresPrix } from '../../src/calcul/voiture'
 import type { Grille } from '../../src/calcul/grille'
 import { INJOIGNABLE, type Horaires, type Ligne, type Station } from '../../src/donnees/horaires'
 import type { Rails } from '../../src/donnees/rails'
+import type { CheminsUrbains, ReseauUrbain } from '../../src/donnees/urbain'
 import type { Itineraires } from '../../src/donnees/voiture'
 import type { Ami, Lieu } from '../../src/types'
 
@@ -225,7 +226,7 @@ test('routesADemander : étapes en voiture encore absentes du cache', () => {
   const p = {
     noms: ['Léa'], lat: 45.8, lon: 4.9, chemin: [{ lat: 45.75, lon: 4.85, nom: 'A' }, { lat: 43.3, lon: 5.38, nom: 'B' }],
     trace: null, gareDepart: 0, gareArrivee: 1, directSansTrain: false, enVoiture: false, traceVoiture: null,
-    traceAcces: null, traceSortie: null, accesEnVoiture: true, sortieEnVoiture: true,
+    traceAcces: null, traceSortie: null, accesEnVoiture: true, sortieEnVoiture: true, traceDirecte: null, urbainsADemander: [],
   }
   const cible: Lieu = { lat: 43.29, lon: 5.4, label: 'Marseille' }
   expect(routesADemander([p], cible)).toEqual([
@@ -233,4 +234,27 @@ test('routesADemander : étapes en voiture encore absentes du cache', () => {
     { depart: { lat: 43.3, lon: 5.38 }, arrivee: { lat: 43.29, lon: 5.4 } },
   ])
   expect(routesADemander([{ ...p, accesEnVoiture: false }], cible)).toHaveLength(1)
+})
+
+test('trajet sans train en métro : tracé par les stations traversées une fois le chemin chargé', async () => {
+  // Réseau : Est (près de Franck) -> Milieu -> Ouest (près de la cible), 12 min.
+  const reseau: ReseauUrbain = {
+    id: 'idf', nom: 'Île-de-France', gares: [],
+    stations: [
+      { nom: 'Est', lat: 48.86, lon: 2.345 },
+      { nom: 'Milieu', lat: 48.87, lon: 2.31 },
+      { nom: 'Ouest', lat: 48.86, lon: 2.28 },
+    ],
+    minutes: Uint8Array.from([0, 6, 12, 6, 0, 6, 12, 6, 0]),
+  }
+  const moteur = creerMoteurTc({ ...fauxHoraires(), reseaux: [reseau] }, 1)
+  await moteur.preparer([franck])
+  const cible: Lieu = { lat: 48.86, lon: 2.279, label: 'Ouest' }
+  const avant = personnesTrajetCarte([franck], 'tc', moteur, null, cible, null, null, { regarder: () => null, demander: () => {} })[0]!
+  expect(avant.traceDirecte).toBeNull()
+  expect(avant.urbainsADemander).toEqual([{ reseau, de: 0, vers: 2 }])
+  const charges: CheminsUrbains = { regarder: (_r, de, vers) => (de === 0 && vers === 2 ? [0, 1, 2] : null), demander: () => {} }
+  const apres = personnesTrajetCarte([franck], 'tc', moteur, null, cible, null, null, charges)[0]!
+  expect(apres.traceDirecte).toEqual([[48.86, 2.34], [48.86, 2.345], [48.87, 2.31], [48.86, 2.28], [48.86, 2.279]])
+  expect(apres.urbainsADemander).toEqual([])
 })

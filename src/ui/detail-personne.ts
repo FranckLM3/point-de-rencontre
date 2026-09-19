@@ -1,4 +1,5 @@
 import type { TrajetDetaille } from '../calcul/detail'
+import type { Segment, TronconUrbain } from '../calcul/etapes'
 import type { TrajetTc } from '../calcul/tc'
 import type { ParametresPrix } from '../calcul/voiture'
 import type { Ami, Lieu } from '../types'
@@ -13,14 +14,22 @@ export interface DonneesDetail {
   parametres: ParametresPrix | null
 }
 
+/** Stations de montée et de descente d'une partie en métro, RER ou tram. */
+const nomStation = (u: TronconUrbain, i: number): string => u.reseau.stations[i]!.nom
+const montee = (s: Segment): string => (s.urbain ? `, montée à ${nomStation(s.urbain, s.urbain.de)}` : '')
+const descente = (s: Segment): string => (s.urbain ? `, descente à ${nomStation(s.urbain, s.urbain.vers)}` : '')
+
 function etapesTc(t: TrajetTc, via: string[], cible: Lieu): string[] {
-  if (t.depart === null) return [descriptionTrajet(t)]
+  if (t.depart === null) {
+    const u = t.acces.urbain
+    return [u ? `${SUITE.transports(duree(t.acces.minutes))}, de ${nomStation(u, u.de)} à ${nomStation(u, u.vers)}` : descriptionTrajet(t)]
+  }
   const etapes: string[] = []
-  if (Math.round(t.acces.minutes) > 0) etapes.push(`${SUITE[t.acces.mode](duree(t.acces.minutes))} jusqu'à ${nomCourt(t.depart)}`)
+  if (Math.round(t.acces.minutes) > 0) etapes.push(`${SUITE[t.acces.mode](duree(t.acces.minutes))} jusqu'à ${nomCourt(t.depart)}${montee(t.acces)}`)
   const par = via.length > 0 ? `, via ${via.map(nomCourt).join(', ')}` : ''
   const changements = t.correspondances > 0 ? ` · ${correspondances(t.correspondances)}` : ''
   etapes.push(`Train ${nomCourt(t.depart)} → ${nomCourt(t.arrivee ?? '')}${par}${changements}`)
-  if (t.sortie && Math.round(t.sortie.minutes) > 0) etapes.push(`${SUITE[t.sortie.mode](duree(t.sortie.minutes))} jusqu'à ${cible.label}`)
+  if (t.sortie && Math.round(t.sortie.minutes) > 0) etapes.push(`${SUITE[t.sortie.mode](duree(t.sortie.minutes))} jusqu'à ${cible.label}${descente(t.sortie)}`)
   return etapes
 }
 
@@ -32,7 +41,7 @@ function trajetHtml(tr: TrajetDetaille, cible: Lieu, parametres: ParametresPrix 
     return `<p class="total">${vers} en voiture</p><ol class="etapes"><li>${echapper(texte)}</li></ol>`
   }
   const etapes = etapesTc(tr.trajet, tr.via, cible).map((e) => `<li>${echapper(e)}</li>`).join('')
-  return `<p class="total">${vers} : <b>${duree(tr.trajet.minutes)}</b> · ≈ ${euros(tr.trajet.euros)}</p><ol class="etapes">${etapes}</ol>`
+  return `<p class="total">${vers} : <b>${duree(tr.trajet.minutes)}</b> · <span class="prix">≈ ${euros(tr.trajet.euros)}</span></p><ol class="etapes">${etapes}</ol>`
 }
 
 function fichePersonne(a: Ami, d: DonneesDetail): string {

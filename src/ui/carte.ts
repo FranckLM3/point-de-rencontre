@@ -55,6 +55,11 @@ const STYLE_DROITE: L.PolylineOptions = { color: COULEUR_LIGNE_VILLE, weight: 2,
 /** En voiture (mode voiture, ou mixte avec la couche prête) : ligne droite pointillée, pas de tracé de route (décision 7). */
 const STYLE_VOITURE: L.PolylineOptions = { color: COULEUR_LIGNE_VILLE, weight: 2, opacity: 0.85, dashArray: '5 7', interactive: false }
 
+/** En métro, RER ou tram : ligne pleine, plus fine que le train, par les stations traversées. */
+const STYLE_METRO: L.PolylineOptions = {
+  color: COULEUR_LIGNE_VILLE, weight: 2.5, opacity: 0.85, lineJoin: 'round', interactive: false, className: 'trace-metro',
+}
+
 /** Largeur maximale (px) de la fiche de trajet ouverte au clic sur une personne. */
 const LARGEUR_FICHE = 280
 const MARGE_FICHE_HAUT_GAUCHE: L.PointTuple = [72, 16]
@@ -289,16 +294,22 @@ export function creerCarte(element: HTMLElement): Carte {
         if (p.chemin && p.chemin.length > 0 && p.gareDepart !== null && p.gareArrivee !== null) {
           const depart = p.chemin[0]!
           const arrivee = p.chemin[p.chemin.length - 1]!
-          // Accès et sortie en voiture : la vraie route quand elle est en cache (hors réseau urbain),
-          // sinon un pointillé droit (src/calcul/trace.ts, accesEnVoiture et sortieEnVoiture).
-          if (p.traceAcces) L.polyline(p.traceAcces, STYLE_VOITURE).bindTooltip(infobulle).addTo(coucheTrajets)
+          // Accès et sortie : la vraie route en voiture, les stations traversées en métro, une fois
+          // chargées ; sinon un pointillé droit (src/calcul/trace.ts).
+          const styleAcces = p.accesEnVoiture ? STYLE_VOITURE : STYLE_METRO
+          const styleSortie = p.sortieEnVoiture ? STYLE_VOITURE : STYLE_METRO
+          if (p.traceAcces) L.polyline(p.traceAcces, styleAcces).bindTooltip(infobulle).addTo(coucheTrajets)
           else L.polyline([[p.lat, p.lon], [depart.lat, depart.lon]], STYLE_POINTILLE).bindTooltip(infobulle).addTo(coucheTrajets)
           L.polyline(p.trace ?? p.chemin.map((g): L.LatLngTuple => [g.lat, g.lon]), STYLE_TRAIN).addTo(coucheTrajets)
-          if (p.traceSortie) L.polyline(p.traceSortie, STYLE_VOITURE).addTo(coucheTrajets)
+          if (p.traceSortie) L.polyline(p.traceSortie, styleSortie).addTo(coucheTrajets)
           else L.polyline([[arrivee.lat, arrivee.lon], [cible.lat, cible.lon]], STYLE_POINTILLE).addTo(coucheTrajets)
           dessinerGare(p.gareDepart, depart)
           dessinerGare(p.gareArrivee, arrivee)
         } else {
+          if (p.traceDirecte) {
+            L.polyline(p.traceDirecte, STYLE_METRO).bindTooltip(infobulle).addTo(coucheTrajets)
+            continue
+          }
           const style = p.enVoiture ? STYLE_VOITURE : p.directSansTrain ? STYLE_POINTILLE : STYLE_DROITE
           // Itinéraire routier réel une fois en cache (décision 7 assouplie) ; ligne droite pointillée
           // en attendant ou en cas d'échec (src/calcul/trace.ts, src/donnees/voiture.ts).

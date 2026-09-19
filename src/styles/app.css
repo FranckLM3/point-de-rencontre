@@ -429,6 +429,7 @@ form.groupe .champ { flex: 1 1 100%; }
 .detail-personne h3 { margin: 0 32px 2px 0; font: 600 1.05rem/1.3 var(--police-marque); display: flex; align-items: center; gap: 6px; }
 .detail-personne .adresse { margin: 0 0 6px; color: var(--texte-doux); font-size: .875rem; }
 .detail-personne .total { margin: 6px 0 4px; }
+.detail-personne .prix { white-space: nowrap; }
 .detail-personne .note { margin: 6px 0 0; color: var(--texte-doux); font-size: .9375rem; }
 .detail-personne .etapes { margin: 0; padding-left: 1.2em; }
 .detail-personne .etapes li { padding: 2px 0; font-size: .9375rem; }

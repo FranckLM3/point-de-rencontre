@@ -390,6 +390,8 @@ test('mode transports : le trajet en train suit les gares réelles, pas une lign
     paths.map((p) => (p.getAttribute('d')?.match(/[ML]/g) ?? []).length),
   )
   expect(points.some((n) => n > 2)).toBe(true)
+  // Léa rejoint la Gare de Lyon en métro : tracé par les stations (Hôtel de Ville, Gare de Lyon).
+  await expect(page.locator('svg path.trace-metro')).toHaveCount(1)
 })
 
 test('le « ? » du repaire déplie l’explication du calcul', async ({ page }) => {

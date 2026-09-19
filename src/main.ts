@@ -22,6 +22,7 @@ import { enregistrerGroupe, listerGroupes } from './donnees/groupes'
 import { creerHoraires } from './donnees/horaires'
 import { creerChargeurRails, creerRails, type ChargeurRails } from './donnees/rails'
 import { chargerCarburant, chargerGrille, chargerGrille8km, chargerVilles, type PrixCarburant } from './donnees/statiques'
+import { creerCheminsUrbains, type CheminsUrbains } from './donnees/urbain'
 import { chargerCouches, creerFileCalculVoiture, creerItineraires, type FileCalculVoiture, type Itineraires } from './donnees/voiture'
 import { aRelancer } from './calcul/relance-voiture'
 import { ETAT_DEFAUT, lireEtat } from './etat/url'
@@ -76,6 +77,8 @@ interface Session {
   /** Itinéraires routiers réels (mode voiture ou mixte), mis en cache pour la session par couple
    * départ/arrivée : voir src/donnees/voiture.ts. */
   itineraires: Itineraires
+  /** Chemins arrêt par arrêt dans les réseaux urbains, chargés à la demande. */
+  chemins: CheminsUrbains
   /** Grille de 8 km et prix des carburants, chargés à la première activation du mode voiture ou mixte. */
   voitureBase: { grille8: Grille; carburant: PrixCarburant } | null
   /** Couches voiture déjà calculées, par personne (toutes celles en voiture, pas seulement cochées :
@@ -256,7 +259,7 @@ function cibleCarte(s: Session): Lieu | null {
  * sur la carte et le lieu testé (D8, un seul chemin d'appel, une seule couche). */
 function dessinerTrajets(s: Session, choisis: Ami[]): void {
   const cible = cibleCarte(s)
-  const trajets = personnesTrajetCarte(choisis, s.etat.mode, s.tc.pret(), voitureMoteur(s), cible, s.rails.pret(), s.itineraires)
+  const trajets = personnesTrajetCarte(choisis, s.etat.mode, s.tc.pret(), voitureMoteur(s), cible, s.rails.pret(), s.itineraires, s.chemins)
   s.carte.trajets(trajets, cible)
   // Chargement paresseux : seulement quand un vrai trajet ferroviaire est dessiné, une fois par session.
   if (!s.railsDemande && !s.rails.pret() && trajets.some((t) => t.chemin !== null)) {
@@ -274,6 +277,10 @@ function dessinerTrajets(s: Session, choisis: Ami[]): void {
     // Accès à la gare et sortie vers le lieu en voiture, hors réseaux urbains (métro, RER).
     for (const r of routesADemander(trajets, cible)) {
       s.itineraires.demander(r.depart, r.arrivee, () => dessinerTrajets(s, choisis))
+    }
+    // Métro, RER, tram : le chemin arrêt par arrêt depuis la station de montée.
+    for (const t of trajets.flatMap((p) => p.urbainsADemander)) {
+      s.chemins.demander(t.reseau, t.de, () => dessinerTrajets(s, choisis))
     }
   }
 }
@@ -596,6 +603,7 @@ async function charger(carte: Carte, installer: (s: Session) => void): Promise<v
       rails: creerChargeurRails(creerRails),
       railsDemande: false,
       itineraires: creerItineraires(),
+      chemins: creerCheminsUrbains(),
       voitureBase: null,
       voitureCouches,
       voitureVersion: 1,

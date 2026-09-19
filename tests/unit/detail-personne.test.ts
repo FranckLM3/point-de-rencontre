@@ -50,3 +50,16 @@ test('les noms et adresses sont échappés', () => {
   el.innerHTML = detailPersonnes({ amis: [pirate], cible: null, choisis: new Set(), trajet: () => null, parametres: null })
   expect(el.querySelector('img')).toBeNull()
 })
+
+test('métro : stations de montée et de descente dans les étapes', () => {
+  const reseau = { id: 'idf', nom: 'IDF', gares: [], minutes: new Uint8Array(4), stations: [{ nom: 'Porte de Bagnolet', lat: 0, lon: 0 }, { nom: 'Gare de Lyon', lat: 0, lon: 0 }] }
+  const urbain = { reseau, de: 0, vers: 1 }
+  const avecMetro: TrajetTc = { ...trajetTc, acces: { minutes: 23, mode: 'transports', urbain }, sortie: { minutes: 8, mode: 'transports', urbain: { reseau, de: 1, vers: 0 } } }
+  const el = rendre((a) => (a.id === 'f' ? { moyen: 'tc', trajet: avecMetro, via: [] } : null))
+  const etapes = [...el.querySelectorAll('.detail-personne')[0]!.querySelectorAll('.etapes li')].map((li) => li.textContent)
+  expect(etapes[0]).toBe("23 min en transports jusqu'à Marseille Saint-Charles, montée à Porte de Bagnolet")
+  expect(etapes[2]).toBe("8 min en transports jusqu'à Lyon, descente à Porte de Bagnolet")
+  const direct: TrajetTc = { ...trajetTc, depart: null, arrivee: null, departIndice: null, arriveeIndice: null, sortie: null, acces: { minutes: 25, mode: 'transports', urbain } }
+  const el2 = rendre((a) => (a.id === 'f' ? { moyen: 'tc', trajet: direct, via: [] } : null))
+  expect(el2.querySelector('.etapes li')!.textContent).toBe('25 min en transports, de Porte de Bagnolet à Gare de Lyon')
+})

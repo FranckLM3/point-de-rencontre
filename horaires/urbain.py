@@ -15,6 +15,7 @@ import io
 import json
 import math
 import shutil
+import struct
 import sys
 import urllib.request
 import zipfile
@@ -42,6 +43,7 @@ VITESSE_MARCHE_KMH = 4.5
 DETOUR = 1.3
 CASES_PAR_DEGRE = 100  # 0,01° : 1,1 km en latitude, au moins 0,8 km en longitude en France
 INJOIGNABLE = 255
+SANS_PRECEDENTE = 65535
 MARDI = 1
 
 
@@ -154,14 +156,20 @@ def charger(contenu: bytes) -> ReseauUrbain:
     return ReseauUrbain(jour, stations, connexions, _liaisons_a_pied(stations))
 
 
-def depart_unique(r: ReseauUrbain, source: int, depart: int, departs: list[int] | None = None) -> list[float]:
-    """Heure d'arrivée au plus tôt à chaque station en partant de `source` à `depart`."""
+def depart_unique(
+    r: ReseauUrbain, source: int, depart: int, departs: list[int] | None = None
+) -> tuple[list[float], list[int]]:
+    """Heure d'arrivée au plus tôt à chaque station en partant de `source` à `depart`, et la station
+    précédente sur ce trajet (arrêt par arrêt, marche comprise ; SANS_PRECEDENTE pour la source)."""
     n = len(r.stations)
     arrivee = [math.inf] * n
+    precedente = [SANS_PRECEDENTE] * n
     marge = [0] * n  # correspondance à respecter en descendant d'un véhicule, pas à pied
     arrivee[source] = depart
     for j, s in r.marche[source]:
-        arrivee[j] = min(arrivee[j], depart + s)
+        if depart + s < arrivee[j]:
+            arrivee[j] = depart + s
+            precedente[j] = source
     montees: set[int] = set()
     departs = departs if departs is not None else [c[0] for c in r.connexions]
     borne = depart + DUREE_MAX_S
@@ -174,24 +182,31 @@ def depart_unique(r: ReseauUrbain, source: int, depart: int, departs: list[int] 
         montees.add(course)
         if a < arrivee[v]:
             arrivee[v] = a
+            precedente[v] = u
             marge[v] = CORRESPONDANCE_S
             for j, s in r.marche[v]:
                 if a + s < arrivee[j]:
                     arrivee[j] = a + s
+                    precedente[j] = v
                     marge[j] = 0
-    return arrivee
+    return arrivee, precedente
 
 
-def matrice(r: ReseauUrbain) -> bytes:
-    """N x N octets : durée moyenne en minutes sur les trois départs, 255 si injoignable."""
+def calculer(r: ReseauUrbain) -> tuple[bytes, list[bytes]]:
+    """Matrice N x N octets (durée moyenne en minutes sur les trois départs, 255 si injoignable) et,
+    par station de départ, la station précédente vers chaque autre (uint16, départ de 8 h 00),
+    pour retracer le trajet arrêt par arrêt sur la carte."""
     n = len(r.stations)
     departs = [c[0] for c in r.connexions]
     sortie = bytearray([INJOIGNABLE]) * (n * n)
+    chemins: list[bytes] = []
     for source in range(n):
         sommes = [0.0] * n
         comptes = [0] * n
-        for depart in DEPARTS_S:
-            arrivee = depart_unique(r, source, depart, departs)
+        for k, depart in enumerate(DEPARTS_S):
+            arrivee, precedente = depart_unique(r, source, depart, departs)
+            if k == 0:
+                chemins.append(struct.pack(f"<{n}H", *precedente))
             for j, t in enumerate(arrivee):
                 if t != math.inf:
                     sommes[j] += t - depart
@@ -199,14 +214,22 @@ def matrice(r: ReseauUrbain) -> bytes:
         for j in range(n):
             if comptes[j]:
                 sortie[source * n + j] = min(INJOIGNABLE - 1, round(sommes[j] / comptes[j] / 60))
-    return bytes(sortie)
+    return bytes(sortie), chemins
+
+
+def matrice(r: ReseauUrbain) -> bytes:
+    return calculer(r)[0]
 
 
 def ecrire(reseaux: dict[str, tuple[str, ReseauUrbain]], dossier: Path) -> None:
     dossier.mkdir(parents=True, exist_ok=True)
     index = []
     for ident, (nom, r) in reseaux.items():
-        (dossier / f"{ident}.bin").write_bytes(matrice(r))
+        minutes, chemins = calculer(r)
+        (dossier / f"{ident}.bin").write_bytes(minutes)
+        (dossier / ident).mkdir(exist_ok=True)
+        for source, octets in enumerate(chemins):
+            (dossier / ident / f"{source}.bin").write_bytes(octets)
         stations = [[s.nom, round(s.lat, 5), round(s.lon, 5)] for s in r.stations]
         index.append({"id": ident, "nom": nom, "jour": r.jour, "stations": stations})
     (dossier / "reseaux.json").write_text(json.dumps({"reseaux": index}, ensure_ascii=False, separators=(",", ":")))

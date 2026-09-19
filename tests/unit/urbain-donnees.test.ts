@@ -42,3 +42,11 @@ test('données absentes ou abîmées : aucun réseau, sans erreur', async () => 
   ))
   expect(await chargerReseaux(sncf)).toEqual([])
 })
+
+test('remonterChemin : stations traversées dans l’ordre, repli sur les deux bouts si la chaîne casse', async () => {
+  const { remonterChemin, SANS_PRECEDENTE } = await import('../../src/donnees/urbain')
+  const p = Uint16Array.from([SANS_PRECEDENTE, 0, 1, SANS_PRECEDENTE])
+  expect(remonterChemin(p, 0, 2)).toEqual([0, 1, 2])
+  expect(remonterChemin(p, 0, 0)).toEqual([0])
+  expect(remonterChemin(p, 0, 3)).toEqual([0, 3])
+})

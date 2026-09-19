@@ -5,7 +5,9 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from horaires.urbain import INJOIGNABLE, charger, depart_unique, ecrire, matrice
+import struct
+
+from horaires.urbain import INJOIGNABLE, SANS_PRECEDENTE, charger, depart_unique, ecrire, matrice
 
 # Ligne 1 (métro) : A -> B -> C, départs de A à 8 h 00, 8 h 20, 8 h 40 et 9 h 00 (5 min entre stations).
 # Ligne 2 (tram) : C -> E à 8 h 11 (1 min après l'arrivée : correspondance manquée) et 8 h 30.
@@ -121,11 +123,19 @@ class ParcoursTest(unittest.TestCase):
         self.i = {s.nom: k for k, s in enumerate(self.r.stations)}
 
     def test_un_depart_correspondance_de_2_min_et_marche(self):
-        t = depart_unique(self.r, self.i["Alpha"], 8 * 3600)
+        t, _ = depart_unique(self.r, self.i["Alpha"], 8 * 3600)
         self.assertEqual(t[self.i["Gamma"]], 8 * 3600 + 10 * 60)
         # Le tram de 8 h 11 part 1 min après l'arrivée : on prend celui de 8 h 30.
         self.assertEqual(t[self.i["Epsilon"]], 8 * 3600 + 40 * 60)
         self.assertAlmostEqual(t[self.i["Delta"]] - t[self.i["Gamma"]], 0.5 * 1.3 / 4.5 * 3600, delta=30)
+
+    def test_station_precedente_arret_par_arret_marche_comprise(self):
+        _, p = depart_unique(self.r, self.i["Alpha"], 8 * 3600)
+        self.assertEqual(p[self.i["Alpha"]], SANS_PRECEDENTE)
+        self.assertEqual(p[self.i["Beta"]], self.i["Alpha"])
+        self.assertEqual(p[self.i["Gamma"]], self.i["Beta"])
+        self.assertEqual(p[self.i["Epsilon"]], self.i["Gamma"])
+        self.assertEqual(p[self.i["Delta"]], self.i["Gamma"])  # à pied
 
     def test_matrice_moyenne_des_trois_departs_attente_comprise(self):
         m = matrice(self.r)
@@ -150,6 +160,9 @@ class EcritureTest(unittest.TestCase):
             nom, lat, lon = reseau["stations"][0]
             self.assertIsInstance(nom, str)
             self.assertEqual((Path(d) / "test.bin").stat().st_size, 25)
+            alpha = [s[0] for s in reseau["stations"]].index("Alpha")
+            precedentes = struct.unpack("<5H", (Path(d) / "test" / f"{alpha}.bin").read_bytes())
+            self.assertEqual(precedentes[alpha], SANS_PRECEDENTE)
 
 
 if __name__ == "__main__":

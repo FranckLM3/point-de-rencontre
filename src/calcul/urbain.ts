@@ -67,16 +67,22 @@ export function arretsProches(r: ReseauUrbain, lat: number, lon: number): Arret[
   return proches.slice(0, NB_EN_TRANSPORTS).map((p) => ({ station: p.station, minutes: minutesA(p.km, VITESSE.transports) }))
 }
 
-/** Durée la plus courte de `depuis` vers `vers` par le réseau (accès + trajet + sortie). */
-export function dureeUrbaine(r: ReseauUrbain, depuis: Arret[], vers: Arret[]): number {
+/** Trajet le plus court de `depuis` vers `vers` par le réseau : durée (accès + trajet + sortie) et
+ * stations où l'on monte (`de`) et descend (`vers`) ; null si aucun. */
+export function meilleurUrbain(r: ReseauUrbain, depuis: Arret[], vers: Arret[]): { minutes: number; de: number; vers: number } | null {
   const n = r.stations.length
-  let meilleure = Number.POSITIVE_INFINITY
+  let meilleur: { minutes: number; de: number; vers: number } | null = null
   for (const a of depuis) {
     for (const b of vers) {
       const m = r.minutes[a.station * n + b.station]!
       if (m === INJOIGNABLE_URBAIN) continue
-      meilleure = Math.min(meilleure, a.minutes + m + b.minutes)
+      const minutes = a.minutes + m + b.minutes
+      if (!meilleur || minutes < meilleur.minutes) meilleur = { minutes, de: a.station, vers: b.station }
     }
   }
-  return meilleure
+  return meilleur
 }
+
+/** Durée la plus courte de `depuis` vers `vers` par le réseau, l'infini si aucun trajet. */
+export const dureeUrbaine = (r: ReseauUrbain, depuis: Arret[], vers: Arret[]): number =>
+  meilleurUrbain(r, depuis, vers)?.minutes ?? Number.POSITIVE_INFINITY

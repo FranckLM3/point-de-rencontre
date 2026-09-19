@@ -79,3 +79,56 @@ export async function chargerReseaux(sncf: Station[]): Promise<ReseauUrbain[]> {
     return []
   }
 }
+
+/** Pas de station précédente : la source elle-même, ou une station injoignable. */
+export const SANS_PRECEDENTE = 65535
+/** Sécurité contre une chaîne bouclée (donnée corrompue). */
+const CHEMIN_PAS_MAX = 300
+
+/**
+ * Chemins arrêt par arrêt dans un réseau, pour dessiner le trajet en métro sur la carte. Une ligne
+ * par station de départ (`urbain/<id>/<station>.bin`), chargée à la demande puis gardée.
+ */
+export interface CheminsUrbains {
+  /** Stations traversées de `de` à `vers` (bornes comprises), ou null si la ligne n'est pas chargée. */
+  regarder(r: ReseauUrbain, de: number, vers: number): number[] | null
+  /** Charge la ligne de `de` puis appelle `surCharge` (sans effet si déjà chargée ou en cours). */
+  demander(r: ReseauUrbain, de: number, surCharge: () => void): void
+}
+
+export function remonterChemin(precedentes: Uint16Array, de: number, vers: number): number[] {
+  const chemin = [vers]
+  let courante = vers
+  for (let i = 0; i < CHEMIN_PAS_MAX && courante !== de; i++) {
+    const p = precedentes[courante]
+    if (p === undefined || p === SANS_PRECEDENTE) return [de, vers]
+    chemin.push(p)
+    courante = p
+  }
+  return courante === de ? chemin.reverse() : [de, vers]
+}
+
+export function creerCheminsUrbains(): CheminsUrbains {
+  const chargees = new Map<string, Uint16Array>()
+  const enCours = new Set<string>()
+  const cle = (r: ReseauUrbain, de: number): string => `${r.id}/${de}`
+  return {
+    regarder(r, de, vers) {
+      const precedentes = chargees.get(cle(r, de))
+      return precedentes ? remonterChemin(precedentes, de, vers) : null
+    },
+    demander(r, de, surCharge) {
+      const c = cle(r, de)
+      if (chargees.has(c) || enCours.has(c)) return
+      enCours.add(c)
+      lire(`${c}.bin`)
+        .then((reponse) => reponse.arrayBuffer())
+        .then((tampon) => {
+          chargees.set(c, new Uint16Array(tampon))
+          surCharge()
+        })
+        .catch((e) => console.warn('Chemin urbain indisponible :', e))
+        .finally(() => enCours.delete(c))
+    },
+  }
+}

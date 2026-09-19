@@ -101,6 +101,13 @@ const RESEAUX_URBAINS = {
   reseaux: [{ id: 'idf', nom: 'Île-de-France', jour: '20261006', stations: [['Gare de Lyon', 48.8443, 2.3743], ['Hôtel de Ville', 48.8573, 2.3522]] }],
 }
 const MATRICE_IDF = Buffer.from([0, 9, 9, 0])
+/** Station précédente depuis chaque station (uint16) : trajet direct entre les deux. */
+const precedentes = (source: number): Buffer => {
+  const b = Buffer.alloc(4)
+  b.writeUInt16LE(source === 0 ? 65535 : 1, 0)
+  b.writeUInt16LE(source === 1 ? 65535 : 0, 2)
+  return b
+}
 
 /** Sert des horaires synthétiques à la place des fichiers de `public/data/tc` et `public/data/urbain`. */
 export async function simulerHoraires(page: Page): Promise<HorairesSimules> {
@@ -110,6 +117,8 @@ export async function simulerHoraires(page: Page): Promise<HorairesSimules> {
     const chemin = new URL(route.request().url()).pathname
     if (chemin.endsWith('reseaux.json')) return route.fulfill({ json: RESEAUX_URBAINS })
     if (chemin.endsWith('idf.bin')) return route.fulfill(binaire(MATRICE_IDF))
+    const ligne = chemin.match(/idf\/(\d)\.bin$/)
+    if (ligne) return route.fulfill(binaire(precedentes(Number(ligne[1]))))
     return route.fulfill({ status: 404, body: '' })
   })
   await page.route('**/data/tc/**', async (route) => {
