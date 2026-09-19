@@ -37,10 +37,14 @@ function puceGroupe(nom: string, active: boolean, action: string): string {
 
 function entete(d: DonneesAmis): string {
   const coches = d.amis.filter((a) => d.selection.has(a.id)).length
-  const puces = [
-    puceGroupe('Tous', memesIds(d.amis.map((a) => a.id), d.selection), ''),
-    ...d.groupes.map((g) => puceGroupe(g.nom, memesIds(idsGroupe(g, d.amis), d.selection), g.id)),
-  ]
+  // Sans groupe enregistré, « Tout le monde » ferait doublon avec le bouton « Tous » de l'en-tête.
+  const puces =
+    d.groupes.length === 0
+      ? []
+      : [
+          puceGroupe('Tout le monde', memesIds(d.amis.map((a) => a.id), d.selection), ''),
+          ...d.groupes.map((g) => puceGroupe(g.nom, memesIds(idsGroupe(g, d.amis), d.selection), g.id)),
+        ]
   return `
     <div class="rang entete-liste-amis">
       <strong>Les Crocos</strong>

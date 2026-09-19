@@ -75,11 +75,19 @@ test('choisir une puce de groupe coche ses membres encore présents', () => {
   expect(a.changerSelection).toHaveBeenCalledWith(['b'])
 })
 
-test('la puce « Tous » sélectionne tout le monde et se met en avant quand tout est coché', () => {
+test('sans groupe enregistré, pas de puce « Tout le monde » en doublon de « Tous »', () => {
+  const el = document.createElement('div')
+  rendreAmis(el, { amis, groupes: [], selection: new Set(['a', 'b']) }, actions())
+  expect(el.querySelector('[data-groupe=""]')).toBeNull()
+  expect(el.querySelector('[data-action="groupe"]')).not.toBeNull()
+})
+
+test('avec des groupes, la puce « Tout le monde » sélectionne tout le monde et se met en avant', () => {
   const el = document.createElement('div')
   const a = actions()
-  rendreAmis(el, { amis, groupes: [], selection: new Set(['a', 'b']) }, a)
+  rendreAmis(el, { amis, groupes: [{ id: 'g', nom: 'Sud', amis: ['b'] }], selection: new Set(['a', 'b']) }, a)
   const tous = el.querySelector<HTMLButtonElement>('[data-groupe=""]')!
+  expect(tous.textContent).toBe('Tout le monde')
   expect(tous.getAttribute('aria-pressed')).toBe('true')
   tous.click()
   expect(a.changerSelection).toHaveBeenCalledWith(['a', 'b'])
