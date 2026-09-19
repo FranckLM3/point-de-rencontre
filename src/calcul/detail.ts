@@ -10,15 +10,17 @@ export type TrajetDetaille =
   | { moyen: 'voiture'; valeur: ValeurVoiture }
   | { moyen: 'oiseau'; km: number }
 
-function enTransports(moteur: MoteurTc, a: Ami, lat: number, lon: number): TrajetDetaille | null {
-  const t = versPointTc(moteur.horaires, moteur.depuis(a), a, lat, lon, moteur.gares(lat, lon))
-  if (!t) return null
-  if (t.departIndice === null || t.arriveeIndice === null) return { moyen: 'tc', trajet: t, via: [] }
+/** Gares intermédiaires du chemin d'un trajet en train (vide sans train ou si la ligne manque). */
+export function garesVia(moteur: MoteurTc, t: TrajetTc): string[] {
+  if (t.departIndice === null || t.arriveeIndice === null) return []
   const ligne = moteur.horaires.ligne(t.departIndice)
   const indices = ligne ? cheminGares(ligne, t.departIndice, t.arriveeIndice) : []
-  // Gares intermédiaires du chemin : celles où l'on change de train.
-  const via = indices.slice(1, -1).map((i) => moteur.horaires.stations[i]!.nom)
-  return { moyen: 'tc', trajet: t, via }
+  return indices.slice(1, -1).map((i) => moteur.horaires.stations[i]!.nom)
+}
+
+function enTransports(moteur: MoteurTc, a: Ami, lat: number, lon: number): TrajetDetaille | null {
+  const t = versPointTc(moteur.horaires, moteur.depuis(a), a, lat, lon, moteur.gares(lat, lon))
+  return t ? { moyen: 'tc', trajet: t, via: garesVia(moteur, t) } : null
 }
 
 function enVoiture(moteur: MoteurVoiture, a: Ami, lat: number, lon: number): TrajetDetaille | null {

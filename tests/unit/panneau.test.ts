@@ -578,3 +578,16 @@ test('filtres : « Copier le lien » porte le lien de la vue en cours et appelle
   bouton.click()
   expect(partager).toHaveBeenCalledWith(bouton.dataset.lien)
 })
+
+test('tiroir : les étapes détaillées d’une personne se déplient sous son nom', () => {
+  const el = document.createElement('div')
+  const details = enTrain.parAmi.map((d, i) => (i === 0 ? { ...d, etapes: () => ['22 min à pied jusqu’à Marseille Saint-Charles', '3 h de train : Marseille Saint-Charles → Paris Gare de Lyon'] } : d))
+  rendreResultatLieu(el, marseille, amis, details, 'min', vi.fn())
+  const tiroir = el.querySelector('details.tiroir')!
+  expect(tiroir.querySelector('summary .precision')!.textContent).toBe('Marseille Saint-Charles → Paris Gare de Lyon')
+  expect([...tiroir.querySelectorAll('.etapes li')].map((li) => li.textContent)).toEqual([
+    '22 min à pied jusqu’à Marseille Saint-Charles',
+    '3 h de train : Marseille Saint-Charles → Paris Gare de Lyon',
+  ])
+  expect(el.querySelectorAll('details.tiroir')).toHaveLength(1)
+})

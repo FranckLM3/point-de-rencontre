@@ -5,6 +5,8 @@ export interface Detail {
   valeur: number
   /** Texte court sous le nom, par exemple « Marseille Saint-Charles → Paris Gare de Lyon ». */
   precision?: string
+  /** Étapes détaillées, une phrase chacune (dépliées à la demande) ; calculées seulement si lues. */
+  etapes?: () => string[]
 }
 
 /** Trajet d'une personne vers un point, null si elle ne peut pas l'atteindre. */

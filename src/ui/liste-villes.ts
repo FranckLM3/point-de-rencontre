@@ -42,7 +42,12 @@ export function detailParAmi(amis: Ami[], details: (Detail | null)[], unite: Uni
     .map(({ nom, d }) => {
       const precision = d?.precision ? `<small class="precision">${echapper(d.precision)}</small>` : ''
       const texte = d ? valeur(d.valeur, unite) : PAS_DE_TRAJET
-      return `<tr><td>${echapper(nom)}${precision}</td><td>${texte}</td></tr>`
+      const etapes = d?.etapes?.() ?? []
+      // Tiroir : le résumé reste visible, les étapes détaillées se déplient au toucher.
+      const personne = etapes.length > 0
+        ? `<details class="tiroir"><summary>${echapper(nom)}${precision}</summary><ol class="etapes">${etapes.map((e) => `<li>${echapper(e)}</li>`).join('')}</ol></details>`
+        : `${echapper(nom)}${precision}`
+      return `<tr><td>${personne}</td><td>${texte}</td></tr>`
     })
     .join('')
   return `<table class="detail"><tbody>${lignes}</tbody></table>`

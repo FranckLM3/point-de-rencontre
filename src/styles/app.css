@@ -195,6 +195,20 @@ form.groupe .champ { flex: 1 1 100%; }
 /* La valeur reste d'un bloc : la précision peut être longue, c'est elle qui se replie. */
 .detail td:last-child { text-align: right; white-space: nowrap; vertical-align: top; padding-left: 10px; }
 .detail .precision { display: block; color: var(--texte-doux); font-size: .875rem; }
+/* Tiroir d'une personne : le résumé se déplie en étapes détaillées, chevron à droite du nom. */
+.tiroir summary { list-style: none; cursor: pointer; min-height: var(--cible-tactile); padding-right: 22px; position: relative; }
+.tiroir summary::-webkit-details-marker { display: none; }
+.tiroir summary::after {
+  content: ''; position: absolute; right: 4px; top: 8px; width: 7px; height: 7px;
+  border-right: 2px solid var(--accent); border-bottom: 2px solid var(--accent);
+  transform: rotate(45deg); transition: transform var(--duree);
+}
+.tiroir[open] summary::after { transform: rotate(-135deg); top: 12px; }
+.tiroir summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.tiroir .etapes { margin: 4px 0 6px; padding-left: 1.3em; font-size: .9375rem; line-height: 1.45; }
+.tiroir .etapes li { padding: 2px 0; }
+.tiroir .etapes li::marker { color: var(--accent); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .tiroir summary::after { transition: none; } }
 .reservation { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0 0; }
 .reservation a { color: var(--accent); font-weight: 500; }
 

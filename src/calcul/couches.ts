@@ -3,7 +3,9 @@ import type { Ami, Etat } from '../types'
 import { distancesOiseau } from './agregat'
 import type { Grille } from './grille'
 import { coucheTc, departsPossibles, depuisGares, garesProches, versPointTc, type DepuisGares, type Proche } from './tc'
+import { etapesTrajet } from '../ui/etapes-trajet'
 import { descriptionTrajet, descriptionVoiture } from '../ui/format'
+import { garesVia } from './detail'
 import { coucheVoiture, indexPointsFrance, prixVoiture, valeurVoiture, type Couche, type ParametresPrix } from './voiture'
 import { mesureOiseau, type Mesure } from './villes'
 
@@ -77,7 +79,11 @@ function mesureTcPersonne(moteur: MoteurTc, grandeur: Choix['grandeur']): Mesure
   return (a, lat, lon) => {
     const t = versPointTc(moteur.horaires, moteur.depuis(a), a, lat, lon, moteur.gares(lat, lon))
     if (t === null) return null
-    return { valeur: grandeur === 'temps' ? t.minutes : t.euros, precision: descriptionTrajet(t) }
+    return {
+      valeur: grandeur === 'temps' ? t.minutes : t.euros,
+      precision: descriptionTrajet(t),
+      etapes: () => etapesTrajet(t, garesVia(moteur, t), 'l’arrivée'),
+    }
   }
 }
 

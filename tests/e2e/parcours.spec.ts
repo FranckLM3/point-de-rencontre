@@ -419,7 +419,7 @@ test('clic sur une personne de la carte : fiche avec les étapes de son trajet v
   const fiche = page.locator('.leaflet-popup .detail-personne')
   await expect(fiche.locator('h3')).toContainText('Léa')
   await expect(fiche.locator('.total')).toContainText('Vers Près de Lyon')
-  await expect(fiche.locator('.etapes li').filter({ hasText: /^Train / })).toHaveCount(1)
+  await expect(fiche.locator('.etapes li').filter({ hasText: / de train : / })).toHaveCount(1)
 })
 
 test('mode transports : sélectionner une cible plusieurs fois ne double jamais les tracés (D8)', async ({ page }) => {

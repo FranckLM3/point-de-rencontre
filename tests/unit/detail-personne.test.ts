@@ -26,7 +26,7 @@ test('transports : étapes accès, train avec gare de correspondance, sortie, et
   expect(fiche.querySelector('.total')!.textContent).toBe('Vers Lyon : 3 h 12 · ≈ 45 €')
   expect([...fiche.querySelectorAll('.etapes li')].map((li) => li.textContent)).toEqual([
     "12 min en transports jusqu'à Marseille Saint-Charles",
-    'Train Marseille Saint-Charles → Paris Gare de Lyon, via Lyon Part-Dieu · 1 correspondance',
+    '2 h 52 de train : Marseille Saint-Charles → Paris Gare de Lyon, via Lyon Part-Dieu · 1 correspondance',
     "8 min de voiture jusqu'à Lyon",
   ])
 })
