@@ -1,4 +1,5 @@
 import type { Unite } from '../calcul/unites'
+import type { Critere } from '../types'
 import { echapper, valeur } from './format'
 
 export interface Repaire {
@@ -6,10 +7,20 @@ export interface Repaire {
   ville: string
   pire: number
   total: number
+  /** Personnes comptées dans le total (pour la moyenne). */
+  nombre?: number
 }
 
 /** Résumé du meilleur point, au-dessus de la liste des villes. Rien n'est coché : rien n'est affiché. */
-export function rendreRepaire(el: HTMLElement, r: Repaire | null, unite: Unite, voir: () => void): void {
+/** La valeur du critère actif passe en premier : moyenne puis pire, ou pire puis total. */
+function ligneRepaire(r: Repaire, unite: Unite, critere: Critere): string {
+  if (critere === 'moyenne' && r.nombre) {
+    return `près de ${echapper(r.ville)} · ${valeur(r.total / r.nombre, unite)} en moyenne · ${valeur(r.pire, unite)} au pire`
+  }
+  return `près de ${echapper(r.ville)} · ${valeur(r.pire, unite)} au pire · ${valeur(r.total, unite)} au total`
+}
+
+export function rendreRepaire(el: HTMLElement, r: Repaire | null, unite: Unite, voir: () => void, critere: Critere = 'pire'): void {
   if (!r) {
     el.innerHTML = ''
     return
@@ -17,7 +28,7 @@ export function rendreRepaire(el: HTMLElement, r: Repaire | null, unite: Unite, 
   el.innerHTML = `
     <article class="ville-carte repaire">
       <span class="sur-titre">Le repaire</span>
-      <span class="ligne">près de ${echapper(r.ville)} · ${valeur(r.pire, unite)} au pire · ${valeur(r.total, unite)} au total</span>
+      <span class="ligne">${ligneRepaire(r, unite, critere)}</span>
       <button type="button" class="pastille verte" data-action="voir-carte">Voir sur la carte</button>
     </article>`
   el.querySelector('button')!.addEventListener('click', () => voir())

@@ -29,3 +29,16 @@ test('en km, la valeur reste en km', () => {
   expect(el.textContent).toContain('340 km au pire')
   expect(el.textContent).toContain('1419 km au total')
 })
+
+test('en moyenne, la moyenne passe en premier, puis le pire trajet', () => {
+  const el = document.createElement('div')
+  rendreRepaire(el, { ville: 'Meyzieu', pire: 139, total: 521, nombre: 5 }, 'min', vi.fn(), 'moyenne')
+  const ligne = el.querySelector('.ligne')!.textContent!
+  expect(ligne).toBe('près de Meyzieu · 1 h 44 en moyenne · 2 h 19 au pire')
+})
+
+test('au pire trajet, le pire passe en premier, puis le total', () => {
+  const el = document.createElement('div')
+  rendreRepaire(el, { ville: 'Meyzieu', pire: 139, total: 521, nombre: 5 }, 'min', vi.fn(), 'pire')
+  expect(el.querySelector('.ligne')!.textContent).toBe('près de Meyzieu · 2 h 19 au pire · 8 h 41 au total')
+})

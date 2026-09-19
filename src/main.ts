@@ -268,7 +268,7 @@ function rendrePanneau(s: Session, choisis: Ami[], calculables: Ami[], mesure: M
     if (!s.repaire) return
     s.carte.centrerSur(s.repaire.lat, s.repaire.lon)
     fermerVolet()
-  })
+  }, critere)
   const details = lieu ? choisis.map((a) => mesure(a, lieu.lat, lieu.lon)) : []
   rendreResultatLieu($('#resultat-lieu'), lieu, choisis, details, unite, () => retirerLieu(s))
   rendreVilles($('#villes'), { villes, amis: calculables, nbPersonnes: s.amis.length, max, unite, mode, critere }, {
@@ -281,17 +281,19 @@ function rendrePanneau(s: Session, choisis: Ami[], calculables: Ami[], mesure: M
 function calculerRepaire(s: Session, calculables: Ami[], meilleur: number): Session['repaire'] {
   let pire = 0
   let total = 0
+  let nombre = 0
   const moteurTc = s.tc.pret()
   const moteurVoiture = voitureMoteur(s)
   for (const a of calculables) {
     const v = s.couches.obtenir(a, s.etat, moteurTc, moteurVoiture)?.[meilleur]
-    if (v === undefined) continue
+    if (v === undefined || !Number.isFinite(v)) continue
     total += v
+    nombre++
     if (v > pire) pire = v
   }
   const [lon, lat] = coordonnees(s.grille, meilleur)
   const proche = villeLaPlusProche(s.villes, lat, lon)
-  return { ville: proche?.nom ?? '', pire, total, lat, lon }
+  return { ville: proche?.nom ?? '', pire, total, nombre, lat, lon }
 }
 
 /** Étiquettes de villes façon Chronotrains (D3) : villes classées d'abord, grandes villes en renfort. */
