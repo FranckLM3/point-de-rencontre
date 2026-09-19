@@ -162,7 +162,7 @@ test('connexion, sélection, ajout d’une personne, test d’un lieu', async ({
 
   await definirInclusion(page, 'Tom', false)
   await expect(page.getByRole('heading', { level: 1 })).toContainText('entre 1')
-  await expect(page).toHaveURL(/sel=a/)
+  await expect(page.locator('#copier-lien')).toHaveAttribute('data-lien', /sel=a/)
   await expect(page.locator('.marqueur-personne.inactif')).toHaveCount(1)
 
   await page.locator('[data-action="tous"]').click()
@@ -282,7 +282,7 @@ test('mode transports : zones en heures, gares et liens de réservation', async 
   await ouvrirVoletSiVisible(page)
 
   await passerEnTransports(page)
-  await expect(page).toHaveURL(/mode=tc/)
+  await expect(page.locator('#copier-lien')).toHaveAttribute('data-lien', /mode=tc/)
   await expect(page.locator('#legende .case').first()).toContainText('h')
 
   const premiere = page.locator('#villes .ville-carte').first()
@@ -308,10 +308,10 @@ test('mode transports en prix : légende et menu en euros', async ({ page }) => 
   await page.getByRole('button', { name: 'Prix', exact: true }).click()
   await expect(page.getByRole('combobox', { name: 'Prix maximum' })).toBeVisible()
   await expect(page.locator('#legende .case').first()).toContainText('€')
-  await expect(page).toHaveURL(/grandeur=prix/)
+  await expect(page.locator('#copier-lien')).toHaveAttribute('data-lien', /grandeur=prix/)
 })
 
-test('bouton Réinitialiser : remet mode, critère et URL aux valeurs par défaut, puis disparaît', async ({ page }) => {
+test('bouton Réinitialiser : remet mode, critère et lien partagé aux valeurs par défaut, puis disparaît', async ({ page }) => {
   await simuler(page)
   await page.goto('./')
   await entrer(page)
@@ -321,18 +321,43 @@ test('bouton Réinitialiser : remet mode, critère et URL aux valeurs par défau
 
   await passerEnTransports(page)
   await page.getByRole('button', { name: 'Pire trajet', exact: true }).click()
-  await expect(page).toHaveURL(/mode=tc/)
-  await expect(page).toHaveURL(/critere=pire/)
+  await expect(page.locator('#copier-lien')).toHaveAttribute('data-lien', /mode=tc/)
+  await expect(page.locator('#copier-lien')).toHaveAttribute('data-lien', /critere=pire/)
 
   const reinitialiser = page.getByRole('button', { name: 'Réinitialiser' })
   await expect(reinitialiser).toBeVisible()
   await reinitialiser.click()
 
-  await expect(page).toHaveURL(/mode=mixte/)
-  await expect(page).toHaveURL(/critere=moyenne/)
+  await expect(page.locator('#copier-lien')).toHaveAttribute('data-lien', /mode=mixte/)
+  await expect(page.locator('#copier-lien')).toHaveAttribute('data-lien', /critere=moyenne/)
   await expect(page.locator('[data-mode="mixte"]')).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('[data-critere="moyenne"]')).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('#reinitialiser-filtres')).toHaveCount(0)
+})
+
+test('actualiser ramène au début ; un lien partagé ouvre sa vue une fois puis l’adresse est nettoyée', async ({ page }) => {
+  await simuler(page)
+  await page.goto('./')
+  await entrer(page)
+  await ouvrirVoletSiVisible(page)
+  await passerEnTransports(page)
+  await page.getByRole('button', { name: 'Pire trajet', exact: true }).click()
+  await expect(page.locator('[data-critere="pire"]')).toHaveAttribute('aria-pressed', 'true')
+  // L'adresse de la page ne garde pas les réglages.
+  expect(new URL(page.url()).search).toBe('')
+
+  await page.reload()
+  await page.getByRole('heading', { level: 1 }).waitFor()
+  await ouvrirVoletSiVisible(page)
+  await expect(page.locator('[data-mode="mixte"]')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('[data-critere="moyenne"]')).toHaveAttribute('aria-pressed', 'true')
+
+  // Un lien partagé : la vue s'ouvre, puis l'adresse redevient nue.
+  await page.goto('./?mode=tc&critere=pire')
+  await page.getByRole('heading', { level: 1 }).waitFor()
+  await ouvrirVoletSiVisible(page)
+  await expect(page.locator('[data-mode="tc"]')).toHaveAttribute('aria-pressed', 'true')
+  expect(new URL(page.url()).search).toBe('')
 })
 
 /**
@@ -435,12 +460,12 @@ test('mode voiture : détail du trajet en voiture, prix divisé par personnes pa
   await expect(premiere.locator('.detail')).not.toContainText('Léa')
 
   await page.getByRole('button', { name: 'Prix', exact: true }).click()
-  await expect(page).toHaveURL(/grandeur=prix/)
+  await expect(page.locator('#copier-lien')).toHaveAttribute('data-lien', /grandeur=prix/)
   const reglage = page.getByRole('group', { name: 'Personnes par voiture' })
   await expect(reglage).toBeVisible()
   const detailAvant = await premiere.locator('.zone-detail').textContent()
 
   await reglage.getByRole('button', { name: '4', exact: true }).click()
-  await expect(page).toHaveURL(/parvoiture=4/)
+  await expect(page.locator('#copier-lien')).toHaveAttribute('data-lien', /parvoiture=4/)
   await expect.poll(() => premiere.locator('.zone-detail').textContent()).not.toBe(detailAvant)
 })

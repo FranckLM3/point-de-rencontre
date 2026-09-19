@@ -566,3 +566,15 @@ test('recherche de lieu : vider le champ retire le lieu, definir remplit le cham
   recherche.definir(null)
   expect(champ.value).toBe('')
 })
+
+test('filtres : « Copier le lien » porte le lien de la vue en cours et appelle partager', () => {
+  const el = document.createElement('div')
+  const partager = vi.fn()
+  rendreFiltres(el, { ...ETAT_DEFAUT, mode: 'tc', critere: 'pire' }, 2, vi.fn(), vi.fn(), partager)
+  const bouton = el.querySelector<HTMLButtonElement>('#copier-lien')!
+  expect(bouton.textContent).toBe('Copier le lien')
+  expect(bouton.dataset.lien).toContain('mode=tc')
+  expect(bouton.dataset.lien).toContain('critere=pire')
+  bouton.click()
+  expect(partager).toHaveBeenCalledWith(bouton.dataset.lien)
+})

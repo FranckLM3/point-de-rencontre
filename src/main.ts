@@ -22,7 +22,8 @@ import { creerChargeurRails, creerRails, type ChargeurRails } from './donnees/ra
 import { chargerCarburant, chargerGrille, chargerGrille8km, chargerVilles, type PrixCarburant } from './donnees/statiques'
 import { chargerCouches, creerFileCalculVoiture, creerItineraires, type FileCalculVoiture, type Itineraires } from './donnees/voiture'
 import { aRelancer } from './calcul/relance-voiture'
-import { ETAT_DEFAUT, ecrireEtat, lireEtat } from './etat/url'
+import { ETAT_DEFAUT, lireEtat } from './etat/url'
+import { afficherToast } from './ui/toast'
 import type { Ami, Etat, Groupe, Lieu, Mode, Ville } from './types'
 import { rendreAmis } from './ui/amis'
 import { amisChoisis, cleFocus, cleZones, libelleClic } from './ui/assemblage'
@@ -293,7 +294,7 @@ function rendrePanneau(s: Session, choisis: Ami[], calculables: Ami[], mesure: M
       await recharger(s)
     },
   })
-  rendreFiltres($('#filtres'), s.etat, choisis.length, (p) => changer(s, p), () => reinitialiserFiltres(s))
+  rendreFiltres($('#filtres'), s.etat, choisis.length, (p) => changer(s, p), () => reinitialiserFiltres(s), copierLien)
   $('#avis-voiture').textContent = avisVoiture(s, choisis)
   const { lieu, mode, critere, max } = s.etat
   const unite = uniteDe(mode, s.etat.grandeur)
@@ -409,7 +410,7 @@ function afficher(s: Session, choisis: Ami[], mesure: Mesure, focus: string | nu
 
 /** Pendant le premier chargement (horaires et/ou grille voiture) : filtres à jour, résultats et zones vidés. */
 function attendreChargement(s: Session, choisis: Ami[], texte: string): void {
-  rendreFiltres($('#filtres'), s.etat, choisis.length, (p) => changer(s, p), () => reinitialiserFiltres(s))
+  rendreFiltres($('#filtres'), s.etat, choisis.length, (p) => changer(s, p), () => reinitialiserFiltres(s), copierLien)
   $('#chargement').textContent = texte
   $('#villes').textContent = ''
   $('#resultat-lieu').textContent = ''
@@ -460,8 +461,19 @@ async function preparerVoitureBase(s: Session): Promise<void> {
   s.voitureBase = await chargerBaseVoiture()
 }
 
+/** Copie le lien de la vue en cours (l'adresse de la page, elle, ne garde pas les réglages). */
+function copierLien(lien: string): void {
+  const url = `${location.origin}${location.pathname}${lien}`
+  navigator.clipboard
+    .writeText(url)
+    .then(() => afficherToast('Lien copié'))
+    .catch((e: unknown) => {
+      console.error('Copie du lien :', e)
+      afficherToast('Copie impossible : ton navigateur l’a refusée.')
+    })
+}
+
 function rafraichir(s: Session): void {
-  history.replaceState(null, '', ecrireEtat(s.etat))
   afficherBandeauRepli(s)
   const rendu = ++s.rendu
   const actif = document.activeElement
@@ -555,6 +567,8 @@ async function charger(carte: Carte, installer: (s: Session) => void): Promise<v
       return new Map<string, Couche>()
     })
     const etat = lireEtat(location.search)
+    // Un lien partagé ouvre sa vue une fois ; l'adresse redevient nue pour qu'actualiser ramène au début.
+    if (location.search) history.replaceState(null, '', location.pathname)
     const s: Session = {
       grille, villes, amis, groupes, etat, carte,
       recherche: rendreRechercheLieu($('#lieu'), etat.lieu, (lieu) => changer(s, { lieu })),

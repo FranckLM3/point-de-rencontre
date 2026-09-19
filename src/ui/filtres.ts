@@ -1,9 +1,8 @@
-import { maxParDefaut } from '../etat/url'
 import { maximaProposes, uniteDe, type Unite } from '../calcul/unites'
 import { PERSONNES_PAR_VOITURE_MAX } from '../calcul/voiture'
-import { estParDefaut } from '../etat/url'
+import { ecrireEtat, estParDefaut, maxParDefaut } from '../etat/url'
 import type { Etat, Grandeur, Mode } from '../types'
-import { sousTitre, titreCourt, valeur } from './format'
+import { echapper, sousTitre, titreCourt, valeur } from './format'
 
 /** Le vol d'oiseau n'est plus qu'un repli interne (décision 1) : trois modes seulement dans l'interface. */
 const MODES: { mode: Mode; libelle: string }[] = [
@@ -69,6 +68,8 @@ export function rendreFiltres(
   nombre: number,
   changer: (p: Partial<Etat>) => void,
   reinitialiser: () => void,
+  /** Reçoit le lien relatif de la vue (`?mode=…`) à copier ; l'adresse de la page, elle, reste nue. */
+  partager: (lien: string) => void = () => {},
 ): void {
   const unite = uniteDe(e.mode, e.grandeur)
   const critere = `<button type="button" class="pastille" data-critere="pire" ${presse(e.critere === 'pire')}>Pire trajet</button>
@@ -86,11 +87,12 @@ export function rendreFiltres(
         <div class="segmente" role="group" aria-label="Critère">${critere}</div>
         ${menuMaximum(e, unite)}
         ${boutonReinitialiser}
+        <button type="button" class="pastille secondaire" id="copier-lien" data-lien="${echapper(ecrireEtat(e))}">Copier le lien</button>
       </div>
     </div>
     <h1>${titreCourt(nombre)}</h1>
     <p class="sous-titre">${sousTitre({ mode: e.mode, unite, critere: e.critere, max: e.max })}</p>`
-  // Les unités diffèrent d'un mode ou d'une grandeur à l'autre : le maximum repart de zéro.
+  // Même unité d'un mode à l'autre : le maximum est gardé ; une autre grandeur reprend son maximum par défaut.
   el.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((b) =>
     b.addEventListener('click', () => changer({ mode: b.dataset.mode as Mode })),
   )
@@ -108,4 +110,6 @@ export function rendreFiltres(
     changer({ max: v ? Number(v) : null })
   })
   el.querySelector('#reinitialiser-filtres')?.addEventListener('click', () => reinitialiser())
+  const copier = el.querySelector<HTMLButtonElement>('#copier-lien')!
+  copier.addEventListener('click', () => partager(copier.dataset.lien ?? ''))
 }
