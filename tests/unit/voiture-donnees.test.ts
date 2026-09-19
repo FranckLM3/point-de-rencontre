@@ -171,7 +171,8 @@ test('itineraires : une fois en cache, regarder rend le résultat sans nouvel ap
   const surTermine = vi.fn()
   it.demander(paris, lyon, surTermine)
   await vi.waitFor(() => expect(surTermine).toHaveBeenCalled())
-  expect(it.regarder(paris, lyon)).toEqual(itineraireBrut)
+  // La fonction rend [lon, lat] (convention ORS) ; Leaflet attend [lat, lon] : l'ordre est inversé.
+  expect(it.regarder(paris, lyon)).toEqual({ coordonnees: [[48.85, 2.35], [47.3, 3.5], [45.76, 4.83]], minutes: 280, km: 465 })
   it.demander(paris, lyon, () => {})
   expect(invoke).toHaveBeenCalledTimes(1)
 })

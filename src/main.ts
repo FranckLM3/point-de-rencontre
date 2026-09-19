@@ -9,7 +9,7 @@ import {
   choisirMesure, creerChargeurTc, creerCouches, creerMoteurVoiture, type ChargeurTc, type Couches, type MoteurVoiture,
 } from './calcul/couches'
 import { coordonnees, type Grille } from './calcul/grille'
-import { personnesTrajetCarte } from './calcul/trace'
+import { personnesTrajetCarte, routesADemander } from './calcul/trace'
 import { pasTranches, uniteDe } from './calcul/unites'
 import { CONSOMMATION_DEFAUT, type Couche, type ParametresPrix } from './calcul/voiture'
 import { classerVilles, evaluer, type Mesure, type VilleClassee, villeLaPlusProche } from './calcul/villes'
@@ -268,6 +268,10 @@ function dessinerTrajets(s: Session, choisis: Ami[]): void {
       if (t.enVoiture && !t.traceVoiture) {
         s.itineraires.demander({ lat: t.lat, lon: t.lon }, { lat: cible.lat, lon: cible.lon }, () => dessinerTrajets(s, choisis))
       }
+    }
+    // Accès à la gare et sortie vers le lieu en voiture, hors réseaux urbains (métro, RER).
+    for (const r of routesADemander(trajets, cible)) {
+      s.itineraires.demander(r.depart, r.arrivee, () => dessinerTrajets(s, choisis))
     }
   }
 }

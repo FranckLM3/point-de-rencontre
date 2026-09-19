@@ -272,9 +272,13 @@ export function creerCarte(element: HTMLElement): Carte {
         if (p.chemin && p.chemin.length > 0 && p.gareDepart !== null && p.gareArrivee !== null) {
           const depart = p.chemin[0]!
           const arrivee = p.chemin[p.chemin.length - 1]!
-          L.polyline([[p.lat, p.lon], [depart.lat, depart.lon]], STYLE_POINTILLE).bindTooltip(infobulle).addTo(coucheTrajets)
+          // Accès et sortie en voiture : la vraie route quand elle est en cache (hors réseau urbain),
+          // sinon un pointillé droit (src/calcul/trace.ts, enReseauUrbain).
+          if (p.traceAcces) L.polyline(p.traceAcces, STYLE_VOITURE).bindTooltip(infobulle).addTo(coucheTrajets)
+          else L.polyline([[p.lat, p.lon], [depart.lat, depart.lon]], STYLE_POINTILLE).bindTooltip(infobulle).addTo(coucheTrajets)
           L.polyline(p.trace ?? p.chemin.map((g): L.LatLngTuple => [g.lat, g.lon]), STYLE_TRAIN).addTo(coucheTrajets)
-          L.polyline([[arrivee.lat, arrivee.lon], [cible.lat, cible.lon]], STYLE_POINTILLE).addTo(coucheTrajets)
+          if (p.traceSortie) L.polyline(p.traceSortie, STYLE_VOITURE).addTo(coucheTrajets)
+          else L.polyline([[arrivee.lat, arrivee.lon], [cible.lat, cible.lon]], STYLE_POINTILLE).addTo(coucheTrajets)
           dessinerGare(p.gareDepart, depart)
           dessinerGare(p.gareArrivee, arrivee)
         } else {

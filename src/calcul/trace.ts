@@ -39,6 +39,11 @@ export interface PersonneTrajetCarte {
    * en cache (ligne droite pointillée en attendant, src/ui/carte.ts) ou hors mode voiture.
    */
   traceVoiture: [number, number][] | null
+  /** Points [lat, lon] de la route du domicile à la gare de départ, quand elle est en cache ; sinon
+   * null (pointillés droits en attendant). Seulement avec `chemin`. */
+  traceAcces: [number, number][] | null
+  /** Même chose de la gare d'arrivée jusqu'à la cible (dernier kilomètre). */
+  traceSortie: [number, number][] | null
 }
 
 /** Mêmes coordonnées, un seul trajet dessiné (D8) : deux Crocos au même point partagent leur trace. */
@@ -95,7 +100,71 @@ function trajetGroupeTc(
 
 const SANS_TRAIN = {
   chemin: null, trace: null, gareDepart: null, gareArrivee: null, directSansTrain: false, traceVoiture: null,
+  traceAcces: null, traceSortie: null,
 } as const
+
+/**
+ * Zones où l'accès aux gares se fait en transports urbains (métro, RER, tram) et non en voiture :
+ * la route n'y est ni demandée ni dessinée (pointillés droits). Île-de-France aujourd'hui ;
+ * Lyon et Marseille s'ajouteront avec leurs réseaux (plan 4).
+ */
+const ZONES_RESEAU_URBAIN = [{ nom: 'Île-de-France', latMin: 48.12, latMax: 49.24, lonMin: 1.44, lonMax: 3.56 }] as const
+
+export function enReseauUrbain(lat: number, lon: number): boolean {
+  return ZONES_RESEAU_URBAIN.some((z) => lat >= z.latMin && lat <= z.latMax && lon >= z.lonMin && lon <= z.lonMax)
+}
+
+/** Couples (départ, arrivée) des routes d'accès et de sortie à demander : hors réseau urbain et pas
+ * encore en cache pour un trajet ferroviaire. */
+export function routesADemander(
+  trajets: PersonneTrajetCarte[],
+  cible: Lieu,
+): { depart: { lat: number; lon: number }; arrivee: { lat: number; lon: number } }[] {
+  const routes: { depart: { lat: number; lon: number }; arrivee: { lat: number; lon: number } }[] = []
+  for (const t of trajets) {
+    if (!t.chemin || t.chemin.length === 0) continue
+    const premiere = t.chemin[0]!
+    const derniere = t.chemin[t.chemin.length - 1]!
+    if (!t.traceAcces && !enReseauUrbain(t.lat, t.lon)) {
+      routes.push({ depart: { lat: t.lat, lon: t.lon }, arrivee: { lat: premiere.lat, lon: premiere.lon } })
+    }
+    if (!t.traceSortie && !enReseauUrbain(cible.lat, cible.lon)) {
+      routes.push({ depart: { lat: derniere.lat, lon: derniere.lon }, arrivee: { lat: cible.lat, lon: cible.lon } })
+    }
+  }
+  return routes
+}
+
+/** Routes réelles de l'accès (domicile vers première gare) et de la sortie (dernière gare vers la
+ * cible), quand `itineraires` les a déjà en cache ; null sinon. */
+function routesGares(
+  representant: Ami,
+  chemin: CoordGare[] | null,
+  cible: Lieu,
+  itineraires: Itineraires | null,
+): Pick<PersonneTrajetCarte, 'traceAcces' | 'traceSortie'> {
+  if (!chemin || chemin.length === 0 || !itineraires) return { traceAcces: null, traceSortie: null }
+  const premiere = chemin[0]!
+  const derniere = chemin[chemin.length - 1]!
+  const acces = enReseauUrbain(representant.lat, representant.lon)
+    ? null
+    : itineraires.regarder({ lat: representant.lat, lon: representant.lon }, { lat: premiere.lat, lon: premiere.lon })
+  const sortie = enReseauUrbain(cible.lat, cible.lon)
+    ? null
+    : itineraires.regarder({ lat: derniere.lat, lon: derniere.lon }, { lat: cible.lat, lon: cible.lon })
+  return { traceAcces: acces?.coordonnees ?? null, traceSortie: sortie?.coordonnees ?? null }
+}
+
+function trajetTcAvecRoutes(
+  moteur: MoteurTc,
+  representant: Ami,
+  cible: Lieu,
+  rails: Rails | null,
+  itineraires: Itineraires | null,
+): Omit<PersonneTrajetCarte, 'noms' | 'lat' | 'lon' | 'enVoiture'> {
+  const tc = trajetGroupeTc(moteur, representant, cible, rails)
+  return { ...tc, traceVoiture: null, ...routesGares(representant, tc.chemin, cible, itineraires) }
+}
 
 /** Points [lat, lon] de l'itinéraire routier connu du domicile vers la cible, sinon null (ligne
  * droite pointillée en attendant ou en l'absence d'`itineraires`, décidé par l'appelant). */
@@ -133,10 +202,10 @@ export function personnesTrajetCarte(
       if (coucheVoiturePrete) {
         return { ...base, ...SANS_TRAIN, enVoiture: true, traceVoiture: traceVoitureVers(representant, cible, itineraires) }
       }
-      if (moteurTc) return { ...base, ...trajetGroupeTc(moteurTc, representant, cible, rails), enVoiture: false, traceVoiture: null }
+      if (moteurTc) return { ...base, ...trajetTcAvecRoutes(moteurTc, representant, cible, rails, itineraires), enVoiture: false }
       return { ...base, ...SANS_TRAIN, enVoiture: false }
     }
     if (mode !== 'tc' || !moteurTc) return { ...base, ...SANS_TRAIN, enVoiture: false }
-    return { ...base, ...trajetGroupeTc(moteurTc, representant, cible, rails), enVoiture: false, traceVoiture: null }
+    return { ...base, ...trajetTcAvecRoutes(moteurTc, representant, cible, rails, itineraires), enVoiture: false }
   })
 }

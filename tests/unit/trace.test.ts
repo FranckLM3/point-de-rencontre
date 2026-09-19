@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 import { creerMoteurTc, creerMoteurVoiture } from '../../src/calcul/couches'
-import { personnesTrajetCarte } from '../../src/calcul/trace'
+import { personnesTrajetCarte, routesADemander } from '../../src/calcul/trace'
 import type { Couche, ParametresPrix } from '../../src/calcul/voiture'
 import type { Grille } from '../../src/calcul/grille'
 import { INJOIGNABLE, type Horaires, type Ligne, type Station } from '../../src/donnees/horaires'
@@ -177,4 +177,57 @@ test('mode mixte : repli sur le chemin ferroviaire tant que la couche voiture de
   const moteurVoitureVide = creerMoteurVoiture(grille8, parametres, new Map())
   const resultat = personnesTrajetCarte([lea], 'mixte', moteurTc, moteurVoitureVide, lyon)
   expect(resultat[0]!.enVoiture).toBe(false)
+})
+
+test('mode transports : la sortie vers le lieu suit la route quand elle est connue', async () => {
+  const moteur = creerMoteurTc(fauxHoraires(), 1)
+  await moteur.preparer([franck])
+  const routeAcces: [number, number][] = [[48.86, 2.34], [48.855, 2.345], [48.85, 2.35]]
+  const routeSortie: [number, number][] = [[45.75, 4.85], [45.755, 4.855], [45.76, 4.86]]
+  const demandes: string[] = []
+  const itineraires: Itineraires = {
+    regarder: (d, a) => {
+      if (d.lat === franck.lat && a.lat === stations[0]!.lat) return { coordonnees: routeAcces, minutes: 3, km: 1 }
+      if (d.lat === stations[2]!.lat && a.lat === lyon.lat) return { coordonnees: routeSortie, minutes: 2, km: 1 }
+      return null
+    },
+    demander: (d, a) => { demandes.push(`${d.lat}->${a.lat}`) },
+  }
+  const p = personnesTrajetCarte([franck], 'tc', moteur, null, lyon, null, itineraires)[0]!
+  // Franck habite Paris : son accès passe par le métro (voir le test Île-de-France), pas par la route.
+  expect(p.traceAcces).toBeNull()
+  expect(p.traceSortie).toEqual(routeSortie)
+})
+
+test('mode transports : sans route connue, accès et sortie restent null (pointillés droits)', async () => {
+  const moteur = creerMoteurTc(fauxHoraires(), 1)
+  await moteur.preparer([franck])
+  const p = personnesTrajetCarte([franck], 'tc', moteur, null, lyon, null, { regarder: () => null, demander: () => {} })[0]!
+  expect(p.traceAcces).toBeNull()
+  expect(p.traceSortie).toBeNull()
+})
+
+test('en Île-de-France, accès et sortie ne suivent pas la route (métro, RER) : aucune demande', async () => {
+  const moteur = creerMoteurTc(fauxHoraires(), 1)
+  await moteur.preparer([franck])
+  const demandes: string[] = []
+  const itineraires: Itineraires = { regarder: () => ({ coordonnees: [[0, 0], [1, 1]], minutes: 1, km: 1 }), demander: () => {} }
+  const p = personnesTrajetCarte([franck], 'tc', moteur, null, lyon, null, itineraires)[0]!
+  // Franck habite Paris : l'accès reste en pointillés droits ; la sortie à Lyon suit la route.
+  expect(p.traceAcces).toBeNull()
+  expect(p.traceSortie).not.toBeNull()
+  expect(routesADemander([p], lyon).map((r) => `${r.depart.lat}->${r.arrivee.lat}`)).toEqual(demandes)
+})
+
+test('routesADemander : accès et sortie hors Île-de-France encore absents du cache', () => {
+  const p = {
+    noms: ['Léa'], lat: 45.8, lon: 4.9, chemin: [{ lat: 45.75, lon: 4.85, nom: 'A' }, { lat: 43.3, lon: 5.38, nom: 'B' }],
+    trace: null, gareDepart: 0, gareArrivee: 1, directSansTrain: false, enVoiture: false, traceVoiture: null,
+    traceAcces: null, traceSortie: null,
+  }
+  const cible: Lieu = { lat: 43.29, lon: 5.4, label: 'Marseille' }
+  expect(routesADemander([p], cible)).toEqual([
+    { depart: { lat: 45.8, lon: 4.9 }, arrivee: { lat: 45.75, lon: 4.85 } },
+    { depart: { lat: 43.3, lon: 5.38 }, arrivee: { lat: 43.29, lon: 5.4 } },
+  ])
 })

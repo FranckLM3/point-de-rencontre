@@ -158,7 +158,9 @@ export function creerItineraires(): Itineraires {
           body: { action: 'itineraire', depart: [depart.lon, depart.lat], arrivee: [arrivee.lon, arrivee.lat] },
         })
         .then(({ data, error }: { data: ReponseItineraire | null; error: unknown }) => {
-          cache.set(cle, error || !data ? null : { coordonnees: data.coordonnees, minutes: data.minutes, km: data.km })
+          // La fonction rend [lon, lat] (convention ORS) ; la carte (Leaflet) attend [lat, lon].
+          const coordonnees = data?.coordonnees.map(([lon, lat]): [number, number] => [lat, lon])
+          cache.set(cle, error || !data || !coordonnees ? null : { coordonnees, minutes: data.minutes, km: data.km })
         })
         .catch((e: unknown) => {
           console.error('Itinéraire voiture :', e)
