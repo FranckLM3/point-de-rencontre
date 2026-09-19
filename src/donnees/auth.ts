@@ -29,3 +29,28 @@ export async function deconnecter(): Promise<void> {
   console.error('Échec de déconnexion Supabase :', error)
   throw new Error('Déconnexion impossible. Réessaie.')
 }
+
+const LONGUEUR_MIN = 8
+
+export type RetourEmail = { type: 'reinitialisation' } | { type: 'erreur'; message: string }
+
+/**
+ * Lien reçu par e-mail (« mot de passe oublié ») : Supabase revient sur la page avec l'issue dans
+ * le fragment de l'adresse. À lire avant la première requête Supabase, qui consomme ce fragment.
+ */
+export function lireRetourEmail(fragment: string): RetourEmail | null {
+  const p = new URLSearchParams(fragment.replace(/^#/, ''))
+  if (p.get('type') === 'recovery' && p.get('access_token')) return { type: 'reinitialisation' }
+  if (p.get('error')) return { type: 'erreur', message: 'Ce lien a expiré ou a déjà servi. Redemande un e-mail de réinitialisation.' }
+  return null
+}
+
+/** Nouveau mot de passe du compte du groupe (session ouverte par le lien) ; message d'erreur ou null. */
+export async function changerMotDePasse(motDePasse: string): Promise<string | null> {
+  const { error } = await supabase().auth.updateUser({ password: motDePasse })
+  if (!error) return null
+  if (error.code === 'weak_password') return `Mot de passe trop faible : ${LONGUEUR_MIN} caractères au moins.`
+  if (error.code === 'same_password') return 'C’est déjà le mot de passe actuel.'
+  console.error('Échec du changement de mot de passe :', error.status, error.code)
+  return 'Changement impossible. Réessaie ou redemande un e-mail.'
+}

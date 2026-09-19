@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest'
-import { afficherConnexion } from '../../src/ui/connexion'
+import { afficherConnexion, afficherNouveauMotDePasse } from '../../src/ui/connexion'
 
 afterEach(() => { document.body.innerHTML = '' })
 
@@ -70,4 +70,33 @@ test('la carte de connexion porte le nom du groupe et sa rangée de dents décor
   expect(racine.querySelector('h1')!.textContent).toBe('Les Crocos')
   const dents = racine.querySelector('.dents')!
   expect(dents.getAttribute('aria-hidden')).toBe('true')
+})
+
+test('message d’accueil (lien expiré) affiché au-dessus du formulaire', () => {
+  const racine = document.createElement('div')
+  afficherConnexion(racine, vi.fn(), vi.fn(), 'Ce lien a expiré.')
+  expect(racine.querySelector('.erreur')!.textContent).toBe('Ce lien a expiré.')
+})
+
+test('nouveau mot de passe : 8 caractères, les deux champs identiques, puis succès', async () => {
+  const racine = document.createElement('div')
+  const changer = vi.fn().mockResolvedValue(null)
+  const succes = vi.fn()
+  afficherNouveauMotDePasse(racine, changer, succes)
+  expect(racine.querySelector('label[for="nouveau"]')!.textContent).toBe('Nouveau mot de passe des Crocos')
+  const [nouveau, confirmation] = [...racine.querySelectorAll('input')]
+  const form = racine.querySelector('form')!
+  nouveau!.value = 'court'
+  confirmation!.value = 'court'
+  form.dispatchEvent(new Event('submit'))
+  await vi.waitFor(() => expect(racine.querySelector('.erreur')!.textContent).toBe('8 caractères au moins.'))
+  nouveau!.value = 'Crocodiles-2026'
+  confirmation!.value = 'Crocodiles-2025'
+  form.dispatchEvent(new Event('submit'))
+  await vi.waitFor(() => expect(racine.querySelector('.erreur')!.textContent).toBe('Les deux mots de passe sont différents.'))
+  expect(changer).not.toHaveBeenCalled()
+  confirmation!.value = 'Crocodiles-2026'
+  form.dispatchEvent(new Event('submit'))
+  await vi.waitFor(() => expect(succes).toHaveBeenCalledOnce())
+  expect(changer).toHaveBeenCalledWith('Crocodiles-2026')
 })

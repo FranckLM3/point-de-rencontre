@@ -2,11 +2,12 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 const signInWithPassword = vi.fn()
 const signOut = vi.fn()
+const updateUser = vi.fn()
 vi.mock('../../src/donnees/supabase', () => ({
-  supabase: () => ({ auth: { signInWithPassword, signOut } }),
+  supabase: () => ({ auth: { signInWithPassword, signOut, updateUser } }),
 }))
 
-const { connecter, deconnecter } = await import('../../src/donnees/auth')
+const { changerMotDePasse, connecter, deconnecter, lireRetourEmail } = await import('../../src/donnees/auth')
 
 beforeEach(() => {
   signInWithPassword.mockReset()
@@ -71,4 +72,25 @@ test('deconnecter relance un message lisible sans le texte brut de Supabase', as
   expect((echec as Error).message).toBe('Déconnexion impossible. Réessaie.')
   expect(journal).toHaveBeenCalledWith('Échec de déconnexion Supabase :', { message: 'Session absente' })
   journal.mockRestore()
+})
+
+test('retour d’e-mail : lien de réinitialisation, lien expiré, ou rien', () => {
+  expect(lireRetourEmail('#access_token=abc&expires_in=3600&refresh_token=r&token_type=bearer&type=recovery')).toEqual({ type: 'reinitialisation' })
+  expect(lireRetourEmail('#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired'))
+    .toEqual({ type: 'erreur', message: 'Ce lien a expiré ou a déjà servi. Redemande un e-mail de réinitialisation.' })
+  expect(lireRetourEmail('')).toBeNull()
+  expect(lireRetourEmail('#autre=1')).toBeNull()
+})
+
+test('changer le mot de passe : succès, mot de passe trop faible, autre erreur', async () => {
+  updateUser.mockResolvedValueOnce({ error: null })
+  expect(await changerMotDePasse('Crocodiles-2026')).toBeNull()
+  expect(updateUser).toHaveBeenCalledWith({ password: 'Crocodiles-2026' })
+  updateUser.mockResolvedValueOnce({ error: { status: 422, code: 'weak_password', message: 'weak' } })
+  expect(await changerMotDePasse('a')).toBe('Mot de passe trop faible : 8 caractères au moins.')
+  updateUser.mockResolvedValueOnce({ error: { status: 422, code: 'same_password', message: 'same' } })
+  expect(await changerMotDePasse('x')).toBe('C’est déjà le mot de passe actuel.')
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+  updateUser.mockResolvedValueOnce({ error: { status: 500, message: 'boom' } })
+  expect(await changerMotDePasse('x')).toBe('Changement impossible. Réessaie ou redemande un e-mail.')
 })

@@ -394,6 +394,31 @@ test('mode transports : le trajet en train suit les gares réelles, pas une lign
   await expect(page.locator('svg path.trace-metro')).toHaveCount(1)
 })
 
+test('lien « mot de passe oublié » : choisir le nouveau mot de passe puis ouvrir la carte', async ({ page }) => {
+  await simuler(page)
+  const utilisateur = { id: 'u', aud: 'authenticated', role: 'authenticated', email: 'groupe@test.local', app_metadata: {}, user_metadata: {}, created_at: '2026-09-17T00:00:00Z' }
+  let nouveau = ''
+  await page.route('http://supabase.test/auth/v1/user**', async (route) => {
+    if (route.request().method() === 'PUT') nouveau = (route.request().postDataJSON() as { password: string }).password
+    return route.fulfill({ json: utilisateur })
+  })
+  const expire = Math.floor(Date.now() / 1000) + 3600
+  await page.goto(`./#access_token=jeton&expires_at=${expire}&expires_in=3600&refresh_token=r&token_type=bearer&type=recovery`)
+  await page.getByLabel('Nouveau mot de passe des Crocos').fill('Crocodiles-2026')
+  await page.getByLabel('Encore une fois').fill('Crocodiles-2026')
+  await page.getByRole('button', { name: 'Enregistrer et ouvrir la carte' }).click()
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('entre 2')
+  expect(nouveau).toBe('Crocodiles-2026')
+  expect(page.url()).not.toContain('access_token')
+})
+
+test('lien expiré : retour à la connexion avec un message clair', async ({ page }) => {
+  await simuler(page)
+  await page.goto('./#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired')
+  await expect(page.getByRole('alert')).toContainText('Ce lien a expiré ou a déjà servi')
+  await expect(page.getByLabel('Mot de passe des Crocos')).toBeVisible()
+})
+
 test('le « ? » du repaire déplie l’explication du calcul', async ({ page }) => {
   await simuler(page)
   await page.goto('./')

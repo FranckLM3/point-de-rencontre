@@ -17,7 +17,7 @@ import { CONSOMMATION_DEFAUT, type Couche, type ParametresPrix } from './calcul/
 import { classerVilles, evaluer, type Mesure, type VilleClassee, villeLaPlusProche } from './calcul/villes'
 import { seuils, zones } from './calcul/zones'
 import { ajouterAmi, listerAmis, modifierAmi, supprimerAmi } from './donnees/amis'
-import { connecter, deconnecter, estConnecte } from './donnees/auth'
+import { changerMotDePasse, connecter, deconnecter, estConnecte, lireRetourEmail } from './donnees/auth'
 import { enregistrerGroupe, listerGroupes } from './donnees/groupes'
 import { creerHoraires } from './donnees/horaires'
 import { creerChargeurRails, creerRails, type ChargeurRails } from './donnees/rails'
@@ -31,7 +31,7 @@ import type { Ami, Etat, Groupe, Lieu, Mode, Ville } from './types'
 import { rendreAmis } from './ui/amis'
 import { amisChoisis, cleFocus, cleZones, libelleClic } from './ui/assemblage'
 import { creerCarte, type Carte } from './ui/carte'
-import { afficherConnexion } from './ui/connexion'
+import { afficherConnexion, afficherNouveauMotDePasse } from './ui/connexion'
 import { prixEtiquette, selectionEtiquettes, valeurEtiquette } from './ui/etiquettes'
 import { ouvrirFicheAmi } from './ui/fiche-ami'
 import { rendreFiltres } from './ui/filtres'
@@ -650,9 +650,16 @@ async function demarrer(): Promise<void> {
 }
 
 async function lancer(): Promise<void> {
+  // Lu avant toute requête : le client Supabase consomme le fragment du lien reçu par e-mail.
+  const retour = lireRetourEmail(location.hash)
   try {
-    if (await estConnecte()) return await demarrer()
-    afficherConnexion(racine, connecter, () => void demarrer())
+    const connecte = await estConnecte()
+    if (retour) history.replaceState(null, '', location.pathname)
+    if (retour?.type === 'reinitialisation' && connecte) {
+      return afficherNouveauMotDePasse(racine, changerMotDePasse, () => void demarrer())
+    }
+    if (connecte) return await demarrer()
+    afficherConnexion(racine, connecter, () => void demarrer(), retour?.type === 'erreur' ? retour.message : '')
   } catch (e) {
     racine.innerHTML = `<p class="bandeau erreur" role="alert"></p>`
     $('.bandeau').textContent = (e as Error).message
