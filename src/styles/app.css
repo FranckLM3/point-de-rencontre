@@ -42,7 +42,7 @@ h1 { font-family: var(--police-marque); font-size: var(--titre); font-weight: 70
 
 /* Réglages : un groupe = une étiquette + un interrupteur (segments connectés). */
 .filtre { display: grid; gap: 4px; }
-.etiquette-filtre { font-weight: 500; font-size: .875rem; color: var(--texte-doux); }
+.etiquette-filtre { font-weight: 500; font-size: .875rem; color: var(--texte-doux); margin-top: 10px; }
 .segmente {
   display: inline-flex; align-items: stretch; width: fit-content;
   border: 1px solid var(--bord); border-radius: var(--rayon-pastille); overflow: hidden;
@@ -50,6 +50,14 @@ h1 { font-family: var(--police-marque); font-size: var(--titre); font-weight: 70
 .segmente .pastille { border: 0; border-right: 1px solid var(--bord); border-radius: 0; }
 .segmente .pastille:last-child { border-right: 0; }
 .segmente .pastille:hover, .segmente .pastille:active { transform: none; }
+/* Boutons nus de « Tous | Aucun » : même habillage que les segments, pas le gris du navigateur. */
+.segmente > button:not(.pastille) {
+  border: 0; border-right: 1px solid var(--bord); background: var(--surface); color: var(--texte);
+  font-weight: 500; padding: 4px 12px; cursor: pointer;
+}
+.segmente > button:not(.pastille):last-child { border-right: 0; }
+.segmente > button:not(.pastille):hover { background: var(--fond); }
+.segmente > button:not(.pastille):focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
 
 /* Liste compacte des Crocos (D1). */
 .entete-liste-amis { font-family: var(--police-marque); }
@@ -229,7 +237,7 @@ form.groupe .champ { flex: 1 1 100%; }
 .etiquette-ville.meilleure { border-color: var(--accent); border-width: 2px; box-shadow: var(--ombre), 0 0 0 2px var(--accent-fond); }
 .etiquette-ville:hover, .etiquette-ville:focus-visible { z-index: 1; outline: 2px solid var(--accent); outline-offset: 1px; }
 @media (max-width: 599px) {
-  .etiquette-ville { font-size: .6875rem; padding: 4px 7px 5px; }
+  .etiquette-ville { font-size: .75rem; padding: 4px 7px 5px; }
   .etiquette-ville .prix { display: none; }
 }
 
@@ -402,3 +410,13 @@ form.groupe .champ { flex: 1 1 100%; }
 
 /* Fond de carte OpenStreetMap adouci pour laisser les zones au premier plan. */
 .leaflet-tile-pane { filter: grayscale(1) brightness(1.18) contrast(0.72); }
+
+/* Audit mobile du 2026-09-19 : cibles tactiles d'au moins 44 px sous 1024 px. */
+@media (max-width: 1023px) {
+  .segmente > button, .segmente .pastille { min-height: var(--cible-tactile); padding-inline: 14px; }
+  /* L'interrupteur garde son dessin, sa zone de toucher s'étend autour de lui. */
+  .interrupteur::before { content: ''; position: absolute; inset: -10px -6px; }
+  /* Sélecteur par id : la feuille de Leaflet, chargée après, l'emporterait à spécificité égale. */
+  #carte .leaflet-bar a { width: var(--cible-tactile); height: var(--cible-tactile); line-height: var(--cible-tactile); }
+  .controle-plein-ecran button { width: var(--cible-tactile); height: var(--cible-tactile); }
+}
