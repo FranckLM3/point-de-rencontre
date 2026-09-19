@@ -48,10 +48,15 @@ jobs:
           empreinte=$(sha256sum horaires/*.py public/data/grille-4km.json | sha256sum | cut -c1-12)
           echo "empreinte=$empreinte" >> "$GITHUB_OUTPUT"
           url=$(python3 -m horaires --url)
-          if curl -sfL --retry 3 --retry-delay 10 -o .cache-horaires/sncf.zip "$url"; then
+          rails_url="https://ressources.data.sncf.com/api/explore/v2.1/catalog/datasets/formes-des-lignes-du-rfn/exports/geojson"
+          telecharge=true
+          if ! curl -sfL --retry 3 --retry-delay 10 -o .cache-horaires/sncf.zip "$url"; then telecharge=false; fi
+          if [ "$telecharge" = "true" ] && ! curl -sfL --retry 3 --retry-delay 10 -o .cache-horaires/rails.geojson "$rails_url"; then telecharge=false; fi
+          if [ "$telecharge" = "true" ]; then
             v=$(python3 -c "import csv, io, zipfile; f = zipfile.ZipFile('.cache-horaires/sncf.zip').open('feed_info.txt'); print(next(csv.DictReader(io.TextIOWrapper(f, 'utf-8-sig')))['feed_version'])")
+            rv=$(sha256sum .cache-horaires/rails.geojson | cut -c1-12)
             echo "telecharge=true" >> "$GITHUB_OUTPUT"
-            echo "cle=horaires-$empreinte-$v" >> "$GITHUB_OUTPUT"
+            echo "cle=horaires-$empreinte-$v-$rv" >> "$GITHUB_OUTPUT"
           else
             echo "telecharge=false" >> "$GITHUB_OUTPUT"
             echo "cle=horaires-$empreinte-indisponible" >> "$GITHUB_OUTPUT"
@@ -74,7 +79,7 @@ jobs:
       - name: Calculer les horaires
         id: calcul
         if: steps.version.outputs.telecharge == 'true' && steps.cache.outputs.cache-hit != 'true'
-        run: python3 -m horaires --sortie public/data/tc --source .cache-horaires/sncf.zip
+        run: python3 -m horaires --sortie public/data/tc --source .cache-horaires/sncf.zip --rails .cache-horaires/rails.geojson
       - name: Garder les horaires en cache
         if: steps.calcul.outcome == 'success'
         uses: actions/cache/save@v4
