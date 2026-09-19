@@ -1,4 +1,5 @@
 import type { MoteurTc, MoteurVoiture } from './couches'
+import type { Rails } from '../donnees/rails'
 import { cheminGares, versPointTc } from './tc'
 import type { Ami, Lieu, Mode } from '../types'
 
@@ -16,6 +17,13 @@ export interface PersonneTrajetCarte {
   lon: number
   /** Gares du trajet, dans l'ordre de circulation ; null hors mode transports ou sans train. */
   chemin: CoordGare[] | null
+  /**
+   * Points [lat, lon] du tracé à dessiner entre la première et la dernière gare de `chemin` :
+   * suit les voies réelles entre deux gares consécutives quand `rails` en connaît le tracé,
+   * sinon un segment droit entre elles. Même longueur que `chemin` ou plus (points intermédiaires
+   * insérés) ; null quand `chemin` l'est.
+   */
+  trace: [number, number][] | null
   /** Indices des gares de départ et d'arrivée, présents seulement avec `chemin`. */
   gareDepart: number | null
   gareArrivee: number | null
@@ -40,16 +48,33 @@ function grouperParDepart(amis: Ami[]): Ami[][] {
   return [...groupes.values()]
 }
 
+/**
+ * Points à dessiner entre les gares de `chemin` (dans l'ordre) : la portion réelle des voies
+ * entre deux gares consécutives quand `rails` la connaît (`indices` leur est aligné), sinon un
+ * segment droit entre elles ; les points de jonction restent ceux des gares (pas ceux, proches
+ * mais distincts, du nœud de voie le plus proche), pour rester cohérents avec leurs marqueurs.
+ */
+function construireTrace(indices: number[], chemin: CoordGare[], rails: Rails | null): [number, number][] {
+  const points: [number, number][] = [[chemin[0]!.lat, chemin[0]!.lon]]
+  for (let i = 1; i < chemin.length; i++) {
+    const segment = rails?.segment(indices[i - 1]!, indices[i]!) ?? null
+    if (segment) for (const p of segment.slice(1, -1)) points.push(p)
+    points.push([chemin[i]!.lat, chemin[i]!.lon])
+  }
+  return points
+}
+
 /** Trajet d'un groupe (calculé sur son premier membre) vers la cible, en mode transports. */
 function trajetGroupeTc(
   moteur: MoteurTc,
   representant: Ami,
   cible: Lieu,
-): Pick<PersonneTrajetCarte, 'chemin' | 'gareDepart' | 'gareArrivee' | 'directSansTrain'> {
+  rails: Rails | null,
+): Pick<PersonneTrajetCarte, 'chemin' | 'trace' | 'gareDepart' | 'gareArrivee' | 'directSansTrain'> {
   const d = moteur.depuis(representant)
   const t = versPointTc(moteur.horaires, d, representant, cible.lat, cible.lon, moteur.gares(cible.lat, cible.lon))
   if (!t || t.departIndice === null || t.arriveeIndice === null) {
-    return { chemin: null, gareDepart: null, gareArrivee: null, directSansTrain: t !== null }
+    return { chemin: null, trace: null, gareDepart: null, gareArrivee: null, directSansTrain: t !== null }
   }
   const ligne = moteur.horaires.ligne(t.departIndice)
   const indices = ligne ? cheminGares(ligne, t.departIndice, t.arriveeIndice) : [t.departIndice, t.arriveeIndice]
@@ -57,10 +82,11 @@ function trajetGroupeTc(
     const s = moteur.horaires.stations[i]!
     return { lat: s.lat, lon: s.lon, nom: s.nom }
   })
-  return { chemin, gareDepart: t.departIndice, gareArrivee: t.arriveeIndice, directSansTrain: false }
+  const trace = construireTrace(indices, chemin, rails)
+  return { chemin, trace, gareDepart: t.departIndice, gareArrivee: t.arriveeIndice, directSansTrain: false }
 }
 
-const SANS_TRAIN = { chemin: null, gareDepart: null, gareArrivee: null, directSansTrain: false } as const
+const SANS_TRAIN = { chemin: null, trace: null, gareDepart: null, gareArrivee: null, directSansTrain: false } as const
 
 /**
  * Trajets à dessiner sur la carte pour la cible choisie (ville, étiquette ou lieu testé), un par
@@ -74,6 +100,7 @@ export function personnesTrajetCarte(
   moteurTc: MoteurTc | null,
   moteurVoiture: MoteurVoiture | null,
   cible: Lieu | null,
+  rails: Rails | null = null,
 ): PersonneTrajetCarte[] {
   if (!cible) return []
   return grouperParDepart(amis).map((groupe) => {
@@ -83,10 +110,10 @@ export function personnesTrajetCarte(
     if (mode === 'mixte') {
       const coucheVoiturePrete = representant.transport === 'voiture' && moteurVoiture?.couche(representant.id) !== undefined
       if (coucheVoiturePrete) return { ...base, ...SANS_TRAIN, enVoiture: true }
-      if (moteurTc) return { ...base, ...trajetGroupeTc(moteurTc, representant, cible), enVoiture: false }
+      if (moteurTc) return { ...base, ...trajetGroupeTc(moteurTc, representant, cible, rails), enVoiture: false }
       return { ...base, ...SANS_TRAIN, enVoiture: false }
     }
     if (mode !== 'tc' || !moteurTc) return { ...base, ...SANS_TRAIN, enVoiture: false }
-    return { ...base, ...trajetGroupeTc(moteurTc, representant, cible), enVoiture: false }
+    return { ...base, ...trajetGroupeTc(moteurTc, representant, cible, rails), enVoiture: false }
   })
 }

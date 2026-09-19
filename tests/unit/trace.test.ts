@@ -4,6 +4,7 @@ import { personnesTrajetCarte } from '../../src/calcul/trace'
 import type { Couche, ParametresPrix } from '../../src/calcul/voiture'
 import type { Grille } from '../../src/calcul/grille'
 import { INJOIGNABLE, type Horaires, type Ligne, type Station } from '../../src/donnees/horaires'
+import type { Rails } from '../../src/donnees/rails'
 import type { Ami, Lieu } from '../../src/types'
 
 const ligne = (m: number[], k: number[], g: number[], c: number[], p: number[]): Ligne => ({
@@ -64,6 +65,36 @@ test('mode transports : chemin de gares avec une correspondance', async () => {
   expect(p.chemin!.map((g) => g.nom)).toEqual(['Paris Gare de Lyon', 'Dijon-Ville', 'Lyon Part Dieu'])
   expect(p.chemin!.length).toBeGreaterThan(2)
   expect(p.enVoiture).toBe(false)
+})
+
+test('sans rails, le tracé suit exactement les gares (repli en ligne droite)', async () => {
+  const moteur = creerMoteurTc(fauxHoraires(), 1)
+  await moteur.preparer([franck])
+  const p = personnesTrajetCarte([franck], 'tc', moteur, null, lyon)[0]!
+  expect(p.trace).toEqual(p.chemin!.map((g) => [g.lat, g.lon]))
+})
+
+test('avec des rails, le tracé passe par les points intermédiaires du segment connu', async () => {
+  const moteur = creerMoteurTc(fauxHoraires(), 1)
+  await moteur.preparer([franck])
+  const rails: Rails = {
+    segment: (de, vers) => (de === 0 && vers === 1 ? [[48.85, 2.35], [48.0, 3.5], [47.32, 5.04]] : null),
+  }
+  const p = personnesTrajetCarte([franck], 'tc', moteur, null, lyon, rails)[0]!
+  expect(p.trace).not.toBeNull()
+  // Point intermédiaire du segment 0 -> 1 (Paris -> Dijon), ses extrémités restant celles des gares.
+  expect(p.trace).toContainEqual([48.0, 3.5])
+  expect(p.trace![0]).toEqual([stations[0]!.lat, stations[0]!.lon])
+  // Segment 1 -> 2 (Dijon -> Lyon) inconnu : repli en ligne droite jusqu'à la gare d'arrivée.
+  expect(p.trace!.at(-1)).toEqual([stations[2]!.lat, stations[2]!.lon])
+})
+
+test('avec des rails, un segment inconnu retombe sur une ligne droite entre les deux gares', async () => {
+  const moteur = creerMoteurTc(fauxHoraires(), 1)
+  await moteur.preparer([franck])
+  const rails: Rails = { segment: () => null }
+  const p = personnesTrajetCarte([franck], 'tc', moteur, null, lyon, rails)[0]!
+  expect(p.trace).toEqual(p.chemin!.map((g) => [g.lat, g.lon]))
 })
 
 test('deux personnes au même point : un seul trajet dessiné, tous les noms', async () => {
