@@ -38,7 +38,8 @@ function lireLieu(brut: string | null): Lieu | null {
 }
 
 /** 4 h par défaut en temps, aucun maximum en prix (décision 4) : sert quand le paramètre est absent. */
-const maxParDefaut = (grandeur: Grandeur): number | null => (grandeur === 'temps' ? ETAT_DEFAUT.max : null)
+/** Maximum par défaut d'une grandeur : 4 h en temps, aucun en prix. */
+export const maxParDefaut = (grandeur: Grandeur): number | null => (grandeur === 'temps' ? ETAT_DEFAUT.max : null)
 
 /** `max=0` marque un maximum explicitement retiré, distinct de l'absence du paramètre (repli par défaut). */
 function lireMax(p: URLSearchParams, grandeur: Grandeur): number | null {

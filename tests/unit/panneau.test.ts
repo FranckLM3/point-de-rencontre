@@ -246,16 +246,24 @@ test('filtres : bouton Réinitialiser présent dès qu’un réglage diffère, e
   expect(reinitialiser).toHaveBeenCalledTimes(1)
 })
 
-test('filtres : changer de mode remet le maximum à zéro', () => {
+test('filtres : changer de mode garde la durée maximum (même unité)', () => {
   const el = document.createElement('div')
   const changer = vi.fn()
   rendreFiltres(el, { ...ETAT_DEFAUT, max: 300 }, 2, changer, vi.fn())
   cliquer(el, '[data-mode="tc"]')
-  expect(changer).toHaveBeenCalledWith({ mode: 'tc', max: null })
+  expect(changer).toHaveBeenCalledWith({ mode: 'tc' })
   const tc = document.createElement('div')
   rendreFiltres(tc, { ...ETAT_DEFAUT, mode: 'tc' }, 2, changer, vi.fn())
   cliquer(tc, '[data-mode="voiture"]')
-  expect(changer).toHaveBeenCalledWith({ mode: 'voiture', max: null })
+  expect(changer).toHaveBeenCalledWith({ mode: 'voiture' })
+})
+
+test('filtres : revenir au temps remet les 4 h par défaut', () => {
+  const el = document.createElement('div')
+  const changer = vi.fn()
+  rendreFiltres(el, { ...ETAT_DEFAUT, grandeur: 'prix', max: null }, 2, changer, vi.fn())
+  cliquer(el, '[data-grandeur="temps"]')
+  expect(changer).toHaveBeenCalledWith({ grandeur: 'temps', max: 240 })
 })
 
 test('filtres : le mode reste dans un ordre fixe, aria-pressed reflète l’actif', () => {

@@ -1,3 +1,4 @@
+import { maxParDefaut } from '../etat/url'
 import { maximaProposes, uniteDe, type Unite } from '../calcul/unites'
 import { PERSONNES_PAR_VOITURE_MAX } from '../calcul/voiture'
 import { estParDefaut } from '../etat/url'
@@ -91,10 +92,10 @@ export function rendreFiltres(
     <p class="sous-titre">${sousTitre({ mode: e.mode, unite, critere: e.critere, max: e.max })}</p>`
   // Les unités diffèrent d'un mode ou d'une grandeur à l'autre : le maximum repart de zéro.
   el.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((b) =>
-    b.addEventListener('click', () => changer({ mode: b.dataset.mode as Mode, max: null })),
+    b.addEventListener('click', () => changer({ mode: b.dataset.mode as Mode })),
   )
   el.querySelectorAll<HTMLButtonElement>('[data-grandeur]').forEach((b) =>
-    b.addEventListener('click', () => changer({ grandeur: b.dataset.grandeur as Grandeur, max: null })),
+    b.addEventListener('click', () => changer({ grandeur: b.dataset.grandeur as Grandeur, max: maxParDefaut(b.dataset.grandeur as Grandeur) })),
   )
   el.querySelectorAll<HTMLButtonElement>('[data-personnes]').forEach((b) =>
     b.addEventListener('click', () => changer({ personnesParVoiture: Number(b.dataset.personnes) })),
