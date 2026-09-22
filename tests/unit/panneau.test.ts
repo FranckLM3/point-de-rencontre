@@ -258,12 +258,12 @@ test('filtres : changer de mode garde la durée maximum (même unité)', () => {
   expect(changer).toHaveBeenCalledWith({ mode: 'voiture' })
 })
 
-test('filtres : revenir au temps remet les 4 h par défaut', () => {
+test('filtres : changer de mesure retire le maximum (heures et euros ne se comparent pas)', () => {
   const el = document.createElement('div')
   const changer = vi.fn()
-  rendreFiltres(el, { ...ETAT_DEFAUT, grandeur: 'prix', max: null }, 2, changer, vi.fn())
+  rendreFiltres(el, { ...ETAT_DEFAUT, grandeur: 'prix', max: 50 }, 2, changer, vi.fn())
   cliquer(el, '[data-grandeur="temps"]')
-  expect(changer).toHaveBeenCalledWith({ grandeur: 'temps', max: 240 })
+  expect(changer).toHaveBeenCalledWith({ grandeur: 'temps', max: null })
 })
 
 test('filtres : le mode reste dans un ordre fixe, aria-pressed reflète l’actif', () => {

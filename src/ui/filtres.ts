@@ -1,6 +1,6 @@
 import { maximaProposes, uniteDe, type Unite } from '../calcul/unites'
 import { PERSONNES_PAR_VOITURE_MAX } from '../calcul/voiture'
-import { ecrireEtat, estParDefaut, maxParDefaut } from '../etat/url'
+import { ecrireEtat, estParDefaut } from '../etat/url'
 import type { Etat, Grandeur, Mode } from '../types'
 import { echapper, sousTitre, titreCourt, valeur } from './format'
 
@@ -97,7 +97,7 @@ export function rendreFiltres(
     b.addEventListener('click', () => changer({ mode: b.dataset.mode as Mode })),
   )
   el.querySelectorAll<HTMLButtonElement>('[data-grandeur]').forEach((b) =>
-    b.addEventListener('click', () => changer({ grandeur: b.dataset.grandeur as Grandeur, max: maxParDefaut(b.dataset.grandeur as Grandeur) })),
+    b.addEventListener('click', () => changer({ grandeur: b.dataset.grandeur as Grandeur, max: null })),
   )
   el.querySelectorAll<HTMLButtonElement>('[data-personnes]').forEach((b) =>
     b.addEventListener('click', () => changer({ personnesParVoiture: Number(b.dataset.personnes) })),

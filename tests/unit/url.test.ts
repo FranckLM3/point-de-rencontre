@@ -18,13 +18,12 @@ test('une ancienne URL avec mode=oiseau retombe sur le mode par défaut (D1)', (
   expect(lireEtat('?mode=oiseau').mode).toBe(ETAT_DEFAUT.mode)
 })
 
-test('maximum par défaut : 4 h en temps, aucun en prix', () => {
-  expect(lireEtat('').max).toBe(240)
+test('aucun maximum par défaut ; un maximum choisi est gardé ; max=0 (anciens liens) vaut aucun', () => {
+  expect(lireEtat('').max).toBeNull()
   expect(lireEtat('?grandeur=prix').max).toBeNull()
-})
-
-test('maximum explicitement retiré (max=0) reste retiré, distinct de l’absence du paramètre', () => {
-  expect(lireEtat(ecrireEtat({ ...ETAT_DEFAUT, max: null }))).toEqual({ ...ETAT_DEFAUT, max: null })
+  expect(lireEtat(ecrireEtat({ ...ETAT_DEFAUT, max: 180 })).max).toBe(180)
+  expect(lireEtat('?max=0').max).toBeNull()
+  expect(ecrireEtat(ETAT_DEFAUT)).not.toContain('max')
 })
 
 test('personnes par voiture : par défaut 1, bornée entre 1 et 4', () => {

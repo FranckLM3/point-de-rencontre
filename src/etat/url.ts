@@ -3,7 +3,7 @@ import { PERSONNES_PAR_VOITURE_DEFAUT, PERSONNES_PAR_VOITURE_MAX, PERSONNES_PAR_
 
 /** Plan 3 : chacun son moyen par défaut, moyenne, 4 h sans que personne ne dépasse ce maximum. */
 export const ETAT_DEFAUT: Etat = {
-  mode: 'mixte', critere: 'moyenne', grandeur: 'temps', max: 240, selection: null, lieu: null,
+  mode: 'mixte', critere: 'moyenne', grandeur: 'temps', max: null, selection: null, lieu: null,
   personnesParVoiture: PERSONNES_PAR_VOITURE_DEFAUT,
 }
 
@@ -37,17 +37,11 @@ function lireLieu(brut: string | null): Lieu | null {
   return { lat: la, lon: lo, label: reste.join(',') }
 }
 
-/** 4 h par défaut en temps, aucun maximum en prix (décision 4) : sert quand le paramètre est absent. */
-/** Maximum par défaut d'une grandeur : 4 h en temps, aucun en prix. */
-export const maxParDefaut = (grandeur: Grandeur): number | null => (grandeur === 'temps' ? ETAT_DEFAUT.max : null)
-
-/** `max=0` marque un maximum explicitement retiré, distinct de l'absence du paramètre (repli par défaut). */
-function lireMax(p: URLSearchParams, grandeur: Grandeur): number | null {
-  if (!p.has('max')) return maxParDefaut(grandeur)
-  const brut = p.get('max')
-  if (brut === '0' || brut === '') return null
-  const max = Number(brut)
-  return Number.isFinite(max) && max > 0 ? max : maxParDefaut(grandeur)
+/** Aucun maximum par défaut (2026-09-22) : à plusieurs, un maximum masquait presque toute la carte.
+ * `max=0` (anciens liens partagés) vaut aussi « aucun maximum ». */
+function lireMax(p: URLSearchParams): number | null {
+  const max = Number(p.get('max'))
+  return p.has('max') && Number.isFinite(max) && max > 0 ? max : null
 }
 
 function lierPersonnesParVoiture(p: URLSearchParams): number {
@@ -68,7 +62,7 @@ export function lireEtat(recherche: string): Etat {
     mode: MODES.includes(mode) ? mode : ETAT_DEFAUT.mode,
     critere: CRITERES.includes(critere) ? critere : ETAT_DEFAUT.critere,
     grandeur: grandeurLue,
-    max: lireMax(p, grandeurLue),
+    max: lireMax(p),
     selection: sel === null ? null : sel.split(',').filter(Boolean),
     lieu: lireLieu(p.get('lieu')),
     personnesParVoiture: lierPersonnesParVoiture(p),
@@ -81,7 +75,6 @@ export function ecrireEtat(e: Etat): string {
   p.set('critere', e.critere)
   if (e.mode !== 'oiseau') p.set('grandeur', e.grandeur)
   if (e.max !== null) p.set('max', String(e.max))
-  else if (maxParDefaut(e.grandeur) !== null) p.set('max', '0')
   if (e.selection !== null) p.set('sel', e.selection.join(','))
   if (e.lieu) p.set('lieu', `${e.lieu.lat.toFixed(5)},${e.lieu.lon.toFixed(5)},${e.lieu.label}`)
   if (e.personnesParVoiture !== ETAT_DEFAUT.personnesParVoiture) p.set('parvoiture', String(e.personnesParVoiture))
