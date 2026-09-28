@@ -82,6 +82,7 @@ function mesureTcPersonne(moteur: MoteurTc, grandeur: Choix['grandeur']): Mesure
     return {
       valeur: grandeur === 'temps' ? t.minutes : t.euros,
       precision: descriptionTrajet(t),
+      retour: t.dernierRetour,
       etapes: () => etapesTrajet(t, garesVia(moteur, t), 'l’arrivée'),
     }
   }

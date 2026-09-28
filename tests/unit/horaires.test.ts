@@ -3,13 +3,14 @@ import { creerHoraires, decoderLigne, decoderVoisins } from '../../src/donnees/h
 
 afterEach(() => vi.unstubAllGlobals())
 
-function ligneBinaire(entrees: [number, number, number, number?][]): ArrayBuffer {
-  const v = new DataView(new ArrayBuffer(entrees.length * 7))
-  entrees.forEach(([m, k, f, p = 65535], j) => {
-    v.setUint16(j * 7, m, true)
-    v.setUint16(j * 7 + 2, k, true)
-    v.setUint8(j * 7 + 4, f)
-    v.setUint16(j * 7 + 5, p, true)
+function ligneBinaire(entrees: [number, number, number, number?, number?][]): ArrayBuffer {
+  const v = new DataView(new ArrayBuffer(entrees.length * 8))
+  entrees.forEach(([m, k, f, p = 65535, r = 255], j) => {
+    v.setUint16(j * 8, m, true)
+    v.setUint16(j * 8 + 2, k, true)
+    v.setUint8(j * 8 + 4, f)
+    v.setUint16(j * 8 + 5, p, true)
+    v.setUint8(j * 8 + 7, r)
   })
   return v.buffer
 }
@@ -31,6 +32,11 @@ test('decoderLigne lit le nombre de correspondances dans les bits 1 à 4', () =>
 test('decoderLigne lit la gare précédente', () => {
   const l = decoderLigne(ligneBinaire([[0, 0, 0, 65535], [60, 10, 0, 2]]))
   expect(Array.from(l.precedente)).toEqual([65535, 2])
+})
+
+test('decoderLigne lit l’heure du dernier retour (pas de 10 min, 255 = aucun)', () => {
+  const l = decoderLigne(ligneBinaire([[0, 0, 0, 65535, 144], [60, 10, 0, 2, 128]]))
+  expect(Array.from(l.dernierRetour)).toEqual([144, 128])
 })
 
 test('decoderLigne refuse une taille incohérente', () => {

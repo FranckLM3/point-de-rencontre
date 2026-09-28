@@ -7,6 +7,8 @@ export interface Detail {
   precision?: string
   /** Étapes détaillées, une phrase chacune (dépliées à la demande) ; calculées seulement si lues. */
   etapes?: () => string[]
+  /** Heure du dernier retour (minutes depuis minuit) ; null quand on ne peut pas rentrer le soir. */
+  retour?: number | null
 }
 
 /** Trajet d'une personne vers un point, null si elle ne peut pas l'atteindre. */

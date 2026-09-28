@@ -608,3 +608,29 @@ test('interrupteur « Par foyer » : bascule et reflète l’état', () => {
   bascule.click()
   expect(changer).toHaveBeenLastCalledWith({ parFoyer: false })
 })
+
+test('ligne de retour : l’heure la plus contraignante et la personne concernée', () => {
+  const el = document.createElement('div')
+  const details = [
+    { valeur: 100, retour: 21 * 60 + 20 },
+    { valeur: 140, retour: 19 * 60 + 40 },
+  ]
+  rendreResultatLieu(el, marseille, amis, details, 'min', vi.fn())
+  expect(el.querySelector('.retour')!.textContent).toBe(`Dernier retour 19 h 40 pour ${amis[1]!.nom}.`)
+})
+
+test('ligne de retour : personne qui ne peut pas rentrer le soir', () => {
+  const el = document.createElement('div')
+  const details = [
+    { valeur: 100, retour: 21 * 60 + 20 },
+    { valeur: 300, retour: null },
+  ]
+  rendreResultatLieu(el, marseille, amis, details, 'min', vi.fn())
+  expect(el.querySelector('.retour')!.textContent).toBe(`Pas de retour le soir même pour ${amis[1]!.nom}.`)
+})
+
+test('sans information de retour (voiture, vol d’oiseau), aucune ligne de retour', () => {
+  const el = document.createElement('div')
+  rendreResultatLieu(el, marseille, amis, [{ valeur: 100 }, { valeur: 140 }], 'min', vi.fn())
+  expect(el.querySelector('.retour')).toBeNull()
+})

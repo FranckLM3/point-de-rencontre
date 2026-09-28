@@ -1,7 +1,7 @@
 import type { Unite } from '../calcul/unites'
 import type { Detail, VilleClassee } from '../calcul/villes'
 import type { Ami, Critere, Mode } from '../types'
-import { echapper, valeur } from './format'
+import { echapper, heureDuJour, valeur } from './format'
 
 export interface DonneesVilles {
   villes: VilleClassee[]
@@ -34,6 +34,21 @@ const PLUS_GRAND: Record<Unite, string> = {
   eur: 'un prix plus élevé',
 }
 
+/**
+ * Le retour qui contraint le groupe : l'heure du dernier départ la plus tôt, avec la personne
+ * concernée ; ou l'avertissement quand quelqu'un ne peut pas rentrer le soir même.
+ */
+export function ligneRetour(amis: Ami[], details: (Detail | null)[]): string {
+  const avecTrain = amis.map((a, i) => ({ a, d: details[i] ?? null })).filter((x) => x.d?.retour !== undefined)
+  if (avecTrain.length === 0) return ''
+  const sansRetour = avecTrain.filter((x) => x.d!.retour === null).map((x) => x.a.nom)
+  if (sansRetour.length > 0) {
+    return `<p class="retour alerte">Pas de retour le soir même pour ${echapper(sansRetour.join(', '))}.</p>`
+  }
+  const contraignant = avecTrain.reduce((min, x) => (x.d!.retour! < min.d!.retour! ? x : min))
+  return `<p class="retour">Dernier retour ${heureDuJour(contraignant.d!.retour!)} pour ${echapper(contraignant.a.nom)}.</p>`
+}
+
 /** Une ligne par personne, la plus éloignée d'abord ; null = pas de trajet. */
 export function detailParAmi(amis: Ami[], details: (Detail | null)[], unite: Unite): string {
   const lignes = amis
@@ -50,7 +65,7 @@ export function detailParAmi(amis: Ami[], details: (Detail | null)[], unite: Uni
       return `<tr><td>${personne}</td><td>${texte}</td></tr>`
     })
     .join('')
-  return `<table class="detail"><tbody>${lignes}</tbody></table>`
+  return `<table class="detail"><tbody>${lignes}</tbody></table>${ligneRetour(amis, details)}`
 }
 
 const liensReservation = (): string =>

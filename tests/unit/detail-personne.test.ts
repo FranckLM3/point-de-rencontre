@@ -11,6 +11,7 @@ const lyon: Lieu = { lat: 45.76, lon: 4.83, label: 'Lyon' }
 const trajetTc: TrajetTc = {
   minutes: 192, euros: 45, depart: 'Marseille Saint-Charles', arrivee: 'Paris Gare de Lyon Hall 1 - 2',
   departIndice: 0, arriveeIndice: 2, acces: { minutes: 12, mode: 'transports' }, sortie: { minutes: 8, mode: 'voiture' }, correspondances: 1,
+  dernierRetour: 21 * 60 + 20,
 }
 
 const rendre = (trajet: (a: Ami) => TrajetDetaille | null, cible: Lieu | null = lyon, choisis = ['f', 'm']): HTMLElement => {
@@ -28,6 +29,7 @@ test('transports : étapes accès, train avec gare de correspondance, sortie, et
     "12 min en transports jusqu'à Marseille Saint-Charles",
     '2 h 52 de train : Marseille Saint-Charles → Paris Gare de Lyon, via Lyon Part-Dieu · 1 correspondance',
     "8 min de voiture jusqu'à Lyon",
+    'Dernier retour vers 21 h 20, depuis Paris Gare de Lyon',
   ])
 })
 
@@ -59,7 +61,13 @@ test('métro : stations de montée et de descente dans les étapes', () => {
   const etapes = [...el.querySelectorAll('.detail-personne')[0]!.querySelectorAll('.etapes li')].map((li) => li.textContent)
   expect(etapes[0]).toBe("23 min en transports jusqu'à Marseille Saint-Charles, montée à Porte de Bagnolet")
   expect(etapes[2]).toBe("8 min en transports jusqu'à Lyon, descente à Porte de Bagnolet")
+  expect(etapes[3]).toBe('Dernier retour vers 21 h 20, depuis Paris Gare de Lyon')
   const direct: TrajetTc = { ...trajetTc, depart: null, arrivee: null, departIndice: null, arriveeIndice: null, sortie: null, acces: { minutes: 25, mode: 'transports', urbain } }
   const el2 = rendre((a) => (a.id === 'f' ? { moyen: 'tc', trajet: direct, via: [] } : null))
   expect(el2.querySelector('.etapes li')!.textContent).toBe('25 min en transports, de Porte de Bagnolet à Gare de Lyon')
+})
+
+test('sans retour le soir même, la fiche le dit', () => {
+  const el = rendre((a) => (a.id === 'f' ? { moyen: 'tc', trajet: { ...trajetTc, dernierRetour: null }, via: [] } : null))
+  expect(el.textContent).toContain('Pas de retour le soir même')
 })

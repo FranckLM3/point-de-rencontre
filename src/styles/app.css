@@ -208,6 +208,8 @@ form.groupe .champ { flex: 1 1 100%; }
 /* La valeur reste d'un bloc : la précision peut être longue, c'est elle qui se replie. */
 .detail td:last-child { text-align: right; white-space: nowrap; vertical-align: top; padding-left: 10px; }
 .detail .precision { display: block; color: var(--texte-doux); font-size: .875rem; }
+.retour { margin: 8px 0 0; font-size: .9375rem; color: var(--texte-doux); }
+.retour.alerte { color: var(--danger); font-weight: 500; }
 /* Tiroir d'une personne : le résumé se déplie en étapes détaillées, chevron à droite du nom. */
 .tiroir summary { list-style: none; cursor: pointer; min-height: var(--cible-tactile); padding-right: 22px; position: relative; }
 .tiroir summary::-webkit-details-marker { display: none; }

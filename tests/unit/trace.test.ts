@@ -12,6 +12,7 @@ import type { Ami, Lieu } from '../../src/types'
 const ligne = (m: number[], k: number[], g: number[], c: number[], p: number[]): Ligne => ({
   minutes: Uint16Array.from(m), km: Uint16Array.from(k),
   grandeLigne: Uint8Array.from(g), correspondances: Uint8Array.from(c), precedente: Uint16Array.from(p),
+  dernierRetour: Uint8Array.from(m.map(() => 128)),
 })
 
 // A (Paris, proche des amis) -> B (Dijon, intermédiaire, à plus de 50 km des deux bouts) -> C (Lyon,

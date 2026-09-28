@@ -19,7 +19,9 @@ const MINUTES = 120
 const KM = 465
 /** Bit 0 : une grande ligne est empruntée ; bits 1 à 4 : aucune correspondance. */
 const DRAPEAUX = 0b0000_0001
-const OCTETS_PAR_GARE = 7
+const OCTETS_PAR_GARE = 8
+/** Dernier retour simulé : 21 h 20 (pas de 10 min). */
+const DERNIER_RETOUR = 128
 const NB_VOISINS = 3
 const INJOIGNABLE = 65535
 const HECTOMETRES_MAX = 65535
@@ -47,7 +49,7 @@ function precedenteDepuis(source: number, j: number): number {
   return source
 }
 
-/** `lignes/<i>.bin` : 7 octets par gare, la gare elle-même à zéro. */
+/** `lignes/<i>.bin` : 8 octets par gare, la gare elle-même à zéro. */
 function ligne(source: number): Buffer {
   const octets = Buffer.alloc(GARES.length * OCTETS_PAR_GARE)
   for (let j = 0; j < GARES.length; j++) {
@@ -56,6 +58,7 @@ function ligne(source: number): Buffer {
     octets.writeUInt16LE(j === source ? 0 : KM, decalage + 2)
     octets.writeUInt8(j === source ? 0 : DRAPEAUX, decalage + 4)
     octets.writeUInt16LE(precedenteDepuis(source, j), decalage + 5)
+    octets.writeUInt8(DERNIER_RETOUR, decalage + 7)
   }
   return octets
 }

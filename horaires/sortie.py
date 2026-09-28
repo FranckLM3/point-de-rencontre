@@ -13,6 +13,7 @@ from pathlib import Path
 
 from horaires.geo import haversine_km
 from horaires.gtfs import Gare, Reseau
+from horaires.retour import AUCUN_RETOUR, derniers_departs, etiquettes_vides, miroir
 from horaires.parcours import INJOIGNABLE, Index, Trajet, meilleurs_trajets, preparer
 
 NB_VOISINS = 3
@@ -25,14 +26,18 @@ DISTANCE_GARES_DISTINCTES_KM = 0.5
 
 _reseau: Reseau | None = None
 _index: Index | None = None
+_index_retour: Index | None = None
 
 
-def encoder_ligne(trajets: list[Trajet]) -> bytes:
+def encoder_ligne(trajets: list[Trajet], retours: list[int] | None = None) -> bytes:
+    """8 octets par gare : minutes, km, drapeaux, gare précédente, puis l'heure du dernier retour
+    (pas de 10 min depuis minuit, 255 = aucun retour le soir même)."""
     sortie = bytearray()
-    for t in trajets:
+    for i, t in enumerate(trajets):
         km = 0 if t.minutes == INJOIGNABLE else min(KM_MAX, round(t.km))
         drapeaux = (1 if t.grande_ligne else 0) | min(CORRESPONDANCES_MAX, t.correspondances) << 1
-        sortie += struct.pack("<HHBH", t.minutes, km, drapeaux, t.precedente)
+        retour = AUCUN_RETOUR if retours is None else retours[i]
+        sortie += struct.pack("<HHBHB", t.minutes, km, drapeaux, t.precedente, retour)
     return bytes(sortie)
 
 
@@ -123,14 +128,17 @@ def index_voisins(gares: list[Gare], grille: dict, desservies: list[bool], train
 
 
 def _initialiser(reseau: Reseau) -> None:
-    global _reseau, _index
+    global _reseau, _index, _index_retour
     _reseau = reseau
     _index = preparer(reseau)
+    _index_retour = preparer(miroir(reseau))
 
 
 def _ligne(source: int) -> tuple[int, bytes]:
-    assert _reseau is not None
-    return source, encoder_ligne(meilleurs_trajets(_reseau, source, _index))
+    assert _reseau is not None and _index_retour is not None
+    n = len(_reseau.gares)
+    retours = derniers_departs(_index_retour, source, etiquettes_vides(n), n)
+    return source, encoder_ligne(meilleurs_trajets(_reseau, source, _index), retours)
 
 
 def _ecrire_lignes(reseau: Reseau, dossier: Path, processus: int) -> None:

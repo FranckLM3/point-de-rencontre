@@ -13,6 +13,13 @@ export function duree(minutes: number): string {
   return m === 0 ? `${h} h` : `${h} h ${String(m).padStart(2, '0')}`
 }
 
+/** Heure du jour : « 21 h 20 », « 9 h 05 ». */
+export function heureDuJour(minutes: number): string {
+  const h = Math.floor(minutes / 60) % 24
+  const m = Math.round(minutes) % 60
+  return `${h} h ${String(m).padStart(2, '0')}`
+}
+
 export const euros = (v: number): string => `${Math.round(v)} €`
 
 export function valeur(v: number, unite: Unite): string {

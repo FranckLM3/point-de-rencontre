@@ -10,6 +10,8 @@ const ligne = (m: number[], k: number[], g: number[], c: number[] = m.map(() => 
   minutes: Uint16Array.from(m), km: Uint16Array.from(k),
   grandeLigne: Uint8Array.from(g), correspondances: Uint8Array.from(c),
   precedente: Uint16Array.from(p),
+  // 21 h 20 (pas de 10 min) : un dernier retour existe depuis chaque gare.
+  dernierRetour: Uint8Array.from(m.map(() => 128)),
 })
 
 // Gare 0 à Marseille, gare 1 à Paris ; 194 min, 750 km, grande ligne, 1 correspondance.

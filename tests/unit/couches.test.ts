@@ -12,6 +12,7 @@ const ligne = (m: number[], k: number[], g: number[], c: number[] = m.map(() => 
   minutes: Uint16Array.from(m), km: Uint16Array.from(k),
   grandeLigne: Uint8Array.from(g), correspondances: Uint8Array.from(c),
   precedente: Uint16Array.from(m.map(() => INJOIGNABLE)),
+  dernierRetour: Uint8Array.from(m.map(() => 126)),
 })
 
 // Gare 0 à Marseille, gare 1 à Paris.

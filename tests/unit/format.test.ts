@@ -71,7 +71,7 @@ test('nomCourt retire le hall en fin de nom de gare', () => {
 
 const trajet = (t: Partial<TrajetTc>): TrajetTc => ({
   minutes: 0, euros: 0, depart: null, arrivee: null, departIndice: null, arriveeIndice: null, correspondances: 0,
-  acces: { minutes: 0, mode: 'à pied' }, sortie: null, ...t,
+  acces: { minutes: 0, mode: 'à pied' }, sortie: null, dernierRetour: null, ...t,
 })
 
 test('descriptionTrajet : accès, gares, correspondances et sortie', () => {

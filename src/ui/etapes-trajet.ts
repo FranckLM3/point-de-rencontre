@@ -1,6 +1,6 @@
 import type { Segment, TronconUrbain } from '../calcul/etapes'
 import type { TrajetTc } from '../calcul/tc'
-import { correspondances, descriptionTrajet, duree, nomCourt, SUITE } from './format'
+import { correspondances, descriptionTrajet, duree, heureDuJour, nomCourt, SUITE } from './format'
 
 /** Stations de montée et de descente d'une partie en métro, RER ou tram. */
 const nomStation = (u: TronconUrbain, i: number): string => u.reseau.stations[i]!.nom
@@ -24,5 +24,10 @@ export function etapesTrajet(t: TrajetTc, via: string[], arrivee: string): strin
   const changements = t.correspondances > 0 ? ` · ${correspondances(t.correspondances)}` : ''
   etapes.push(`${duree(enTrain)} de train : ${nomCourt(t.depart)} → ${nomCourt(t.arrivee ?? '')}${par}${changements}`)
   if (t.sortie && Math.round(t.sortie.minutes) > 0) etapes.push(`${SUITE[t.sortie.mode](duree(t.sortie.minutes))} jusqu'à ${arrivee}${descente(t.sortie)}`)
+  etapes.push(
+    t.dernierRetour === null
+      ? 'Pas de retour le soir même : il faut dormir sur place'
+      : `Dernier retour vers ${heureDuJour(t.dernierRetour)}, depuis ${nomCourt(t.arrivee ?? '')}`,
+  )
   return etapes
 }

@@ -1,5 +1,5 @@
 import type { Horaires, Ligne, Station } from '../donnees/horaires'
-import { INJOIGNABLE, NB_VOISINS } from '../donnees/horaires'
+import { AUCUN_RETOUR, INJOIGNABLE, NB_VOISINS, PAS_RETOUR_MIN } from '../donnees/horaires'
 import type { Ami, Grandeur } from '../types'
 import { haversineKm } from './geo'
 import { bout, etapeDirecte, etapeGare, garesDuReseau, type Bout, type Etape, type Segment } from './etapes'
@@ -77,6 +77,8 @@ export interface DepuisGares {
   depart: Int32Array
   /** Nombre de changements de train jusqu'à chaque gare. */
   correspondances: Uint8Array
+  /** Heure du dernier départ qui ramène chez soi avant minuit, en pas de 10 min (AUCUN_RETOUR = aucun). */
+  retour: Uint8Array
   /** Gares de départ envisagées, et l'étape pour les rejoindre. */
   departs: Depart[]
   /** Le domicile : réseau urbain et stations proches, pour les trajets sans train. */
@@ -113,6 +115,7 @@ export function depuisGares(h: Horaires, ami: Ami): DepuisGares {
     euros: new Float32Array(n).fill(Number.NaN),
     depart: new Int32Array(n).fill(-1),
     correspondances: new Uint8Array(n),
+    retour: new Uint8Array(n).fill(AUCUN_RETOUR),
     departs,
     domicile,
   }
@@ -129,6 +132,7 @@ export function depuisGares(h: Horaires, ami: Ami): DepuisGares {
         r.euros[g] = p.etape.euros + prixTrain(ligne.km[g]!, ligne.grandeLigne[g] === 1)
         r.depart[g] = p.gare
         r.correspondances[g] = ligne.correspondances[g]!
+        r.retour[g] = ligne.dernierRetour[g]!
       }
     }
   }
@@ -148,6 +152,8 @@ export interface TrajetTc {
   acces: Segment
   /** Quitter la gare d'arrivée ; null si le lieu est la gare même ou s'il n'y a pas de train. */
   sortie: Segment | null
+  /** Heure (minutes depuis minuit) du dernier train du retour ; null sans train ou sans retour le soir. */
+  dernierRetour: number | null
   correspondances: number
 }
 
@@ -176,6 +182,7 @@ function meilleurVers(h: Horaires, d: DepuisGares, ami: Ami, lat: number, lon: n
       arriveeIndice: null,
       acces: direct.segment,
       sortie: null,
+      dernierRetour: null,
       correspondances: 0,
     }
     meilleurScore = best.minutes
@@ -200,6 +207,7 @@ function meilleurVers(h: Horaires, d: DepuisGares, ami: Ami, lat: number, lon: n
         arriveeIndice: g,
         acces: d.departs.find((p) => p.gare === gareDepart)!.etape.segment,
         sortie: sortie.segment.minutes > 0 ? sortie.segment : null,
+        dernierRetour: d.retour[g] === AUCUN_RETOUR ? null : d.retour[g]! * PAS_RETOUR_MIN,
         correspondances: d.correspondances[g]!,
       }
     }

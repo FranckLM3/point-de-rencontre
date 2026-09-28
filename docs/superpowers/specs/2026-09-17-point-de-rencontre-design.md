@@ -201,8 +201,9 @@ est la distance en km. Prix : non applicable (la pastille Prix est grisée).
   60 min de liaison au plus (voir 5.4 ter).
 - Sortie : `data/tc/stations.json` (nom, lat, lon, desservie),
   `data/tc/voisins-4km.bin` et une ligne par gare `data/tc/lignes/<i>.bin`
-  (5 octets par gare cible : minutes, km, drapeaux grande ligne et nombre de
-  correspondances). Gares au-delà de 50 km ignorées (la Corse n'a pas de
+  (8 octets par gare cible depuis le 2026-09-28 : minutes, km, drapeaux grande ligne et nombre de
+  correspondances, gare précédente, heure du dernier retour qui ramène avant
+  minuit par pas de 10 min). Gares au-delà de 50 km ignorées (la Corse n'a pas de
   train dans ces horaires).
 - Trajet d'un ami vers une gare cible G :
   min sur les 3 gares les plus proches de l'ami A de
