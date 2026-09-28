@@ -591,3 +591,20 @@ test('tiroir : les étapes détaillées d’une personne se déplient sous son n
   ])
   expect(el.querySelectorAll('details.tiroir')).toHaveLength(1)
 })
+
+test('interrupteur « Par foyer » : bascule et reflète l’état', () => {
+  const el = document.createElement('div')
+  const changer = vi.fn()
+  rendreFiltres(el, ETAT_DEFAUT, 2, changer, vi.fn())
+  const bouton = el.querySelector<HTMLButtonElement>('[data-foyer]')!
+  expect(bouton.getAttribute('aria-pressed')).toBe('false')
+  bouton.click()
+  expect(changer).toHaveBeenCalledWith({ parFoyer: true })
+
+  const actif = document.createElement('div')
+  rendreFiltres(actif, { ...ETAT_DEFAUT, parFoyer: true }, 2, changer, vi.fn())
+  const bascule = actif.querySelector<HTMLButtonElement>('[data-foyer]')!
+  expect(bascule.getAttribute('aria-pressed')).toBe('true')
+  bascule.click()
+  expect(changer).toHaveBeenLastCalledWith({ parFoyer: false })
+})

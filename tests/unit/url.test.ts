@@ -8,7 +8,7 @@ test('URL vide : état par défaut', () => {
 
 test('aller-retour complet', () => {
   const e: Etat = {
-    mode: 'voiture', critere: 'moyenne', max: 300, grandeur: 'temps',
+    mode: 'voiture', critere: 'moyenne', max: 300, grandeur: 'temps', parFoyer: true,
     selection: ['a1', 'b2'], lieu: { lat: 45.75, lon: 4.85, label: 'Lyon, Rhône' }, personnesParVoiture: 3,
   }
   expect(lireEtat(ecrireEtat(e))).toEqual(e)
@@ -71,11 +71,12 @@ test('estParDefaut : vrai pour l’état par défaut', () => {
 
 test('estParDefaut : faux dès qu’un seul réglage diffère', () => {
   expect(estParDefaut({ ...ETAT_DEFAUT, mode: 'tc' })).toBe(false)
-  expect(estParDefaut({ ...ETAT_DEFAUT, critere: 'pire' })).toBe(false)
+  expect(estParDefaut({ ...ETAT_DEFAUT, critere: 'moyenne' })).toBe(false)
   expect(estParDefaut({ ...ETAT_DEFAUT, grandeur: 'prix' })).toBe(false)
   expect(estParDefaut({ ...ETAT_DEFAUT, max: 120 })).toBe(false)
   expect(estParDefaut({ ...ETAT_DEFAUT, selection: ['a'] })).toBe(false)
   expect(estParDefaut({ ...ETAT_DEFAUT, selection: [] })).toBe(false)
+  expect(estParDefaut({ ...ETAT_DEFAUT, parFoyer: true })).toBe(false)
   expect(estParDefaut({ ...ETAT_DEFAUT, lieu: { lat: 45, lon: 4, label: 'x' } })).toBe(false)
   expect(estParDefaut({ ...ETAT_DEFAUT, personnesParVoiture: 2 })).toBe(false)
 })

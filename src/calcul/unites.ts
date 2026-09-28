@@ -14,5 +14,10 @@ const MAXIMA: Record<Unite, number[]> = {
   eur: [20, 40, 60, 80, 100, 150],
 }
 
+/** En deçà, deux lieux se valent : nos temps et nos prix sont des estimations, pas des horaires exacts. */
+const ECART_EQUIVALENT: Record<Unite, number> = { km: 20, min: 10, eur: 5 }
+
+export const ecartEquivalent = (u: Unite): number => ECART_EQUIVALENT[u]
+
 export const pasTranches = (u: Unite): number => PAS[u]
 export const maximaProposes = (u: Unite): number[] => MAXIMA[u]

@@ -63,6 +63,7 @@ export function classerVilles(
   return villes
     .map((ville) => evaluer(ville, amis, mesure))
     .filter((c): c is VilleClassee => c !== null && (max === null || c.pire <= max))
-    .sort((x, y) => x[critere] - y[critere] || x.moyenne - y.moyenne)
+    // Égalité départagée par l'autre critère : à pire trajet égal la moyenne tranche, et l'inverse.
+    .sort((x, y) => x[critere] - y[critere] || (critere === 'pire' ? x.moyenne - y.moyenne : x.pire - y.pire))
     .slice(0, limite)
 }

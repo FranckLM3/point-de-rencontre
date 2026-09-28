@@ -176,6 +176,19 @@ h1 { font-family: var(--police-marque); font-size: var(--titre); font-weight: 70
 .ville-carte.lieu .detail { width: 100%; }
 .ville-carte.repaire { display: grid; gap: 8px; justify-items: start; border-color: var(--accent); background: var(--accent-fond); }
 .ville-carte.repaire .ligne { font-weight: 500; }
+.repaires { list-style: none; display: grid; gap: 6px; margin: 0; padding: 0; width: 100%; }
+.repaire-ville {
+  width: 100%; display: grid; gap: 2px; justify-items: start; text-align: left; cursor: pointer;
+  min-height: var(--cible-tactile); padding: 6px 8px; border: 1px solid transparent; border-radius: var(--rayon-pastille);
+  background: transparent; font: inherit; color: inherit; transition: background var(--duree), border-color var(--duree);
+}
+.repaire-ville:hover, .repaire-ville:focus-visible { background: var(--surface); border-color: var(--accent); }
+.repaire-ville .nom { font-family: var(--police-marque); font-weight: 700; font-size: 1.0625rem; }
+.repaires li:first-child .repaire-ville { background: var(--surface); border-color: var(--accent); }
+.equivalent {
+  margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--surface);
+  font-family: var(--police); font-size: .75rem; font-weight: 500; vertical-align: middle;
+}
 .ville-carte.repaire .sur-titre { font-family: var(--police-marque); font-weight: 700; font-size: 1rem; text-transform: none; letter-spacing: normal; }
 #repaire:empty { display: none; }
 .sur-titre { color: var(--accent); font-size: .875rem; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }

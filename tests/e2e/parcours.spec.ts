@@ -159,10 +159,10 @@ test('connexion, sélection, ajout d’une personne, test d’un lieu', async ({
   expect(nbCases).toBeGreaterThanOrEqual(1)
   expect(nbCases).toBeLessThanOrEqual(8)
 
-  await expect(page.locator('#repaire')).toContainText('Le repaire')
-  await page.getByRole('button', { name: 'Voir sur la carte' }).click()
+  await expect(page.locator('#repaire')).toContainText('repaire')
+  await page.locator('#repaire .repaire-ville').first().click()
   await expect(page.locator('.cible')).toBeVisible()
-  // Voir sur la carte referme le volet sur mobile (D1) : on le rouvre pour continuer.
+  // Choisir un repaire referme le volet sur mobile (D1) : on le rouvre pour continuer.
   await ouvrirVoletSiVisible(page)
 
   await definirInclusion(page, 'Tom', false)
@@ -325,18 +325,18 @@ test('bouton Réinitialiser : remet mode, critère et lien partagé aux valeurs 
   await expect(page.locator('#reinitialiser-filtres')).toHaveCount(0)
 
   await passerEnTransports(page)
-  await page.getByRole('button', { name: 'Pire trajet', exact: true }).click()
+  await page.getByRole('button', { name: 'Moyenne', exact: true }).click()
   await expect(page.locator('#copier-lien')).toHaveAttribute('data-lien', /mode=tc/)
-  await expect(page.locator('#copier-lien')).toHaveAttribute('data-lien', /critere=pire/)
+  await expect(page.locator('#copier-lien')).toHaveAttribute('data-lien', /critere=moyenne/)
 
   const reinitialiser = page.getByRole('button', { name: 'Réinitialiser' })
   await expect(reinitialiser).toBeVisible()
   await reinitialiser.click()
 
   await expect(page.locator('#copier-lien')).toHaveAttribute('data-lien', /mode=mixte/)
-  await expect(page.locator('#copier-lien')).toHaveAttribute('data-lien', /critere=moyenne/)
+  await expect(page.locator('#copier-lien')).toHaveAttribute('data-lien', /critere=pire/)
   await expect(page.locator('[data-mode="mixte"]')).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.locator('[data-critere="moyenne"]')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('[data-critere="pire"]')).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('#reinitialiser-filtres')).toHaveCount(0)
 })
 
@@ -346,8 +346,8 @@ test('actualiser ramène au début ; un lien partagé ouvre sa vue une fois puis
   await entrer(page)
   await ouvrirVoletSiVisible(page)
   await passerEnTransports(page)
-  await page.getByRole('button', { name: 'Pire trajet', exact: true }).click()
-  await expect(page.locator('[data-critere="pire"]')).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Moyenne', exact: true }).click()
+  await expect(page.locator('[data-critere="moyenne"]')).toHaveAttribute('aria-pressed', 'true')
   // L'adresse de la page ne garde pas les réglages.
   expect(new URL(page.url()).search).toBe('')
 
@@ -355,10 +355,10 @@ test('actualiser ramène au début ; un lien partagé ouvre sa vue une fois puis
   await page.getByRole('heading', { level: 1 }).waitFor()
   await ouvrirVoletSiVisible(page)
   await expect(page.locator('[data-mode="mixte"]')).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.locator('[data-critere="moyenne"]')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('[data-critere="pire"]')).toHaveAttribute('aria-pressed', 'true')
 
   // Un lien partagé : la vue s'ouvre, puis l'adresse redevient nue.
-  await page.goto('./?mode=tc&critere=pire')
+  await page.goto('./?mode=tc&critere=moyenne')
   await page.getByRole('heading', { level: 1 }).waitFor()
   await ouvrirVoletSiVisible(page)
   await expect(page.locator('[data-mode="tc"]')).toHaveAttribute('aria-pressed', 'true')
@@ -426,7 +426,7 @@ test('le « ? » du repaire déplie l’explication du calcul', async ({ page })
   await ouvrirVoletSiVisible(page)
   const aide = page.locator('#repaire details.aide')
   await aide.locator('summary').click()
-  await expect(aide.locator('.aide-texte')).toContainText('le repaire est l’endroit où')
+  await expect(aide.locator('.aide-texte')).toContainText('la ville où')
 })
 
 test('clic sur une personne de la carte : fiche avec les étapes de son trajet vers le lieu', async ({ page }) => {

@@ -12,7 +12,7 @@ import { coordonnees, type Grille } from './calcul/grille'
 import { personnesTrajetCarte, routesADemander } from './calcul/trace'
 import { trajetDetaille } from './calcul/detail'
 import { detailPersonnes } from './ui/detail-personne'
-import { pasTranches, uniteDe } from './calcul/unites'
+import { ecartEquivalent, pasTranches, uniteDe } from './calcul/unites'
 import { CONSOMMATION_DEFAUT, type Couche, type ParametresPrix } from './calcul/voiture'
 import { classerVilles, evaluer, type Mesure, type VilleClassee, villeLaPlusProche } from './calcul/villes'
 import { seuils, zones } from './calcul/zones'
@@ -30,6 +30,8 @@ import { afficherToast } from './ui/toast'
 import type { Ami, Etat, Groupe, Lieu, Mode, Ville } from './types'
 import { rendreAmis } from './ui/amis'
 import { amisChoisis, cleFocus, cleZones, libelleClic } from './ui/assemblage'
+import { compterParFoyer } from './calcul/foyers'
+import { meilleuresVilles, type Repaire } from './calcul/repaires'
 import { creerCarte, type Carte } from './ui/carte'
 import { afficherConnexion, afficherNouveauMotDePasse } from './ui/connexion'
 import { selectionEtiquettes, valeurEtiquette } from './ui/etiquettes'
@@ -40,7 +42,7 @@ import { rendreRechercheLieu, rendreResultatLieu, type RechercheLieu } from './u
 import { rendreVilles } from './ui/liste-villes'
 import { infobulleCentre } from './ui/marqueurs'
 import { mascotteCroco } from './ui/mascotte'
-import { rendreRepaire, type Repaire } from './ui/repaire'
+import { rendreRepaires } from './ui/repaire'
 
 const NB_VILLES = 20
 /** Seules les meilleures villes du groupe sont nommées sur la carte (2026-09-28). */
@@ -97,7 +99,8 @@ interface Session {
   recemment: string | null
   cleZones: string | null
   /** Résumé du meilleur point, recalculé en même temps que les zones (même clé). */
-  repaire: (Repaire & { lat: number; lon: number }) | null
+  /** Les meilleurs lieux du groupe (villes réelles, trois au plus), recalculés à chaque rendu. */
+  repaires: Repaire[]
   /** Ville choisie (carte de ville ou étiquette cliquée) : lignes vertes et bordure d'accent (D3). */
   villeChoisie: VilleClassee | null
 }
@@ -165,9 +168,11 @@ function personnesSansCoucheVoiture(s: Session, amis: Ami[]): Ami[] {
 /** En mode voiture, une personne dont la couche n'est pas prête est exclue du calcul (zones, repaire,
  * villes) le temps du calcul ; en mixte elle retombe sur les transports (couches.ts) et reste incluse. */
 function calculables(s: Session, choisis: Ami[]): Ami[] {
-  if (s.etat.mode !== 'voiture') return choisis
-  const enAttente = new Set(personnesSansCoucheVoiture(s, choisis).map((a) => a.id))
-  return choisis.filter((a) => !enAttente.has(a.id))
+  const retenus = s.etat.mode === 'voiture'
+    ? choisis.filter((a) => !personnesSansCoucheVoiture(s, choisis).some((x) => x.id === a.id))
+    : choisis
+  // Un trajet par foyer (réglage) : deux personnes d'une même adresse voyagent ensemble.
+  return s.etat.parFoyer ? compterParFoyer(retenus) : retenus
 }
 
 const PLURIEL = (n: number, singulier: string, pluriel: string): string => (n > 1 ? pluriel : singulier)
@@ -321,11 +326,11 @@ function rendrePanneau(s: Session, choisis: Ami[], calculables: Ami[], mesure: M
   $('#avis-voiture').textContent = avisVoiture(s, choisis)
   const { lieu, mode, critere, max } = s.etat
   const unite = uniteDe(mode, s.etat.grandeur)
-  rendreRepaire($('#repaire'), s.repaire, unite, () => {
-    if (!s.repaire) return
-    s.carte.centrerSur(s.repaire.lat, s.repaire.lon)
+  rendreRepaires($('#repaire'), s.repaires, unite, (r) => {
+    choisirVille(s, choisis, r.classee)
+    s.carte.centrerSur(r.classee.ville.lat, r.classee.ville.lon)
     fermerVolet()
-  }, critere, { mode, max })
+  }, critere, { mode, max, parFoyer: s.etat.parFoyer })
   const details = lieu ? choisis.map((a) => mesure(a, lieu.lat, lieu.lon)) : []
   rendreResultatLieu($('#resultat-lieu'), lieu, choisis, details, unite, () => retirerLieu(s))
   rendreVilles($('#villes'), { villes, amis: calculables, nbPersonnes: s.amis.length, max, unite, mode, critere }, {
@@ -334,30 +339,11 @@ function rendrePanneau(s: Session, choisis: Ami[], calculables: Ami[], mesure: M
   })
 }
 
-/** Pire trajet et total exacts au meilleur point, pour la carte « Le repaire » (mêmes règles que classerVilles). */
-function calculerRepaire(s: Session, calculables: Ami[], meilleur: number): Session['repaire'] {
-  let pire = 0
-  let total = 0
-  let nombre = 0
-  const moteurTc = s.tc.pret()
-  const moteurVoiture = voitureMoteur(s)
-  for (const a of calculables) {
-    const v = s.couches.obtenir(a, s.etat, moteurTc, moteurVoiture)?.[meilleur]
-    if (v === undefined || !Number.isFinite(v)) continue
-    total += v
-    nombre++
-    if (v > pire) pire = v
-  }
-  const [lon, lat] = coordonnees(s.grille, meilleur)
-  const proche = villeLaPlusProche(s.villes, lat, lon)
-  return { ville: proche?.nom ?? '', pire, total, nombre, lat, lon }
-}
-
 /** Étiquettes de villes façon Chronotrains (D3) : villes classées d'abord, grandes villes en renfort. */
 function rendreEtiquettes(s: Session, choisis: Ami[], calculables: Ami[], villesClassees: VilleClassee[], mesure: Mesure): void {
   const { critere, mode, grandeur } = s.etat
   const unite = uniteDe(mode, grandeur)
-  const candidats = selectionEtiquettes(villesClassees, MAX_ETIQUETTES)
+  const candidats = selectionEtiquettes(s.repaires.map((r) => r.classee), MAX_ETIQUETTES)
   // Pas de ligne de prix sur la carte (2026-09-28) : les étiquettes masquaient le fond. Le prix
   // reste dans la liste des villes, dans le lieu testé et dans la fiche d'une personne.
   const enrichis = candidats.map((c) => ({ ...c, valeurAffichee: valeurEtiquette(c.ville, critere, unite) }))
@@ -367,10 +353,8 @@ function rendreEtiquettes(s: Session, choisis: Ami[], calculables: Ami[], villes
 function rendreZones(s: Session, choisis: Ami[], calculables: Ami[], villesClassees: VilleClassee[], mesure: Mesure): void {
   if (calculables.length === 0) {
     s.carte.zones([])
-    s.carte.sansCentre()
     s.carte.etiquettes([], () => {})
     rendreLegende($('#legende'), [])
-    s.repaire = null
     return
   }
   const moteurTc = s.tc.pret()
@@ -389,15 +373,6 @@ function rendreZones(s: Session, choisis: Ami[], calculables: Ami[], villesClass
   const tranches = zones(s.grille, valeurs, seuils(pasTranches(unite), s.etat.max, plusGrande))
   s.carte.zones(tranches)
   rendreLegende($('#legende'), tranches, unite)
-  const meilleur = meilleurIndice(valeurs)
-  if (meilleur < 0) {
-    s.carte.sansCentre()
-    s.repaire = null
-  } else {
-    const [lon, lat] = coordonnees(s.grille, meilleur)
-    s.carte.centre(lat, lon, infobulleCentre(valeurs[meilleur]!, s.etat.critere, unite))
-    s.repaire = calculerRepaire(s, calculables, meilleur)
-  }
   rendreEtiquettes(s, choisis, calculables, villesClassees, mesure)
 }
 
@@ -415,7 +390,15 @@ function rendreCarte(s: Session, choisis: Ami[], calculables: Ami[], villesClass
 function afficher(s: Session, choisis: Ami[], mesure: Mesure, focus: string | null): void {
   const disponibles = calculables(s, choisis)
   const villesClassees = classerVilles(s.villes, disponibles, mesure, s.etat.critere, s.etat.max, NB_VILLES)
-  // La carte d'abord : elle recalcule s.repaire (même clé que les zones), lu ensuite par le panneau.
+  const unite = uniteDe(s.etat.mode, s.etat.grandeur)
+  s.repaires = meilleuresVilles(villesClassees, s.etat.critere, ecartEquivalent(unite))
+  const meilleur = s.repaires[0]
+  if (meilleur) {
+    const { ville } = meilleur.classee
+    s.carte.centre(ville.lat, ville.lon, infobulleCentre(meilleur.classee[s.etat.critere], s.etat.critere, unite))
+  } else {
+    s.carte.sansCentre()
+  }
   rendreCarte(s, choisis, disponibles, villesClassees, mesure)
   rendrePanneau(s, choisis, disponibles, mesure, villesClassees)
   const actif = document.activeElement
@@ -433,8 +416,8 @@ function attendreChargement(s: Session, choisis: Ami[], texte: string): void {
   s.carte.sansCentre()
   s.carte.etiquettes([], () => {})
   rendreLegende($('#legende'), [])
-  s.repaire = null
-  rendreRepaire($('#repaire'), null, uniteDe(s.etat.mode, s.etat.grandeur), () => {})
+  s.repaires = []
+  rendreRepaires($('#repaire'), [], uniteDe(s.etat.mode, s.etat.grandeur), () => {})
   s.cleZones = null
 }
 
@@ -606,7 +589,7 @@ async function charger(carte: Carte, installer: (s: Session) => void): Promise<v
       version: 0,
       recemment: null,
       cleZones: null,
-      repaire: null,
+      repaires: [],
       villeChoisie: null,
     }
     installer(s)

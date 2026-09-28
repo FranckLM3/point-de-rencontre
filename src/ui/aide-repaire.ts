@@ -5,6 +5,8 @@ import { valeur } from './format'
 export interface ContexteAide {
   mode: Mode
   max: number | null
+  /** Réglage « Par foyer » : une même adresse ne compte qu'un trajet. */
+  parFoyer?: boolean
 }
 
 /** Ce que le repaire rend le plus petit, selon la grandeur et le critère. */
@@ -29,11 +31,15 @@ const VOITURE = 'En voiture : durée et distance sur la route réelle ; le prix 
 function paragraphes(unite: Unite, critere: Critere, c: ContexteAide): string[] {
   const limite = c.max !== null ? `, sans que personne ne dépasse ${valeur(c.max, unite)}` : ''
   const moyens = c.mode === 'tc' ? [TRAIN] : c.mode === 'voiture' ? [VOITURE] : c.mode === 'mixte' ? [TRAIN, VOITURE] : []
+  const foyer = c.parFoyer
+    ? 'Les Crocos qui partent de la même adresse avec le même moyen comptent pour un seul trajet (réglage « Par foyer »).'
+    : 'Chaque Croco coché compte un trajet, même à deux à la même adresse ; « Par foyer » n’en compte qu’un.'
   return [
-    `Parmi les Crocos cochés, le repaire est l’endroit où ${OBJECTIF[unite][critere]}${limite}.`,
+    `Parmi les Crocos cochés, le repaire est la ville où ${OBJECTIF[unite][critere]}${limite}. Les deux suivantes sont les meilleures à 50 km au moins de la première ; « ça se vaut » signale un écart trop petit pour départager.`,
     MOYEN[c.mode],
+    foyer,
     ...moyens,
-    'La France est découpée en carrés de 4 km : le repaire est le meilleur carré, nommé d’après la ville la plus proche. Les zones vertes montrent les autres carrés par tranche.',
+    'Le classement porte sur les communes de plus de 20000 habitants, calculées à leur centre. Les zones vertes, elles, couvrent toute la France par carrés de 4 km.',
   ]
 }
 
