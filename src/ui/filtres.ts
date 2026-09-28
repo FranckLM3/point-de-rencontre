@@ -75,6 +75,7 @@ export function rendreFiltres(
   const critere = `<button type="button" class="pastille" data-critere="pire" ${presse(e.critere === 'pire')}>Pire trajet</button>
       <button type="button" class="pastille" data-critere="moyenne" ${presse(e.critere === 'moyenne')}>Moyenne</button>`
   const foyer = `<button type="button" class="pastille" data-foyer="${e.parFoyer ? '0' : '1'}" ${presse(e.parFoyer)}>Par foyer</button>`
+  const journee = `<button type="button" class="pastille" data-journee="${e.journee ? '0' : '1'}" ${presse(e.journee)}>Aller-retour dans la journée</button>`
   const boutonReinitialiser = estParDefaut(e)
     ? ''
     : '<button type="button" class="pastille secondaire" id="reinitialiser-filtres">Réinitialiser</button>'
@@ -88,6 +89,7 @@ export function rendreFiltres(
         <div class="segmente" role="group" aria-label="Critère">${critere}</div>
         ${menuMaximum(e, unite)}
         ${foyer}
+        ${journee}
         ${boutonReinitialiser}
         <button type="button" class="pastille secondaire" id="copier-lien" data-lien="${echapper(ecrireEtat(e))}">Copier le lien</button>
       </div>
@@ -106,6 +108,9 @@ export function rendreFiltres(
   )
   el.querySelector<HTMLButtonElement>('[data-foyer]')!.addEventListener('click', (evt) =>
     changer({ parFoyer: (evt.currentTarget as HTMLButtonElement).dataset.foyer === '1' }),
+  )
+  el.querySelector<HTMLButtonElement>('[data-journee]')!.addEventListener('click', (evt) =>
+    changer({ journee: (evt.currentTarget as HTMLButtonElement).dataset.journee === '1' }),
   )
   el.querySelectorAll<HTMLButtonElement>('[data-critere]').forEach((b) =>
     b.addEventListener('click', () => changer({ critere: b.dataset.critere as Etat['critere'] })),

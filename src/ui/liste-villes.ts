@@ -14,6 +14,8 @@ export interface DonneesVilles {
   mode: Mode
   /** Critère actif : sa valeur est mise en avant sur chaque carte. */
   critere: Critere
+  /** Aller-retour dans la journée : le dernier train du soir est alors affiché. */
+  journee?: boolean
 }
 
 export interface ActionsVilles {
@@ -50,7 +52,7 @@ export function ligneRetour(amis: Ami[], details: (Detail | null)[]): string {
 }
 
 /** Une ligne par personne, la plus éloignée d'abord ; null = pas de trajet. */
-export function detailParAmi(amis: Ami[], details: (Detail | null)[], unite: Unite): string {
+export function detailParAmi(amis: Ami[], details: (Detail | null)[], unite: Unite, journee = false): string {
   const lignes = amis
     .map((a, i) => ({ nom: a.nom, d: details[i] ?? null }))
     .sort((x, y) => (y.d?.valeur ?? Number.POSITIVE_INFINITY) - (x.d?.valeur ?? Number.POSITIVE_INFINITY))
@@ -65,7 +67,7 @@ export function detailParAmi(amis: Ami[], details: (Detail | null)[], unite: Uni
       return `<tr><td>${personne}</td><td>${texte}</td></tr>`
     })
     .join('')
-  return `<table class="detail"><tbody>${lignes}</tbody></table>${ligneRetour(amis, details)}`
+  return `<table class="detail"><tbody>${lignes}</tbody></table>${journee ? ligneRetour(amis, details) : ''}`
 }
 
 const liensReservation = (): string =>
@@ -86,7 +88,7 @@ function carteVille(c: VilleClassee, i: number, d: DonneesVilles): string {
       <span class="nom"><span class="titre-ville">${echapper(c.ville.nom)}</span> <span class="dep">${echapper(c.ville.dep)}</span></span>
       <span class="ligne">${ligneCritere(c, d.unite, d.critere)}</span>
     </button>
-    <div class="zone-detail" id="detail-ville-${i}" hidden>${detailParAmi(d.amis, c.parAmi, d.unite)}${liens}</div>
+    <div class="zone-detail" id="detail-ville-${i}" hidden>${detailParAmi(d.amis, c.parAmi, d.unite, d.journee)}${liens}</div>
   </article>`
 }
 

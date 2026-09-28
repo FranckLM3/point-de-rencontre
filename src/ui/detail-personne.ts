@@ -11,16 +11,18 @@ export interface DonneesDetail {
   choisis: Set<string>
   trajet: (a: Ami) => TrajetDetaille | null
   parametres: ParametresPrix | null
+  /** Aller-retour dans la journée : la dernière étape donne le dernier train du soir. */
+  journee?: boolean
 }
 
-function trajetHtml(tr: TrajetDetaille, cible: Lieu, parametres: ParametresPrix | null): string {
+function trajetHtml(tr: TrajetDetaille, cible: Lieu, parametres: ParametresPrix | null, journee: boolean): string {
   const vers = `Vers <b>${echapper(cible.label)}</b>`
   if (tr.moyen === 'oiseau') return `<p class="total">${vers} : ${km(tr.km)} à vol d’oiseau</p>`
   if (tr.moyen === 'voiture') {
     const texte = parametres ? descriptionVoiture(tr.valeur, parametres) : `${duree(tr.valeur.minutes)} de route · ${km(tr.valeur.km)}`
     return `<p class="total">${vers} en voiture</p><ol class="etapes"><li>${echapper(texte)}</li></ol>`
   }
-  const etapes = etapesTrajet(tr.trajet, tr.via, cible.label).map((e) => `<li>${echapper(e)}</li>`).join('')
+  const etapes = etapesTrajet(tr.trajet, tr.via, cible.label, journee).map((e) => `<li>${echapper(e)}</li>`).join('')
   return `<p class="total">${vers} : <b>${duree(tr.trajet.minutes)}</b> · <span class="prix">≈ ${euros(tr.trajet.euros)}</span></p><ol class="etapes">${etapes}</ol>`
 }
 
@@ -32,7 +34,7 @@ function fichePersonne(a: Ami, d: DonneesDetail): string {
   else if (!d.cible) corps = '<p class="note">Choisis une ville, ou touche la carte, pour voir son trajet.</p>'
   else {
     const tr = d.trajet(a)
-    corps = tr ? trajetHtml(tr, d.cible, d.parametres) : `<p class="note">Pas de trajet trouvé vers ${echapper(d.cible.label)}.</p>`
+    corps = tr ? trajetHtml(tr, d.cible, d.parametres, d.journee ?? false) : `<p class="note">Pas de trajet trouvé vers ${echapper(d.cible.label)}.</p>`
   }
   return `<section class="detail-personne">${entete}${adresse}${corps}</section>`
 }

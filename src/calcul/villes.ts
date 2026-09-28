@@ -58,13 +58,17 @@ export function classerVilles(
   critere: Critere,
   max: number | null,
   limite: number,
+  /** Aller-retour dans la journée : une ville d'où quelqu'un ne peut pas rentrer le soir est écartée. */
+  retourObligatoire = false,
 ): VilleClassee[] {
   if (amis.length === 0) return []
+  const retourPossible = (c: VilleClassee): boolean =>
+    !retourObligatoire || c.parAmi.every((d) => d.retour === undefined || d.retour !== null)
   // Le maximum s'applique toujours au pire trajet (personne ne le dépasse), quel que soit le
   // critère choisi ; le critère ne sert qu'à classer les villes qui passent ce filtre.
   return villes
     .map((ville) => evaluer(ville, amis, mesure))
-    .filter((c): c is VilleClassee => c !== null && (max === null || c.pire <= max))
+    .filter((c): c is VilleClassee => c !== null && (max === null || c.pire <= max) && retourPossible(c))
     // Égalité départagée par l'autre critère : à pire trajet égal la moyenne tranche, et l'inverse.
     .sort((x, y) => x[critere] - y[critere] || (critere === 'pire' ? x.moyenne - y.moyenne : x.pire - y.pire))
     .slice(0, limite)

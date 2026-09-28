@@ -37,6 +37,8 @@ export interface Etat {
   critere: Critere
   /** Vrai : les personnes d'une même adresse avec le même moyen comptent pour un seul trajet. */
   parFoyer: boolean
+  /** Vrai : aller-retour dans la journée, le dernier train du soir compte. Faux : séjour de plusieurs jours. */
+  journee: boolean
   grandeur: Grandeur
   /** Valeur maximale (km en vol d'oiseau), null = sans limite ; s'applique toujours au pire trajet. */
   max: number | null

@@ -9,7 +9,7 @@ import { garesVia } from './detail'
 import { coucheVoiture, indexPointsFrance, prixVoiture, valeurVoiture, type Couche, type ParametresPrix } from './voiture'
 import { mesureOiseau, type Mesure } from './villes'
 
-type Choix = Pick<Etat, 'mode' | 'grandeur'>
+type Choix = Pick<Etat, 'mode' | 'grandeur'> & Partial<Pick<Etat, 'journee'>>
 
 export const cleDepuis = (a: Ami): string => `${a.lat},${a.lon},${a.transport}`
 
@@ -75,7 +75,7 @@ export function creerMoteurVoiture(grille8: Grille, parametres: ParametresPrix, 
   return { grille8, index8: indexPointsFrance(grille8), parametres, version, couche: (id) => couches.get(id) }
 }
 
-function mesureTcPersonne(moteur: MoteurTc, grandeur: Choix['grandeur']): Mesure {
+function mesureTcPersonne(moteur: MoteurTc, grandeur: Choix['grandeur'], journee = false): Mesure {
   return (a, lat, lon) => {
     const t = versPointTc(moteur.horaires, moteur.depuis(a), a, lat, lon, moteur.gares(lat, lon))
     if (t === null) return null
@@ -83,7 +83,7 @@ function mesureTcPersonne(moteur: MoteurTc, grandeur: Choix['grandeur']): Mesure
       valeur: grandeur === 'temps' ? t.minutes : t.euros,
       precision: descriptionTrajet(t),
       retour: t.dernierRetour,
-      etapes: () => etapesTrajet(t, garesVia(moteur, t), 'l’arrivée'),
+      etapes: () => etapesTrajet(t, garesVia(moteur, t), 'l’arrivée', journee),
     }
   }
 }
@@ -105,11 +105,11 @@ function mesureVoiturePersonne(moteur: MoteurVoiture, grandeur: Choix['grandeur'
  * vol d'oiseau si les transports non plus ne sont pas disponibles (décision 1).
  */
 export function choisirMesure(c: Choix, moteurTc: MoteurTc | null, moteurVoiture: MoteurVoiture | null = null): Mesure {
-  if (c.mode === 'tc') return moteurTc ? mesureTcPersonne(moteurTc, c.grandeur) : mesureOiseau
+  if (c.mode === 'tc') return moteurTc ? mesureTcPersonne(moteurTc, c.grandeur, c.journee) : mesureOiseau
   if (c.mode === 'voiture') return moteurVoiture ? mesureVoiturePersonne(moteurVoiture, c.grandeur) : mesureOiseau
   if (c.mode === 'mixte') {
     const mesureVoit = moteurVoiture ? mesureVoiturePersonne(moteurVoiture, c.grandeur) : null
-    const mesureTr = moteurTc ? mesureTcPersonne(moteurTc, c.grandeur) : mesureOiseau
+    const mesureTr = moteurTc ? mesureTcPersonne(moteurTc, c.grandeur, c.journee) : mesureOiseau
     return (a, lat, lon) => {
       if (a.transport === 'voiture') return mesureVoit?.(a, lat, lon) ?? mesureTr(a, lat, lon)
       return mesureTr(a, lat, lon)

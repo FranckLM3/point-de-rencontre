@@ -7,6 +7,8 @@ export interface ContexteAide {
   max: number | null
   /** Réglage « Par foyer » : une même adresse ne compte qu'un trajet. */
   parFoyer?: boolean
+  /** Réglage « Aller-retour dans la journée » : le dernier train du soir compte. */
+  journee?: boolean
 }
 
 /** Ce que le repaire rend le plus petit, selon la grandeur et le critère. */
@@ -34,10 +36,14 @@ function paragraphes(unite: Unite, critere: Critere, c: ContexteAide): string[] 
   const foyer = c.parFoyer
     ? 'Les Crocos qui partent de la même adresse avec le même moyen comptent pour un seul trajet (réglage « Par foyer »).'
     : 'Chaque Croco coché compte un trajet, même à deux à la même adresse ; « Par foyer » n’en compte qu’un.'
+  const sejour = c.journee
+    ? 'Aller-retour dans la journée : les villes d’où quelqu’un ne pourrait pas rentrer avant minuit sont écartées, et le dernier train du retour est affiché.'
+    : 'Séjour de plusieurs jours : le dernier train du soir ne compte pas. L’option « Aller-retour dans la journée » le fait compter.'
   return [
     `Parmi les Crocos cochés, le repaire est la ville où ${OBJECTIF[unite][critere]}${limite}. Les deux suivantes sont les meilleures à 50 km au moins de la première ; « ça se vaut » signale un écart trop petit pour départager.`,
     MOYEN[c.mode],
     foyer,
+    sejour,
     ...moyens,
     'Le classement porte sur les communes de plus de 20000 habitants, calculées à leur centre. Les zones vertes, elles, couvrent toute la France par carrés de 4 km.',
   ]

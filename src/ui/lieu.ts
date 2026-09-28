@@ -76,13 +76,13 @@ export function rendreRechercheLieu(el: HTMLElement, lieu: Lieu | null, choisir:
   }
 }
 
-function resumeLieu(amis: Ami[], details: (Detail | null)[], unite: Unite): string {
+function resumeLieu(amis: Ami[], details: (Detail | null)[], unite: Unite, journee: boolean): string {
   if (amis.length === 0) return ''
   const valeurs = details.flatMap((d) => (d ? [d.valeur] : []))
   const ligne = valeurs.length < amis.length
     ? 'Pas de trajet pour tout le monde'
     : `Pire trajet ${valeur(Math.max(...valeurs), unite)} · <span class="valeur">Total ${valeur(valeurs.reduce((s, v) => s + v, 0), unite)}</span>`
-  return `<span class="ligne">${ligne}</span>${detailParAmi(amis, details, unite)}`
+  return `<span class="ligne">${ligne}</span>${detailParAmi(amis, details, unite, journee)}`
 }
 
 /** `details` : trajet de chaque personne (même ordre que `amis`), null si elle ne peut pas venir. */
@@ -93,6 +93,7 @@ export function rendreResultatLieu(
   details: (Detail | null)[],
   unite: Unite,
   retirer: () => void,
+  journee = false,
 ): void {
   if (!lieu) {
     el.innerHTML = ''
@@ -102,7 +103,7 @@ export function rendreResultatLieu(
     <article class="ville-carte lieu">
       <span class="sur-titre">Lieu testé</span>
       <h2>${echapper(lieu.label)}</h2>
-      ${resumeLieu(amis, details, unite)}
+      ${resumeLieu(amis, details, unite, journee)}
       <button type="button" class="pastille secondaire" data-action="retirer-lieu">Retirer le lieu</button>
     </article>`
   el.querySelector('button')!.addEventListener('click', () => retirer())

@@ -12,7 +12,7 @@ const descente = (s: Segment): string => (s.urbain ? `, descente à ${nomStation
  * métro où l'on monte), le train (durée, gares de correspondance), puis la fin du trajet jusqu'à
  * `arrivee`. `via` : gares intermédiaires du chemin (`garesVia`), vide si inconnues.
  */
-export function etapesTrajet(t: TrajetTc, via: string[], arrivee: string): string[] {
+export function etapesTrajet(t: TrajetTc, via: string[], arrivee: string, avecRetour = false): string[] {
   if (t.depart === null) {
     const u = t.acces.urbain
     return [u ? `${SUITE.transports(duree(t.acces.minutes))}, de ${nomStation(u, u.de)} à ${nomStation(u, u.vers)}` : descriptionTrajet(t)]
@@ -24,10 +24,12 @@ export function etapesTrajet(t: TrajetTc, via: string[], arrivee: string): strin
   const changements = t.correspondances > 0 ? ` · ${correspondances(t.correspondances)}` : ''
   etapes.push(`${duree(enTrain)} de train : ${nomCourt(t.depart)} → ${nomCourt(t.arrivee ?? '')}${par}${changements}`)
   if (t.sortie && Math.round(t.sortie.minutes) > 0) etapes.push(`${SUITE[t.sortie.mode](duree(t.sortie.minutes))} jusqu'à ${arrivee}${descente(t.sortie)}`)
-  etapes.push(
-    t.dernierRetour === null
-      ? 'Pas de retour le soir même : il faut dormir sur place'
-      : `Dernier retour vers ${heureDuJour(t.dernierRetour)}, depuis ${nomCourt(t.arrivee ?? '')}`,
-  )
+  if (avecRetour) {
+    etapes.push(
+      t.dernierRetour === null
+        ? 'Aucun retour le soir même : il faut dormir sur place'
+        : `Dernier retour vers ${heureDuJour(t.dernierRetour)}, depuis ${nomCourt(t.arrivee ?? '')}`,
+    )
+  }
   return etapes
 }

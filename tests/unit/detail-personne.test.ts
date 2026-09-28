@@ -16,7 +16,7 @@ const trajetTc: TrajetTc = {
 
 const rendre = (trajet: (a: Ami) => TrajetDetaille | null, cible: Lieu | null = lyon, choisis = ['f', 'm']): HTMLElement => {
   const el = document.createElement('div')
-  el.innerHTML = detailPersonnes({ amis: [franck, mo], cible, choisis: new Set(choisis), trajet, parametres: null })
+  el.innerHTML = detailPersonnes({ amis: [franck, mo], cible, choisis: new Set(choisis), trajet, parametres: null, journee: true })
   return el
 }
 
@@ -69,5 +69,5 @@ test('métro : stations de montée et de descente dans les étapes', () => {
 
 test('sans retour le soir même, la fiche le dit', () => {
   const el = rendre((a) => (a.id === 'f' ? { moyen: 'tc', trajet: { ...trajetTc, dernierRetour: null }, via: [] } : null))
-  expect(el.textContent).toContain('Pas de retour le soir même')
+  expect(el.textContent).toContain('Aucun retour le soir même')
 })

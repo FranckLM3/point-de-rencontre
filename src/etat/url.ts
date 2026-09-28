@@ -3,7 +3,7 @@ import { PERSONNES_PAR_VOITURE_DEFAUT, PERSONNES_PAR_VOITURE_MAX, PERSONNES_PAR_
 
 /** Plan 3 : chacun son moyen par défaut, moyenne, 4 h sans que personne ne dépasse ce maximum. */
 export const ETAT_DEFAUT: Etat = {
-  mode: 'mixte', critere: 'pire', grandeur: 'temps', max: null, parFoyer: false, selection: null, lieu: null,
+  mode: 'mixte', critere: 'pire', grandeur: 'temps', max: null, parFoyer: false, journee: false, selection: null, lieu: null,
   personnesParVoiture: PERSONNES_PAR_VOITURE_DEFAUT,
 }
 
@@ -13,6 +13,7 @@ export function estParDefaut(e: Etat): boolean {
     e.mode === ETAT_DEFAUT.mode &&
     e.critere === ETAT_DEFAUT.critere &&
     e.parFoyer === ETAT_DEFAUT.parFoyer &&
+    e.journee === ETAT_DEFAUT.journee &&
     e.grandeur === ETAT_DEFAUT.grandeur &&
     e.max === ETAT_DEFAUT.max &&
     e.selection === null &&
@@ -67,6 +68,7 @@ export function lireEtat(recherche: string): Etat {
     selection: sel === null ? null : sel.split(',').filter(Boolean),
     lieu: lireLieu(p.get('lieu')),
     parFoyer: p.get('foyer') === '1',
+    journee: p.get('journee') === '1',
     personnesParVoiture: lierPersonnesParVoiture(p),
   }
 }
@@ -78,6 +80,7 @@ export function ecrireEtat(e: Etat): string {
   if (e.mode !== 'oiseau') p.set('grandeur', e.grandeur)
   if (e.max !== null) p.set('max', String(e.max))
   if (e.parFoyer) p.set('foyer', '1')
+  if (e.journee) p.set('journee', '1')
   if (e.selection !== null) p.set('sel', e.selection.join(','))
   if (e.lieu) p.set('lieu', `${e.lieu.lat.toFixed(5)},${e.lieu.lon.toFixed(5)},${e.lieu.label}`)
   if (e.personnesParVoiture !== ETAT_DEFAUT.personnesParVoiture) p.set('parvoiture', String(e.personnesParVoiture))

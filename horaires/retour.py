@@ -48,7 +48,8 @@ def derniers_departs(index: Index, source: int, e: _Etiquettes, n: int) -> list[
     resultat = [AUCUN_RETOUR] * n
     for j in set(_un_depart(index, source, 0, e)):
         arrivee = min(e.par_train[j], e.libre[j])
-        if arrivee < JAMAIS:
+        # Une arrivée miroir au-delà de la borne voudrait dire partir avant minuit la veille : pas un retour.
+        if arrivee < JAMAIS and arrivee <= RENTRER_AVANT_S:
             resultat[j] = min(AUCUN_RETOUR - 1, (RENTRER_AVANT_S - arrivee) // 60 // PAS_MINUTES)
         e.par_train[j] = e.libre[j] = JAMAIS
     return resultat

@@ -296,6 +296,7 @@ function detailAuClic(s: Session, amis: Ami[]): string {
     cible,
     choisis: new Set(amisChoisis(s.amis, s.etat.selection).map((a) => a.id)),
     trajet: (a) => (cible ? trajetDetaille(s.etat.mode, s.tc.pret(), moteurVoiture, a, cible.lat, cible.lon) : null),
+    journee: s.etat.journee,
     parametres: moteurVoiture?.parametres ?? null,
   })
 }
@@ -330,10 +331,10 @@ function rendrePanneau(s: Session, choisis: Ami[], calculables: Ami[], mesure: M
     choisirVille(s, choisis, r.classee)
     s.carte.centrerSur(r.classee.ville.lat, r.classee.ville.lon)
     fermerVolet()
-  }, critere, { mode, max, parFoyer: s.etat.parFoyer })
+  }, critere, { mode, max, parFoyer: s.etat.parFoyer, journee: s.etat.journee })
   const details = lieu ? choisis.map((a) => mesure(a, lieu.lat, lieu.lon)) : []
-  rendreResultatLieu($('#resultat-lieu'), lieu, choisis, details, unite, () => retirerLieu(s))
-  rendreVilles($('#villes'), { villes, amis: calculables, nbPersonnes: s.amis.length, max, unite, mode, critere }, {
+  rendreResultatLieu($('#resultat-lieu'), lieu, choisis, details, unite, () => retirerLieu(s), s.etat.journee)
+  rendreVilles($('#villes'), { villes, amis: calculables, nbPersonnes: s.amis.length, max, unite, mode, critere, journee: s.etat.journee }, {
     choisir: (c) => choisirVille(s, choisis, c),
     ajouter: () => ajouter(s),
   })
@@ -389,7 +390,7 @@ function rendreCarte(s: Session, choisis: Ami[], calculables: Ami[], villesClass
 
 function afficher(s: Session, choisis: Ami[], mesure: Mesure, focus: string | null): void {
   const disponibles = calculables(s, choisis)
-  const villesClassees = classerVilles(s.villes, disponibles, mesure, s.etat.critere, s.etat.max, NB_VILLES)
+  const villesClassees = classerVilles(s.villes, disponibles, mesure, s.etat.critere, s.etat.max, NB_VILLES, s.etat.journee)
   const unite = uniteDe(s.etat.mode, s.etat.grandeur)
   s.repaires = meilleuresVilles(villesClassees, s.etat.critere, ecartEquivalent(unite))
   const meilleur = s.repaires[0]

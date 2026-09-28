@@ -615,7 +615,7 @@ test('ligne de retour : l’heure la plus contraignante et la personne concerné
     { valeur: 100, retour: 21 * 60 + 20 },
     { valeur: 140, retour: 19 * 60 + 40 },
   ]
-  rendreResultatLieu(el, marseille, amis, details, 'min', vi.fn())
+  rendreResultatLieu(el, marseille, amis, details, 'min', vi.fn(), true)
   expect(el.querySelector('.retour')!.textContent).toBe(`Dernier retour 19 h 40 pour ${amis[1]!.nom}.`)
 })
 
@@ -625,12 +625,29 @@ test('ligne de retour : personne qui ne peut pas rentrer le soir', () => {
     { valeur: 100, retour: 21 * 60 + 20 },
     { valeur: 300, retour: null },
   ]
-  rendreResultatLieu(el, marseille, amis, details, 'min', vi.fn())
+  rendreResultatLieu(el, marseille, amis, details, 'min', vi.fn(), true)
   expect(el.querySelector('.retour')!.textContent).toBe(`Pas de retour le soir même pour ${amis[1]!.nom}.`)
 })
 
 test('sans information de retour (voiture, vol d’oiseau), aucune ligne de retour', () => {
   const el = document.createElement('div')
-  rendreResultatLieu(el, marseille, amis, [{ valeur: 100 }, { valeur: 140 }], 'min', vi.fn())
+  rendreResultatLieu(el, marseille, amis, [{ valeur: 100 }, { valeur: 140 }], 'min', vi.fn(), true)
   expect(el.querySelector('.retour')).toBeNull()
+})
+
+test('séjour de plusieurs jours (par défaut) : le dernier train du soir n’est pas affiché', () => {
+  const el = document.createElement('div')
+  const details = [{ valeur: 100, retour: 21 * 60 + 20 }, { valeur: 140, retour: null }]
+  rendreResultatLieu(el, marseille, amis, details, 'min', vi.fn())
+  expect(el.querySelector('.retour')).toBeNull()
+})
+
+test('interrupteur « Aller-retour dans la journée » : bascule et reflète l’état', () => {
+  const el = document.createElement('div')
+  const changer = vi.fn()
+  rendreFiltres(el, ETAT_DEFAUT, 2, changer, vi.fn())
+  const bouton = el.querySelector<HTMLButtonElement>('[data-journee]')!
+  expect(bouton.getAttribute('aria-pressed')).toBe('false')
+  bouton.click()
+  expect(changer).toHaveBeenCalledWith({ journee: true })
 })
