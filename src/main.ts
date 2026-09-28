@@ -32,7 +32,7 @@ import { rendreAmis } from './ui/amis'
 import { amisChoisis, cleFocus, cleZones, libelleClic } from './ui/assemblage'
 import { creerCarte, type Carte } from './ui/carte'
 import { afficherConnexion, afficherNouveauMotDePasse } from './ui/connexion'
-import { prixEtiquette, selectionEtiquettes, valeurEtiquette } from './ui/etiquettes'
+import { selectionEtiquettes, valeurEtiquette } from './ui/etiquettes'
 import { ouvrirFicheAmi } from './ui/fiche-ami'
 import { rendreFiltres } from './ui/filtres'
 import { rendreLegende } from './ui/legende'
@@ -43,9 +43,8 @@ import { mascotteCroco } from './ui/mascotte'
 import { rendreRepaire, type Repaire } from './ui/repaire'
 
 const NB_VILLES = 20
-/** Nombre de grandes villes (population décroissante) offertes en renfort aux étiquettes de la carte (D3). */
-const NB_GRANDES_VILLES = 40
-const MAX_ETIQUETTES = 32
+/** Seules les meilleures villes du groupe sont nommées sur la carte (2026-09-28). */
+const MAX_ETIQUETTES = 3
 const TEXTE_CHARGEMENT = 'Chargement de la carte…'
 const TEXTE_HORAIRES = 'Chargement des horaires…'
 const TEXTE_VOITURE = 'Chargement de la voiture…'
@@ -99,8 +98,6 @@ interface Session {
   cleZones: string | null
   /** Résumé du meilleur point, recalculé en même temps que les zones (même clé). */
   repaire: (Repaire & { lat: number; lon: number }) | null
-  /** Grandes villes (population décroissante), calculé une fois : renfort des étiquettes de la carte (D3). */
-  grandesVilles: Ville[]
   /** Ville choisie (carte de ville ou étiquette cliquée) : lignes vertes et bordure d'accent (D3). */
   villeChoisie: VilleClassee | null
 }
@@ -360,18 +357,10 @@ function calculerRepaire(s: Session, calculables: Ami[], meilleur: number): Sess
 function rendreEtiquettes(s: Session, choisis: Ami[], calculables: Ami[], villesClassees: VilleClassee[], mesure: Mesure): void {
   const { critere, mode, grandeur } = s.etat
   const unite = uniteDe(mode, grandeur)
-  const grandesClassees = classerVilles(s.grandesVilles, calculables, mesure, critere, null, NB_GRANDES_VILLES).sort(
-    (a, b) => b.ville.population - a.ville.population,
-  )
-  const candidats = selectionEtiquettes(villesClassees, grandesClassees, MAX_ETIQUETTES)
-  // Ligne de prix même quand le critère actif est le temps : mesure séparée, mais seulement point à
-  // point sur les quelques villes déjà retenues (pas de nouveau calcul de grille). Pas à vol d'oiseau.
-  const mesurePrix =
-    mode !== 'oiseau' && grandeur !== 'prix' ? choisirMesure({ mode, grandeur: 'prix' }, s.tc.pret(), voitureMoteur(s)) : null
-  const enrichis = candidats.map((c) => {
-    const prixCalc = mesurePrix ? evaluer(c.ville.ville, calculables, mesurePrix) : null
-    return { ...c, valeurAffichee: valeurEtiquette(c.ville, critere, unite), prix: prixCalc ? prixEtiquette(prixCalc, critere) : undefined }
-  })
+  const candidats = selectionEtiquettes(villesClassees, MAX_ETIQUETTES)
+  // Pas de ligne de prix sur la carte (2026-09-28) : les étiquettes masquaient le fond. Le prix
+  // reste dans la liste des villes, dans le lieu testé et dans la fiche d'une personne.
+  const enrichis = candidats.map((c) => ({ ...c, valeurAffichee: valeurEtiquette(c.ville, critere, unite) }))
   s.carte.etiquettes(enrichis, (v) => choisirVille(s, choisis, v))
 }
 
@@ -618,7 +607,6 @@ async function charger(carte: Carte, installer: (s: Session) => void): Promise<v
       recemment: null,
       cleZones: null,
       repaire: null,
-      grandesVilles: [...villes].sort((a, b) => b.population - a.population).slice(0, NB_GRANDES_VILLES),
       villeChoisie: null,
     }
     installer(s)

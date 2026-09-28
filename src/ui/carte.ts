@@ -40,8 +40,9 @@ const RAYON_LIEU = 8
 const RAYON_GRAPPE_PX = 26
 /** Sous cette largeur de fenêtre, moins d'étiquettes (lisibilité mobile, D3). */
 const SEUIL_MOBILE_ETIQUETTES = 600
-const MAX_ETIQUETTES = 32
-const MAX_ETIQUETTES_MOBILE = 16
+/** Étiquettes de villes dessinées au plus (les candidats sont déjà réduits par `selectionEtiquettes`). */
+const MAX_ETIQUETTES = 3
+const MAX_ETIQUETTES_MOBILE = 3
 /** Étiquettes de gares (nom court) : au plus 6 à la fois, pour ne pas encombrer la carte. */
 const MAX_ETIQUETTES_GARES = 6
 const RAYON_GARE = 4
@@ -188,7 +189,7 @@ export function creerCarte(element: HTMLElement): Carte {
     const placees: { placement: PlacementEtiquette; c: EtiquetteVille }[] = []
     for (const [i, c] of candidats.slice(0, limite).entries()) {
       const pt = carte.latLngToLayerPoint([c.ville.ville.lat, c.ville.ville.lon])
-      const hauteur = c.prix ? 56 : 40
+      const hauteur = 40
       const largeur = Math.max(72, c.ville.ville.nom.length * 7 + 24)
       // La pointe s'appuie sur le point visé, décalée vers le haut si un marqueur de personne
       // ou une grappe gêne (D9) ; l'étiquette est omise plutôt que dessinée cachée derrière lui.
@@ -205,7 +206,7 @@ export function creerCarte(element: HTMLElement): Carte {
       el.tabIndex = -1
       el.style.left = `${p.placement.x}px`
       el.style.top = `${p.placement.y}px`
-      el.innerHTML = `<span class="nom">${echapper(p.c.ville.ville.nom)}</span><span class="valeur">${echapper(p.c.valeurAffichee ?? '')}</span>${p.c.prix ? `<span class="prix">${echapper(p.c.prix)}</span>` : ''}`
+      el.innerHTML = `<span class="nom">${echapper(p.c.ville.ville.nom)}</span><span class="valeur">${echapper(p.c.valeurAffichee ?? '')}</span>`
       el.addEventListener('click', () => choisir(p.c.ville))
       paneEtiquettes.append(el)
     }

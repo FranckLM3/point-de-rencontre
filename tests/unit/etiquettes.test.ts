@@ -4,7 +4,6 @@ import type { Ville } from '../../src/types'
 import {
   eviterCollisions,
   placerEtiquette,
-  prixEtiquette,
   selectionEtiquettes,
   valeurEtiquette,
   type BoiteEtiquette,
@@ -23,39 +22,30 @@ const classee = (nom: string, pire: number, population = 1): VilleClassee => ({
 
 test('selectionEtiquettes : les villes classées passent en premier, dans leur ordre', () => {
   const classees = [classee('Dijon', 100), classee('Lyon', 150), classee('Nantes', 200)]
-  const r = selectionEtiquettes(classees, [], 10)
+  const r = selectionEtiquettes(classees, 10)
   expect(r.map((e) => e.ville.ville.nom)).toEqual(['Dijon', 'Lyon', 'Nantes'])
 })
 
 test('selectionEtiquettes : la première ville classée est marquée « meilleure »', () => {
   const classees = [classee('Dijon', 100), classee('Lyon', 150)]
-  const r = selectionEtiquettes(classees, [], 10)
+  const r = selectionEtiquettes(classees, 10)
   expect(r[0]!.meilleure).toBe(true)
   expect(r[1]!.meilleure).toBe(false)
 })
 
-test('selectionEtiquettes : comble avec les grandes villes, dans l’ordre fourni, sans doublon', () => {
-  const classees = [classee('Dijon', 100)]
-  const grandes = [classee('Paris', 300, 2_000_000), classee('Dijon', 100, 150_000), classee('Lyon', 250, 500_000)]
-  const r = selectionEtiquettes(classees, grandes, 10)
-  expect(r.map((e) => e.ville.ville.nom)).toEqual(['Dijon', 'Paris', 'Lyon'])
+test('selectionEtiquettes : sans doublon de nom', () => {
+  const r = selectionEtiquettes([classee('Lyon', 100), classee('Lyon', 150), classee('Dijon', 200)], 10)
+  expect(r.map((e) => e.ville.ville.nom)).toEqual(['Lyon', 'Dijon'])
 })
 
 test('selectionEtiquettes : respecte la limite maximale', () => {
   const classees = Array.from({ length: 5 }, (_, i) => classee(`V${i}`, i))
-  const r = selectionEtiquettes(classees, [], 3)
+  const r = selectionEtiquettes(classees, 3)
   expect(r).toHaveLength(3)
 })
 
-test('selectionEtiquettes : les grandes villes ne comptent pas comme « meilleure »', () => {
-  const classees = [classee('Dijon', 100)]
-  const grandes = [classee('Paris', 300, 2_000_000)]
-  const r = selectionEtiquettes(classees, grandes, 10)
-  expect(r.find((e) => e.ville.ville.nom === 'Paris')!.meilleure).toBe(false)
-})
-
 test('selectionEtiquettes : liste vide', () => {
-  expect(selectionEtiquettes([], [], 10)).toEqual([])
+  expect(selectionEtiquettes([], 10)).toEqual([])
 })
 
 test('valeurEtiquette : suit le critère actif (pire ou moyenne) et l’unité', () => {
@@ -65,10 +55,6 @@ test('valeurEtiquette : suit le critère actif (pire ou moyenne) et l’unité',
   expect(valeurEtiquette(c, 'pire', 'km')).toBe('220 km')
 })
 
-test('prixEtiquette : ligne approchée avec le symbole ≈', () => {
-  const c = { ville: ville('Dijon'), parAmi: [], total: 0, moyenne: 38, pire: 40 }
-  expect(prixEtiquette(c, 'pire')).toBe('≈ 40 €')
-})
 
 const boite = (id: string, x: number, y: number, largeur = 40, hauteur = 16): BoiteEtiquette => ({ id, x, y, largeur, hauteur })
 
